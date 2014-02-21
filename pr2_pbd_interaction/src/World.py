@@ -73,6 +73,21 @@ class WorldObject:
         '''Function to decrese object index'''
         self.index -= 1
 
+class Legend:
+    '''Key for showing what various Rviz GUI objects and colors represent, such
+    as the different colors for gripper markers.'''
+
+    def __init__(self):
+        self.marker_pub = rospy.Publisher('visualization_marker', Marker)
+        marker = Marker(type=Marker.SPHERE, id=42424242,
+            lifetime=rospy.Duration(60),
+            scale=Vector3(1,1,1),
+            header=Header(frame_id='base_link'), # Seems like this will change
+            color=ColorRGBA(1.0, 0.0, 0.0, 0.5),
+            pose=Pose(Point(0,0,0), Quaternion(0,0,0,1)),
+            text='Legend')
+        self.marker_pub.publish(marker)
+        rospy.loginfo("Published legend")
 
 class World:
     '''Object recognition and localization related stuff'''
@@ -103,6 +118,10 @@ class World:
         # The following is to get the table information
         rospy.Subscriber('tabletop_segmentation_markers',
                          Marker, self.receieve_table_marker)
+
+        # NOTE(max): Testing to get a legend... who knows whether this will
+        # work...
+        legend = Legend()
 
     def _reset_objects(self):
         '''Function that removes all objects'''

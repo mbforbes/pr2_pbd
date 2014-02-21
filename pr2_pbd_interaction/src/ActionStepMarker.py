@@ -25,6 +25,7 @@ class ActionStepMarker:
     _ref_object_list = None
     _ref_names = None
     _marker_click_cb = None
+    _total_n_markers = 0
 
     def __init__(self, step_number, arm_index, action_step,
                  marker_click_cb):
@@ -483,6 +484,84 @@ class ActionStepMarker:
             control.orientation_mode = InteractiveMarkerControl.FIXED
         return control
 
+    @staticmethod
+    def set_total_n_markers(total_n_markers):
+        ActionStepMarker._total_n_markers = total_n_markers
+
+    def get_marker_color(self):
+        '''Makes marker colors in a gradient according to the progression set in
+        _get_rgb_from_abs_pos() (below).
+
+        returns (r,g,b) tuple, each from 0.0 to 1.0
+        '''
+        total = ActionStepMarker._total_n_markers
+        # These are 1-based indexing; turn them into 0-based indexing.
+        idx = self.step_number - 1
+
+        # First calculate "absolute" color position, plotting on a 0.0 - 1.0
+        # scale. This only applies if there's more than one step; otherwise we
+        # set to 0.0 (though it could be anything, as it just gets multiplied
+        # by 0, as the idx must be 0 if there's only one step total).
+        abs_step_size = 1.0 / float(total - 1) if total > 1 else 0.0
+        abs_pos = abs_step_size * idx
+
+        # Then, use our helper method to turn this into an RGB value.
+        return self._get_rgb_from_abs_pos(abs_pos)
+
+
+    def _get_rgb_from_abs_pos(self, abs_pos):
+        '''Turns abs_pos, a float from 0.0 to 1.0 inclusive, into an rgb value
+        of the range currently programmed. The progression is as follows (in
+        order to avoid green hues, which could be confused with the objects),
+        by gradient "bucket" step:
+        - 0 yellow (start) -> red
+        - 1 red -> purple
+        - 2 purple -> blue
+        - 3 blue -> cyan (end)
+
+        Returns (r,g,b) tuple of floats, each from 0.0 to 1.0 inclusive.'''
+        # Bucket settings (make constant)
+        n_buckets = 4
+        bucket_size = 1.0 / n_buckets
+
+        # Calculate which "bucket" it falls into; we'll fix the last bucket
+        # case later (where it ends up in a bucket that doesn't exist).
+        bucket = int(abs_pos / (bucket_size))
+        bucket_pos = (abs_pos % (bucket_size)) / bucket_size
+
+        # Fix last step case
+        if bucket == 4:
+            bucket = 3
+            bucket_pos = 1.0
+
+        # Now translate to colors; todo later implement with better data
+        # structure.
+        r = 0.0
+        g = 0.0
+        b = 0.0
+        if bucket == 0:
+            # yellow -> red
+            r = 1.0 
+            g = 1.0 - bucket_pos
+        elif bucket == 1:
+            # red -> purple
+            r = 1.0
+            b = bucket_pos
+        elif bucket == 2:
+            r = 1.0 - bucket_pos
+            b = 1.0
+        elif bucket == 3:
+            g = bucket_pos
+            b = 1.0
+        else:
+            # Set white as error color
+            rospy.logwarn("Bad color gradient; bucket " + str(bucket) +
+                " and bucket position " + str(bucket_pos))
+            r,g,b = 1.0, 1.0, 1.0
+
+        return (r,g,b)
+
+
     def _make_mesh_marker(self):
         '''Creates a mesh marker'''
         mesh = Marker()
@@ -492,7 +571,13 @@ class ActionStepMarker:
         mesh.scale.y = 1.0
         mesh.scale.z = 1.0
         if self._is_reachable():
-            mesh.color = ColorRGBA(1.0, 0.5, 0.0, 0.6)
+            # Original: some kinda orange
+            # r,g,b = 1.0, 0.5, 0.0
+
+            # New: rainbow! See method comment for details.
+            r,g,b = self.get_marker_color()
+
+            mesh.color = ColorRGBA(r, g, b, 0.6)
         else:
             mesh.color = ColorRGBA(0.5, 0.5, 0.5, 0.6)
         return mesh
