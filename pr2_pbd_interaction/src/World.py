@@ -80,13 +80,15 @@ class Legend:
     def __init__(self):
         self.marker_pub = rospy.Publisher('visualization_marker', Marker)
         marker = Marker(type=Marker.SPHERE, id=42424242,
-            lifetime=rospy.Duration(60),
+            #lifetime=rospy.Duration(1), # Assuming nothing makes infinite
             scale=Vector3(1,1,1),
             header=Header(frame_id='base_link'), # Seems like this will change
             color=ColorRGBA(1.0, 0.0, 0.0, 0.5),
-            pose=Pose(Point(0,0,0), Quaternion(0,0,0,1)),
+            pose=Pose(Point(1,0,0), Quaternion(0,0,0,1)),
             text='Legend')
-        self.marker_pub.publish(marker)
+        # NOTE(max): Publishing once doesn't work, but publishing infinitely
+        # or sleeping before publishing does. Strange.
+        # self.marker_pub.publish(marker)
         rospy.loginfo("Published legend")
 
 class World:
