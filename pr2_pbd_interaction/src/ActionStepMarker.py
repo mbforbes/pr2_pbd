@@ -362,10 +362,21 @@ class ActionStepMarker:
                         color=ColorRGBA(1.0, 0.8, 0.2, 0.5),
                         points=[pose.position, Point(0, 0, 0)]))
 
+        # Calculate text position so that they "orbit" around the marker;
+        # this is done so that poses in identical or similar positions
+        # have non-overlapping text. Note that to do this without moving
+        # the text around as the camera is moved, we assume that the viewer
+        # is always looking directly at the robot, so we assume the x dimension
+        # is constant and "orbin" in the y-z plane.
+        n_orbitals = 8 # this should be a constant
+        offset = 0.15 # this should be a constant        
+        orbital = (self.step_number - 1) % n_orbitals # - 1 to make 0-based
+        angle_rad = (float(orbital) / n_orbitals) * (-2 * numpy.pi) + \
+            (numpy.pi / 2.0) # start above, at pi/2 (90 degrees)
         text_pos = Point()
         text_pos.x = pose.position.x
-        text_pos.y = pose.position.y
-        text_pos.z = pose.position.z + 0.1
+        text_pos.y = pose.position.y + numpy.cos(angle_rad) * offset
+        text_pos.z = pose.position.z + numpy.sin(angle_rad) * offset
         r,g,b = self.get_marker_color()
         menu_control.markers.append(Marker(type=Marker.TEXT_VIEW_FACING,
                         id=self.get_uid(), scale=Vector3(0, 0, 0.05),
