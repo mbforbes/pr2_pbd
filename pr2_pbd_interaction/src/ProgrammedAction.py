@@ -6,7 +6,7 @@ roslib.load_manifest('pr2_pbd_interaction')
 # Generic libraries
 import threading
 import os
-from geometry_msgs.msg import Vector3, Pose
+from geometry_msgs.msg import Vector3, Pose, Point
 from visualization_msgs.msg import MarkerArray, Marker
 
 # ROS Libraries
@@ -71,22 +71,29 @@ class ProgrammedAction:
     def _get_link(self, arm_index, to_index):
         '''Returns a marker representing a link b/w two
         consecutive action steps'''
-        if (arm_index == 0):
-            start = self.r_markers[to_index - 1].get_absolute_position(
-                                                            is_start=True)
-            end = self.r_markers[to_index].get_absolute_position(
-                                                            is_start=False)
-        else:
-            start = self.l_markers[to_index - 1].get_absolute_position(
-                                                            is_start=True)
-            end = self.l_markers[to_index].get_absolute_position(
-                                                            is_start=False)
+        # Grab the start/end point via the two markers
+        markers = self.r_markers if arm_index == 0 else self.l_markers
+        start = markers[to_index - 1].get_absolute_position(is_start=True)
+        end = markers[to_index].get_absolute_position(is_start=False)
+
+        # Scale the arrow
+        scale = 0.8 # should be constant; shortening arrows to see ends
+        # NOTE(max): Check if we should worry about object creation / garbage
+        # collection, and if so just turn these intermediate objects into
+        # locals.
+        diff = Point(end.x - start.x, end.y - start.y, end.z - start.z)
+        diff_scaled = Point(diff.x * scale, diff.y * scale, diff.z * scale)
+        new_start = Point(end.x - diff_scaled.x, end.y - diff_scaled.y,
+            end.z - diff_scaled.z)
+        new_end = Point(start.x + diff_scaled.x, start.y + diff_scaled.y,
+            start.z + diff_scaled.z)
 
         return Marker(type=Marker.ARROW, id=(2 * to_index + arm_index),
                       lifetime=rospy.Duration(2),
                       scale=Vector3(0.01, 0.03, 0.01),
                       header=Header(frame_id='base_link'),
-                      color=ColorRGBA(0.8, 0.8, 0.8, 0.3), points=[start, end])
+                      color=ColorRGBA(0.8, 0.8, 0.5, 0.4),
+                      points=[new_start, new_end])
 
     def update_objects(self, object_list):
         '''Updates the object list for all action steps'''
