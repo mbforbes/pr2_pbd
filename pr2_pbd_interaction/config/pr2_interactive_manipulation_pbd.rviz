@@ -847,7 +847,7 @@ Visualization Manager:
       Zoom Factor: 1
   Enabled: true
   Global Options:
-    Background Color: 48; 48; 48
+    Background Color: 175; 175; 175
     Fixed Frame: /odom_combined
   Name: root
   Tools:
