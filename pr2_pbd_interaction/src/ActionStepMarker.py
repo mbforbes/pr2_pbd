@@ -366,10 +366,11 @@ class ActionStepMarker:
         text_pos.x = pose.position.x
         text_pos.y = pose.position.y
         text_pos.z = pose.position.z + 0.1
+        r,g,b = self.get_marker_color()
         menu_control.markers.append(Marker(type=Marker.TEXT_VIEW_FACING,
-                        id=self.get_uid(), scale=Vector3(0, 0, 0.03),
-                        text='Step' + str(self.step_number),
-                        color=ColorRGBA(0.0, 0.0, 0.0, 0.5),
+                        id=self.get_uid(), scale=Vector3(0, 0, 0.05),
+                        text='Step ' + str(self.step_number),
+                        color=ColorRGBA(r, g, b, 1.0),
                         header=Header(frame_id=frame_id),
                         pose=Pose(text_pos, Quaternion(0, 0, 0, 1))))
 
