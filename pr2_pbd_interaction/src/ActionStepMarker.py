@@ -359,7 +359,7 @@ class ActionStepMarker:
                         lifetime=rospy.Duration(2),
                         scale=Vector3(0.02, 0.03, 0.04),
                         header=Header(frame_id=frame_id),
-                        color=ColorRGBA(1.0, 0.8, 0.2, 0.5),
+                        color=ColorRGBA(2.0, 0.8, 0.0, 0.6),
                         points=[pose.position, Point(0, 0, 0)]))
 
         # Calculate text position so that they "orbit" around the marker;
