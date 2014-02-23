@@ -404,7 +404,7 @@ class World:
                             lifetime=rospy.Duration(2),
                             scale=dimensions,
                             header=Header(frame_id='base_link'),
-                            color=ColorRGBA(0.8, 0.0, 0.4, 0.4),
+                            color=ColorRGBA(0.5, 0.5, 0.5, 0.4),
                             pose=pose)
         button_control.markers.append(object_marker)
         text_pos = Point()
