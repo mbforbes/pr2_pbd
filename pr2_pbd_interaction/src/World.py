@@ -133,7 +133,17 @@ class World:
     def mock_table(self):
         '''Testing for right now, but should add a fake object to the
         interaction / rviz.'''
-        pass
+        # This is mocked from the first data point collected
+        position = Point(0.681273249847, 0.0500235402375, 0.555035150217)
+        orientation = Quaternion(-0.000624796068025, -0.0230785640599,
+            1.44232405509e-05, 0.999733459129)
+        pose = Pose(position, orientation)
+        dimensions = Vector3(0.635490983725, 1.12122958899, 0.01)
+
+        # This is straight-up copy-pasted from receive_table_marker().
+        self.surface = World._get_surface_marker(pose, dimensions)
+        self._im_server.insert(self.surface, self.marker_feedback_cb)
+        self._im_server.applyChanges()
 
     def _reset_objects(self):
         '''Function that removes all objects'''
