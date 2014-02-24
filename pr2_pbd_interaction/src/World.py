@@ -168,7 +168,8 @@ class World:
                     if (cluster_pose != None):
                         rospy.loginfo('Adding unrecognized object with\n' +
                             '- pose:\n' + World.pose_to_string(cluster_pose) +
-                            '- dimensions: ' + vector_to_string(bbox.box_dims) +
+                            '- dimensions: ' + World.vector_to_string(
+                                bbox.box_dims) +
                             '- in ref frame: ' + str(bbox.pose.header.frame_id))
                         self._add_new_object(cluster_pose, # pose
                             bbox.box_dims, # dimensions
