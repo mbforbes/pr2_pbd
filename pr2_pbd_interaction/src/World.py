@@ -167,9 +167,9 @@ class World:
                     cluster_pose = bbox.pose.pose
                     if (cluster_pose != None):
                         rospy.loginfo('Adding unrecognized object with\n' +
-                            '- pose:\n' + World.pose_to_string(cluster_pose) +
+                            '- pose:' + World.pose_to_string(cluster_pose) +
                             '- dimensions: ' + World.vector_to_string(
-                                bbox.box_dims) +
+                                bbox.box_dims) + '\n' +
                             '- in ref frame: ' + str(bbox.pose.header.frame_id))
                         self._add_new_object(cluster_pose, # pose
                             bbox.box_dims, # dimensions
@@ -515,14 +515,16 @@ class World:
     @staticmethod
     def pose_to_string(pose):
         '''For printing a pose to stdout'''
-        return '\t- position: ' + World.vector_to_string(pose.position) + '\n'+\
-            '\t-orientation: ' + World.vector_to_string(pose.orientation) + '\n'
+        return '\t- position:   ' + World.vector_to_string(pose.position) + \
+            '\n\t- orientation: ' + World.vector_to_string(pose.orientation) + \
+            '\n'
 
     @staticmethod
     def vector_to_string(vector_like):
         '''For printing something with x, y, z, and possibly w attributes to
         stdout, when we don't want a bunch of newlines. This returns a string of
-        the form "(x, y, z[, w])". We might want this when printing a:
+        the form "[x, y, z[, w]]" (w optional). We might want this when printing
+        an object that is a:
          - Point (e.g. pose.position)
          - Quaternion (e.g. pose.orientation)
          - Vector3 (e.g. boudning box dimensions)
