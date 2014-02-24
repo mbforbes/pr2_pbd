@@ -88,21 +88,52 @@ class World:
         self.surface = None
         self._tf_broadcaster = TransformBroadcaster()
         self._im_server = InteractiveMarkerServer('world_objects')
-        bb_service_name = 'find_cluster_bounding_box'
-        rospy.wait_for_service(bb_service_name)
-        self._bb_service = rospy.ServiceProxy(bb_service_name,
-                                            FindClusterBoundingBox)
-        rospy.Subscriber('interactive_object_recognition_result',
-            GraspableObjectList, self.receive_object_info)
-        self._object_action_client = actionlib.SimpleActionClient(
-            'object_detection_user_command', UserCommandAction)
-        self._object_action_client.wait_for_server()
-        rospy.loginfo('Interactive object detection action ' +
-                      'server has responded.')
+
+        # NOTE(max): The following is for detecting "real" objects, so we're
+        # disabling it for now while we mock them.
+        # bb_service_name = 'find_cluster_bounding_box'
+        # rospy.wait_for_service(bb_service_name)
+        # self._bb_service = rospy.ServiceProxy(bb_service_name,
+        #                                     FindClusterBoundingBox)
+        # rospy.Subscriber('interactive_object_recognition_result',
+        #     GraspableObjectList, self.receive_object_info)
+        # self._object_action_client = actionlib.SimpleActionClient(
+        #     'object_detection_user_command', UserCommandAction)
+        # self._object_action_client.wait_for_server()
+        # rospy.loginfo('Interactive object detection action ' +
+        #               'server has responded.')
+
+        # NOTE(max): I made this method not do anything, but am keeping the call
+        # here as a reminder.
         self.clear_all_objects()
+
+        # NOTE(max): We remove the table-getting subscription as well.
         # The following is to get the table information
-        rospy.Subscriber('tabletop_segmentation_markers',
-                         Marker, self.receive_table_marker)
+        # rospy.Subscriber('tabletop_segmentation_markers',
+        #                 Marker, self.receive_table_marker)
+
+        # Mock table
+        self.mock_table()
+
+        # Mock objects
+        self.mock_objects()
+
+    def mock_objects(self):
+        '''Add fake objects to the interaction / rviz. Should eventually do this
+        smartly, i.e. w.r.t current test.'''
+        # Use hardcoded data for now; will load later.
+        position = Point(0.407702162213, 0.448435729551, 0.596100389957)
+        orientation = Quaternion(0.0, 0.0, 0.621998629232, 0.783018330075)
+        pose = Pose(position, orientation)
+        dimensions = Vector3(0.0885568181956, 0.0448812849838, 0.030891418457)
+        self._add_new_object(pose, # pose
+            dimensions, # dimensions
+            False) # is_recognized
+
+    def mock_table(self):
+        '''Testing for right now, but should add a fake object to the
+        interaction / rviz.'''
+        pass
 
     def _reset_objects(self):
         '''Function that removes all objects'''
@@ -545,7 +576,11 @@ class World:
                                         rospy.Time.now(), name, parent)
 
     def update_object_pose(self):
-        ''' Function to externally update an object pose'''
+        ''' Function to externally update an object pose. Returns bool of
+        success or failure'''
+        # NOTE(max): Mocking this for now
+        return True
+
         Response.perform_gaze_action(GazeGoal.LOOK_DOWN)
         while (Response.gaze_client.get_state() == GoalStatus.PENDING or
                Response.gaze_client.get_state() == GoalStatus.ACTIVE):
@@ -614,6 +649,11 @@ class World:
 
     def clear_all_objects(self):
         '''Removes all objects from the world'''
+        # NOTE(max): Mocking this as well; for now just don't do anything,
+        # though will need to once we get multiple tests with different mocked
+        # objects working...
+        pass
+
         goal = UserCommandGoal(UserCommandGoal.RESET, False)
         self._object_action_client.send_goal(goal)
         while (self._object_action_client.get_state() == GoalStatus.ACTIVE or
