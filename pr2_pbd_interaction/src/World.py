@@ -167,8 +167,8 @@ class World:
                     cluster_pose = bbox.pose.pose
                     if (cluster_pose != None):
                         rospy.loginfo('Adding unrecognized object with\n' +
-                            '- pose: ' + World.pose_to_string(cluster_pose) +
-                            '- dimensions: ' + str(bbox.box_dims) + 
+                            '- pose:\n' + World.pose_to_string(cluster_pose) +
+                            '- dimensions: ' + vector_to_string(bbox.box_dims) +
                             '- in ref frame: ' + str(bbox.pose.header.frame_id))
                         self._add_new_object(cluster_pose, # pose
                             bbox.box_dims, # dimensions
@@ -514,11 +514,23 @@ class World:
     @staticmethod
     def pose_to_string(pose):
         '''For printing a pose to stdout'''
-        return ('\t - position: ' + str(pose.position.x) + ", " +
-                str(pose.position.y) + ', ' + str(pose.position.z) + '\n' +
-                '\t - orientation: ' + str(pose.orientation.x) + ", " +
-                str(pose.orientation.y) + ', ' + str(pose.orientation.z) +
-                ', ' + str(pose.orientation.w) + '\n')
+        return '\t- position: ' + vector_to_string(pose.position) + '\n' +
+            '\t-orientation: ' + vector_to_string(pose.orientation) + '\n'
+
+    @staticmethod
+    def vector_to_string(vector_like):
+        '''For printing something with x, y, z, and possibly w attributes to
+        stdout, when we don't want a bunch of newlines. This returns a string of
+        the form "(x, y, z[, w])". We might want this when printing a:
+         - Point (e.g. pose.position)
+         - Quaternion (e.g. pose.orientation)
+         - Vector3 (e.g. boudning box dimensions)
+         - etc.
+         '''
+        # TODO(max): Actually write this.
+        w = '' if not hasattr(vector_like, 'w') else ', ' + str(vector_like.w)
+        return '(' + str(vector_like.x) + ', ' + str(vector_like.y) + ', ' +
+            str(vector_like.z) + w + ')'
 
     def _publish_tf_pose(self, pose, name, parent):
         ''' Publishes a TF for object pose'''
