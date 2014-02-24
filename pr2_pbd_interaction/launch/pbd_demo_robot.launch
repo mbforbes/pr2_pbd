@@ -1,9 +1,10 @@
 <launch>
 
   <!-- This is the main state machine for interaction and PbD -->
-  <arg name="isReload" value="False" />
+  <arg name="isReload" value="True" />
   <arg name="dataRoot" value="$(env HOME)" />
-  <arg name="experimentNumber" value="3" />
+  <!-- NOTE(max): 10s are for testing. -->
+  <arg name="experimentNumber" value="10" />
   
   <!-- This runs the interactive manipulation -->
   
