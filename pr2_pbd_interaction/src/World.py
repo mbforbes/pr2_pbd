@@ -133,6 +133,15 @@ class World:
                 pose.position.x = pose.position.x + xmin + depth / 2
                 pose.position.y = pose.position.y + ymin + width / 2
                 dimensions = Vector3(depth, width, 0.01)
+
+                # NOTE(max): At this point we're going to print the pose and
+                # dimensions we get so we can mock them later.
+                rospy.loginfo('Table marker attributes:' +
+                    '\npose:        ' + World.vector_to_string(pose.position) +
+                    '\norientation: ' +
+                    World.vector_to_string(pose.orientation) +
+                    '\ndimensions:  ' + World.vector_to_string(dimensions))
+
                 self.surface = World._get_surface_marker(pose, dimensions)
                 self._im_server.insert(self.surface,
                                      self.marker_feedback_cb)
