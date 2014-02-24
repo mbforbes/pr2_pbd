@@ -40,6 +40,8 @@ class ActionIcon(QtGui.QGridLayout):
         path = path[0:len(path)-1]
         self.notSelectedIconPath = path + '/icons/actions0.png'
         self.selectedIconPath = path + '/icons/actions1.png'
+        self.notSelectedDoneIconPath = path + '/icons/actions0_done.png'
+        self.selectedDoneIconPath = path + '/icons/actions1_done.png'
         self.selected = True
         self.actionIconWidth = 50
         self.index = index
@@ -103,17 +105,36 @@ class PbDGUI(Plugin):
         self.currentAction = -1
         self.currentStep = -1
 
+        # Settings
+        self.n_tasks = 3 # How many different action groups we'll have
+        task_names = ['Pick and Place', 'Constrained Pick and Place',
+            'Multi-Object Move']
+        self.n_tests = 10 # How many 'actions' we'll have per task
+
+        # Main box
         allWidgetsBox = QtGui.QVBoxLayout()
-        actionBox = QGroupBox('Actions', self._widget)
-        self.actionGrid = QtGui.QGridLayout()
-        self.actionGrid.setHorizontalSpacing(0)
-        for i in range(6):
-            self.actionGrid.addItem(QtGui.QSpacerItem(90, 90), 0, i, QtCore.Qt.AlignCenter)
-            self.actionGrid.setColumnStretch(i, 0)
-        self.actionIcons = dict()
-        actionBoxLayout = QtGui.QHBoxLayout()
-        actionBoxLayout.addLayout(self.actionGrid)
-        actionBox.setLayout(actionBoxLayout)
+
+        # TODO(max): Fix all references to:
+        # - actionBox (has become task_boxes)
+        # - self.actionGrid (has become self.action_grids)
+        # - self.actionIcons (has become self.action_icon_sets)
+
+        # Create one box per task
+        task_boxes = []
+        self.action_grids = []
+        self.action_icon_sets = []
+        for i in range(self.n_tasks):
+            task_boxes.append(QGroupBox(task_names[i], self._widget))
+            grid = QtGui.QGridLayout()
+            self.action_grids.append(QtGui.QGridLayout())
+            self.action_grids[i].setHorizontalSpacing(0)
+            for j in range(self.n_tests):
+                self.action_grids[i].addItem(QtGui.QSpacerItem(90, 90), 0, j, QtCore.Qt.AlignCenter)
+                self.action_grids[i].setColumnStretch(j, 0)
+            self.action_icon_sets.append(dict())
+            actionBoxLayout = QtGui.QHBoxLayout()
+            actionBoxLayout.addLayout(self.action_grids[i])
+            task_boxes[i].setLayout(actionBoxLayout)
         
         actionButtonGrid = QtGui.QHBoxLayout()
         actionButtonGrid.addWidget(self.create_button(
@@ -183,7 +204,11 @@ class PbDGUI(Plugin):
         speechBox.addWidget(self.speechLabel)
         speechGroupBox.setLayout(speechBox)
 
-        allWidgetsBox.addWidget(actionBox)
+        # add the three action sections
+        for i in range(self.n_tasks):
+            allWidgetsBox.addWidget(task_boxes[i])
+
+        # action button
         allWidgetsBox.addLayout(actionButtonGrid)
         
         allWidgetsBox.addWidget(self.stepsBox)
@@ -258,8 +283,7 @@ class PbDGUI(Plugin):
 
     def update_state(self, state):
         qWarning('Received new state')
-        
-        n_actions = len(self.actionIcons.keys())
+        n_actions = self.n_actions()
         if n_actions < state.n_actions:
             for i in range(n_actions, state.n_actions):
                 self.new_action()
@@ -331,31 +355,34 @@ class PbDGUI(Plugin):
             self.r_model.invisibleRootItem().removeRows(0, n_steps)
 
     def n_actions(self):
-        return len(self.actionIcons.keys())
+        return sum([len(a.keys()) for a in self.action_icon_sets])
 
     def new_action(self):
-        nColumns = 6
+        nColumns = self.n_tests
         actionIndex = self.n_actions()
-        for key in self.actionIcons.keys():
-             self.actionIcons[key].selected = False
-             self.actionIcons[key].updateView()
+        taskIdx = actionIndex / self.n_tests
+        if taskIdx >= self.n_tasks:
+            rospy.logwarn('Cannot add more actions; this study is fixed!')
+            return
+        for s in self.action_icon_sets:
+            for key, icon in s.iteritems():
+               icon.selected = False
+               icon.updateView()
         actIcon = ActionIcon(self._widget, actionIndex, self.action_pressed)
-        self.actionGrid.addLayout(actIcon, int(actionIndex/nColumns), 
-                                  actionIndex%nColumns)
-        self.actionIcons[actionIndex] = actIcon
+        actionGrid = self.action_grids[taskIdx]
+        actionGrid.addLayout(actIcon, actionIndex / nColumns,
+            actionIndex % nColumns)
+        self.action_icon_sets[taskIdx][actionIndex] = actIcon
 
     def step_pressed(self, step_index):
         gui_cmd = GuiCommand(GuiCommand.SELECT_ACTION_STEP, step_index)
         self.gui_cmd_publisher.publish(gui_cmd)
 
     def action_pressed(self, actionIndex, isPublish=True):
-        for i in range(len(self.actionIcons.keys())):
-            key = self.actionIcons.keys()[i]
-            if key == actionIndex:
-                 self.actionIcons[key].selected = True
-            else:
-                 self.actionIcons[key].selected = False
-            self.actionIcons[key].updateView()
+        for s in self.action_icon_sets:
+            for key, icon in s.iteritems():
+                icon.selected = (key == actionIndex)
+                icon.updateView()
         self.currentAction = actionIndex
         self.stepsBox.setTitle('Steps for Action ' + str(self.currentAction+1))
         if isPublish:

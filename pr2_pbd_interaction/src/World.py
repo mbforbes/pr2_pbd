@@ -73,6 +73,23 @@ class WorldObject:
         '''Function to decrese object index'''
         self.index -= 1
 
+class Legend:
+    '''Key for showing what various Rviz GUI objects and colors represent, such
+    as the different colors for gripper markers.'''
+
+    def __init__(self):
+        self.marker_pub = rospy.Publisher('visualization_marker', Marker)
+        marker = Marker(type=Marker.SPHERE, id=42424242,
+            #lifetime=rospy.Duration(1), # Assuming nothing makes infinite
+            scale=Vector3(1,1,1),
+            header=Header(frame_id='base_link'), # Seems like this will change
+            color=ColorRGBA(1.0, 0.0, 0.0, 0.5),
+            pose=Pose(Point(1,0,0), Quaternion(0,0,0,1)),
+            text='Legend')
+        # NOTE(max): Publishing once doesn't work, but publishing infinitely
+        # or sleeping before publishing does. Strange.
+        # self.marker_pub.publish(marker)
+        rospy.loginfo("Published legend")
 
 class World:
     '''Object recognition and localization related stuff'''
@@ -144,6 +161,10 @@ class World:
         self.surface = World._get_surface_marker(pose, dimensions)
         self._im_server.insert(self.surface, self.marker_feedback_cb)
         self._im_server.applyChanges()
+
+        # NOTE(max): Testing to get a legend... who knows whether this will
+        # work...
+        legend = Legend()
 
     def _reset_objects(self):
         '''Function that removes all objects'''
@@ -406,8 +427,8 @@ class World:
         text_pos.z = (World.objects[index].object.pose.position.z +
                      World.objects[index].object.dimensions.z / 2 + 0.06)
         button_control.markers.append(Marker(type=Marker.TEXT_VIEW_FACING,
-                id=index, scale=Vector3(0, 0, 0.03),
-                text=int_marker.name, color=ColorRGBA(0.0, 0.0, 0.0, 0.5),
+                id=index, scale=Vector3(0, 0, 0.05),
+                text=int_marker.name, color=ColorRGBA(0.0, 0.0, 0.0, 1.0),
                 header=Header(frame_id='base_link'),
                 pose=Pose(text_pos, Quaternion(0, 0, 0, 1))))
         int_marker.controls.append(button_control)
@@ -428,7 +449,7 @@ class World:
                             lifetime=rospy.Duration(2),
                             scale=dimensions,
                             header=Header(frame_id='base_link'),
-                            color=ColorRGBA(0.8, 0.0, 0.4, 0.4),
+                            color=ColorRGBA(0.5, 0.5, 0.5, 0.4),
                             pose=pose)
         button_control.markers.append(object_marker)
         text_pos = Point()
@@ -438,8 +459,8 @@ class World:
         text_pos.y = position.y - dimensions.y / 2 + 0.06
         text_pos.z = position.z + dimensions.z / 2 + 0.06
         text_marker = Marker(type=Marker.TEXT_VIEW_FACING, id=2001,
-                scale=Vector3(0, 0, 0.03), text=int_marker.name,
-                color=ColorRGBA(0.0, 0.0, 0.0, 0.5),
+                scale=Vector3(0, 0, 0.05), text=int_marker.name,
+                color=ColorRGBA(0.0, 0.0, 0.0, 1.0),
                 header=Header(frame_id='base_link'),
                 pose=Pose(text_pos, Quaternion(0, 0, 0, 1)))
         button_control.markers.append(text_marker)
