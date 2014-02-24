@@ -532,8 +532,8 @@ class World:
          '''
         # TODO(max): Actually write this.
         w = '' if not hasattr(vector_like, 'w') else ', ' + str(vector_like.w)
-        return '(' + str(vector_like.x) + ', ' + str(vector_like.y) + ', ' + \
-            str(vector_like.z) + w + ')'
+        return '[' + str(vector_like.x) + ', ' + str(vector_like.y) + ', ' + \
+            str(vector_like.z) + w + ']'
 
     def _publish_tf_pose(self, pose, name, parent):
         ''' Publishes a TF for object pose'''
