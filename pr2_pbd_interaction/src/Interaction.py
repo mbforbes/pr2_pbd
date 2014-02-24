@@ -374,6 +374,10 @@ class Interaction:
                 states[arm_index] = ArmState(ArmState.ROBOT_BASE,
                     abs_ee_poses[arm_index], joint_poses[arm_index], Object())
             else:
+                # print "\n\nDEBUG"
+                # print "arm index: " + str(arm_index)
+                # print "abs ee poses for it: " + str(abs_ee_poses[arm_index])
+                # print"\n\n"
                 nearest_obj = self.world.get_nearest_object(
                                                     abs_ee_poses[arm_index])
 

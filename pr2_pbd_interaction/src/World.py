@@ -662,7 +662,7 @@ class World:
         # NOTE(max): Mocking this as well; for now just don't do anything,
         # though will need to once we get multiple tests with different mocked
         # objects working...
-        pass
+        return
 
         goal = UserCommandGoal(UserCommandGoal.RESET, False)
         self._object_action_client.send_goal(goal)
