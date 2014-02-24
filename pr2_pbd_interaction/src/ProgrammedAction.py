@@ -90,7 +90,7 @@ class ProgrammedAction:
 
         return Marker(type=Marker.ARROW, id=(2 * to_index + arm_index),
                       lifetime=rospy.Duration(2),
-                      scale=Vector3(0.01, 0.03, 0.01),
+                      scale=Vector3(0.01, 0.03, 0.07),
                       header=Header(frame_id='base_link'),
                       color=ColorRGBA(0.8, 0.8, 0.5, 0.4),
                       points=[new_start, new_end])

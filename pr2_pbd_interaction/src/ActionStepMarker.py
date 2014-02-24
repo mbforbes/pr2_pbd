@@ -533,18 +533,8 @@ class ActionStepMarker:
 
         Returns (r,g,b) tuple of floats, each from 0.0 to 1.0 inclusive.'''
         # Bucket settings (make constant)
-        n_buckets = 4
-        bucket_size = 1.0 / n_buckets
-
-        # Calculate which "bucket" it falls into; we'll fix the last bucket
-        # case later (where it ends up in a bucket that doesn't exist).
-        bucket = int(abs_pos / (bucket_size))
-        bucket_pos = (abs_pos % (bucket_size)) / bucket_size
-
-        # Fix last step case
-        if bucket == 4:
-            bucket = 3
-            bucket_pos = 1.0
+        bucket = self.arm_index
+        bucket_pos = abs_pos
 
         # Now translate to colors; todo later implement with better data
         # structure.
@@ -556,14 +546,8 @@ class ActionStepMarker:
             r = 1.0 
             g = 1.0 - bucket_pos
         elif bucket == 1:
-            # red -> purple
-            r = 1.0
-            b = bucket_pos
-        elif bucket == 2:
-            r = 1.0 - bucket_pos
-            b = 1.0
-        elif bucket == 3:
-            g = bucket_pos
+            # cyan -> blue
+            g = 1.0 - bucket_pos
             b = 1.0
         else:
             # Set white as error color
