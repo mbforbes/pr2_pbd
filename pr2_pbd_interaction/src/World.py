@@ -515,8 +515,8 @@ class World:
     @staticmethod
     def pose_to_string(pose):
         '''For printing a pose to stdout'''
-        return '\t- position: ' + vector_to_string(pose.position) + '\n' + \
-            '\t-orientation: ' + vector_to_string(pose.orientation) + '\n'
+        return '\t- position: ' + World.vector_to_string(pose.position) + '\n'+\
+            '\t-orientation: ' + World.vector_to_string(pose.orientation) + '\n'
 
     @staticmethod
     def vector_to_string(vector_like):
