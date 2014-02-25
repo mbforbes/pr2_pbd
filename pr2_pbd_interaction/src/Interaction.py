@@ -458,8 +458,7 @@ class Interaction:
                 action_no = int(action_no)
                 if (self.session.n_actions() > 0):
                     self.session.switch_to_action(action_no,
-                        self.world.get_frame_list(
-                            self.session.current_action_index))
+                        self.world.get_frame_list(action_no))
                     response = Response(Interaction.empty_response,
                         [RobotSpeech.SWITCH_SKILL + str(action_no),
                          GazeGoal.NOD])
@@ -479,8 +478,7 @@ class Interaction:
                 if (command.command == GuiCommand.SWITCH_TO_ACTION):
                     action_no = command.param
                     self.session.switch_to_action(action_no,
-                        self.world.get_frame_list(
-                            self.session.current_action_index))
+                        self.world.get_frame_list(action_no))
                     response = Response(Interaction.empty_response,
                         [RobotSpeech.SWITCH_SKILL + str(action_no),
                          GazeGoal.NOD])
