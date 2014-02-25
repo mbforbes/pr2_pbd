@@ -468,7 +468,15 @@ class World:
         return int_marker
 
     @staticmethod
+    def get_mock_object_list(action_no):
+        '''This will change drastically over time.
+        Currently: hard-coded values.'''
+        return 
+
+    @staticmethod
     def get_frame_list():
+        # NOTE(max): Curspot: MOCK! Force parameters or get the action num
+        # here myself? Either way, then call get_mock_object_list().
         '''Function that returns the list of ref. frames'''
         objects = []
         for i in range(len(World.objects)):
