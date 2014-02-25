@@ -130,24 +130,44 @@ class World:
         #                 Marker, self.receive_table_marker)
 
         # Mock table
-        self.mock_table()
+        # self.mock_table()
 
         # Mock objects
-        self.mock_objects()
+        # set this constant based on how many objects we are mocking
+        self._max_mocked_action_idx = 2
+        # this stores the current saved mocked objects so we don't re-mock
+        # unnecessarily. start with an invalid one
+        self._cur_action_idx = 0
+        # we're going to try not mocking to start
+        #self._mock_objects_for_action()
 
-    def mock_objects(self):
+    def _mock_objects_for_action(self, action_index):
         '''Add fake objects to the interaction / rviz. Should eventually do this
         smartly, i.e. w.r.t current test.'''
-        # Use hardcoded data for now; will load later.
-        position = Point(0.407702162213, 0.448435729551, 0.596100389957)
-        orientation = Quaternion(0.0, 0.0, 0.621998629232, 0.783018330075)
-        pose = Pose(position, orientation)
-        dimensions = Vector3(0.0885568181956, 0.0448812849838, 0.030891418457)
-        self._add_new_object(pose, # pose
-            dimensions, # dimensions
-            False) # is_recognized
+        # Clear current objects /table
+        self._reset_objects()
 
-    def mock_table(self):
+        # Use hardcoded data for now; will load later.
+        mocked_objects = []
+        if action_index == 1:
+            position = Point(0.407702162213, 0.448435729551, 0.596100389957)
+            orientation = Quaternion(0.0, 0.0, 0.621998629232, 0.783018330075)
+            pose = Pose(position, orientation)
+            dimensions = Vector3(0.0885568181956, 0.0448812849838,
+                0.030891418457)
+            self._add_new_object(pose, dimensions, False)
+        elif action_index == 2:
+            position = Point(0.829287886892, -0.46793514682, 0.618727564812)
+            orientation = Quaternion(0.0, 0.0, 0.0455530206745, 0.998961922351)
+            pose = Pose(position, orientation)
+            dimensions = Vector3(0.102971868856, 0.0529677164712,
+                0.0323750972748)
+            self._add_new_object(pose, dimensions, False)
+
+        # Create the standard table
+        self._mock_table()
+
+    def _mock_table(self):
         '''Testing for right now, but should add a fake object to the
         interaction / rviz.'''
         # This is mocked from the first data point collected
@@ -467,21 +487,29 @@ class World:
         int_marker.controls.append(button_control)
         return int_marker
 
-    @staticmethod
-    def get_mock_object_list(action_no):
-        '''This will change drastically over time.
-        Currently: hard-coded values.'''
-        return 
+    def get_frame_list(self, action_index):
+        '''Function that returns the list of ref. frames; actually used now as
+        a signal for which action index to load the mocked objects.'''
+        # NOTE(max): Implicitly, this is called with the action_index that we'll
+        # be in next / soon (unless it's called with an invalid number, which is
+        # possible). This means that here we don't want to just return the world
+        # object list, but we want to use it as a trigger for mocking in the new
+        # objects. This is because the world isn't notified when you switch
+        # actions, so this method call is the best of a notification we get!
+        if action_index > 0 and action_index <= self._max_mocked_action_idx \
+            and action_index != self._cur_action_idx:
+            # valid new action, so we mock the new objects
+            rospy.loginfo("Mocking objects for action " + str(action_index))
+            self._mock_objects_for_action(action_index)
+            self._cur_action_idx = action_index
+        return self._get_underlying_objects()
 
-    @staticmethod
-    def get_frame_list():
-        # NOTE(max): Curspot: MOCK! Force parameters or get the action num
-        # here myself? Either way, then call get_mock_object_list().
-        '''Function that returns the list of ref. frames'''
+    def _get_underlying_objects(self):
+        '''Grabs the static object list and returns it.'''
         objects = []
         for i in range(len(World.objects)):
             objects.append(World.objects[i].object)
-        return objects
+        return objects        
 
     @staticmethod
     def has_objects():
@@ -688,9 +716,9 @@ class World:
 
     def clear_all_objects(self):
         '''Removes all objects from the world'''
-        # NOTE(max): Mocking this as well; for now just don't do anything,
-        # though will need to once we get multiple tests with different mocked
-        # objects working...
+        # NOTE(max): Mocking this as well; for now we just clear the mocked
+        # objects until they (or different ones) are added.
+        self._reset_objects()
         return
 
         goal = UserCommandGoal(UserCommandGoal.RESET, False)
@@ -708,6 +736,10 @@ class World:
 
     def get_nearest_object(self, arm_pose):
         '''Gives a pointed to the nearest object'''
+        # DEBUG(max): arm_pose is being passed here as None???
+        if arm_pose == None:
+            rospy.logwarn("arm_pose passed to World::get_nearest_object is None")
+            return None
         distances = []
         for i in range(len(World.objects)):
             dist = World.pose_distance(World.objects[i].object.pose,
