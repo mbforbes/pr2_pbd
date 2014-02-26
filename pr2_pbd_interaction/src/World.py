@@ -197,23 +197,25 @@ class World:
         n_to_mock = 10
         data_filename = 'samples-' + time.strftime('%y.%m.%d_%H.%M.%S') + '.txt'
         fh = open(data_filename, 'a') # append if it exists, for safety
-        rospy.loginfo("Sampling " + str(n_to_mock) + " objects; saving into" +
+        rospy.loginfo("Sampling " + str(n_to_mock) + " objects; saving into " +
             data_filename)
 
         # Actually do the generation
         # First clear the other objects and add the table back
         self._reset_objects()
         self._mock_table()
-        while(len(World.objects) < n_to_mock:
+        while len(World.objects) < n_to_mock:
             # Sample for position
             x = uniform(min_x, max_x)
             y = uniform(min_y, max_y)
+            # We don't want to sample z... we want the objects sitting on the
+            # table!
             z = uniform(min_z, max_z)
             position = Point(x,y,z)
 
             # Orientation we assume only 1 DOF, so qx == qy == 0.0
             qz = uniform(0, 1)
-            qw = math.sqrt(1.0 - qz**2)
+            qw = sqrt(1.0 - qz**2)
             orientation = Quaternion(0.0, 0.0, qz, qw)
 
             # Construct the candidate object
@@ -224,7 +226,7 @@ class World:
             # Ensure it's reachable. Currently just doing with either arm but
             # will likely have to change to a specific arm depending on what
             # the action is.
-            if not is_object_within_reach(candidate):
+            if not World.is_object_within_reach(candidate):
                 continue
 
             # Actually add it
@@ -254,7 +256,7 @@ class World:
     def is_object_within_reach(ref_object):
         '''Sees if the robot can reach the object.'''
         for arm_index in range(2):
-            if not is_object_within_reach_of_arm(ref_object, arm_index):
+            if not World.is_object_within_reach_of_arm(ref_object, arm_index):
                 return False
         return True
 
