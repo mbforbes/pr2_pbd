@@ -121,12 +121,27 @@ class PbDGUI(Plugin):
         # Main box
         allWidgetsBox = QtGui.QVBoxLayout()
 
-        # TODO(max): Fix all references to:
-        # - actionBox (has become task_boxes)
-        # - self.actionGrid (has become self.action_grids)
-        # - self.actionIcons (has become self.action_icon_sets)
+        # Instructions area
+        instructionsGroupBox = QGroupBox('Instructions', self._widget)
+        instructionsGroupBox.setObjectName('InstructionsGroup')
+        instructionsBox = QtGui.QVBoxLayout()
+        i3 = QtGui.QLabel('Please make sure the robot can reach all saved ' +
+            'poses')
+        self.i4 = QtGui.QLabel('\t- (waiting to load action)')
+        i1 = QtGui.QLabel('Please make sure the robot will correctly perform ' +
+            'the action')
+        i2 = QtGui.QLabel('\t- you must check this manually')
 
-        # Create one box per task
+        self.palette = QtGui.QPalette()
+        self.palette.setColor(QtGui.QPalette.Foreground,QtCore.Qt.red)
+        self.i4.setPalette(self.palette)
+        instructionsBox.addWidget(i3)
+        instructionsBox.addWidget(self.i4)
+        instructionsBox.addWidget(i1)
+        instructionsBox.addWidget(i2)
+        instructionsGroupBox.setLayout(instructionsBox)
+
+        # Create one box per task (3 tasks, 10 actions each)
         task_boxes = []
         self.action_grids = []
         self.action_icon_sets = []
@@ -141,36 +156,16 @@ class PbDGUI(Plugin):
             self.action_icon_sets.append(dict())
             actionBoxLayout = QtGui.QHBoxLayout()
             actionBoxLayout.addLayout(self.action_grids[i])
-            task_boxes[i].setLayout(actionBoxLayout)
+            task_boxes[i].setLayout(actionBoxLayout)        
+
+        # add instructions to main area
+        allWidgetsBox.addWidget(instructionsGroupBox)
+        allWidgetsBox.addStretch(1)        
         
-        instructionsGroupBox = QGroupBox('Instructions', self._widget)
-        instructionsGroupBox.setObjectName('InstructionsGroup')
-        instructionsBox = QtGui.QVBoxLayout()
-        i1 = QtGui.QLabel('Please make sure the robot will correctly perform ' +
-            'the action.')
-        i2 = QtGui.QLabel('\t- you must check this manually')
-        i3 = QtGui.QLabel('Please make sure the robot can reach all saved ' +
-            'poses')
-        self.i4 = QtGui.QLabel('\t- (waiting to load action)')
-
-        self.palette = QtGui.QPalette()
-        self.palette.setColor(QtGui.QPalette.Foreground,QtCore.Qt.red)
-        self.i4.setPalette(self.palette)
-        instructionsBox.addWidget(i1)
-        # instructionsBox.addItem(QtGui.QSpacerItem(100, 20))
-        instructionsBox.addWidget(i2)
-        instructionsBox.addWidget(i3)
-        instructionsBox.addWidget(self.i4)
-        instructionsGroupBox.setLayout(instructionsBox)
-
         # add the three action sections
         for i in range(self.n_tasks):
             allWidgetsBox.addWidget(task_boxes[i])
 
-        # instructions
-        allWidgetsBox.addWidget(instructionsGroupBox)
-        allWidgetsBox.addStretch(1)        
-        
         # Fix layout and add main widget to the user interface
         QtGui.QApplication.setStyle(QtGui.QStyleFactory.create('plastique'))
         vAllBox = QtGui.QVBoxLayout()
@@ -240,7 +235,7 @@ class PbDGUI(Plugin):
 
         # NOTE(max): Trying to extract number of unreachable markers.
         nu = state.n_unreachable_markers
-        self.i4.setText('\t -number of unreachable markers: ' +
+        self.i4.setText('\t - number of unreachable markers: ' +
             str(nu))
         if nu > 0:
             self.palette.setColor(QtGui.QPalette.Foreground,QtCore.Qt.red)

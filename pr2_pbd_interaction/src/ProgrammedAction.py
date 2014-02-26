@@ -41,8 +41,11 @@ class ProgrammedAction:
     def get_n_unreachable_markers(self):
         '''Returns the current number of markers for which the IK solver cannot
         find a solution.'''
-        return sum([not m.is_reachable() for m in self.l_markers]) + \
+        self.lock.acquire()
+        res = sum([not m.is_reachable() for m in self.l_markers]) + \
             sum([not m.is_reachable() for m in self.r_markers])
+        self.lock.release()
+        return res
 
     def get_name(self):
         '''Returns the name of the action'''
