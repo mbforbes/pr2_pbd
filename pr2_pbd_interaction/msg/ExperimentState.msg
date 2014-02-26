@@ -7,3 +7,4 @@ uint8[] l_gripper_states
 string[] r_ref_frames
 string[] l_ref_frames
 pr2_pbd_interaction/Object[] objects
+uint8 n_unreachable_markers

@@ -38,6 +38,12 @@ class ProgrammedAction:
             ProgrammedAction._marker_publisher = rospy.Publisher(
                     'visualization_marker_array', MarkerArray)
 
+    def get_n_unreachable_markers(self):
+        '''Returns the current number of markers for which the IK solver cannot
+        find a solution.'''
+        return sum([not m.is_reachable() for m in self.l_markers]) + \
+            sum([not m.is_reachable() for m in self.r_markers])
+
     def get_name(self):
         '''Returns the name of the action'''
         return 'Action' + str(self.action_index)
@@ -77,7 +83,7 @@ class ProgrammedAction:
         end = markers[to_index].get_absolute_position(is_start=False)
 
         # Scale the arrow
-        scale = 0.8 # should be constant; shortening arrows to see ends
+        scale = 0.9 # should be constant; shortening arrows to see ends
         # NOTE(max): Check if we should worry about object creation / garbage
         # collection, and if so just turn these intermediate objects into
         # locals.

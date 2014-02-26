@@ -45,6 +45,9 @@ class Interaction:
         rospy.Subscriber('gui_command', GuiCommand, self.gui_command_cb)
 
         self._undo_function = None
+        # NOTE(max): For counting frequency of pings... want to do not every 0.1
+        # seconds.
+        self._ping_counter = 0
 
         self.responses = {
             Command.TEST_MICROPHONE: Response(Interaction.empty_response,
@@ -531,6 +534,14 @@ class Interaction:
                 self.session.get_current_action().update_objects(
                     self.world.get_frame_list(
                         self.session.current_action_index))
+
+        # Only ping every 1/2 second or so (this is w.r.t the time.sleep
+        # call below).
+        if self._ping_counter == 5:
+            self.session.ping_state()
+            self._ping_counter = 0
+        else:
+            self._ping_counter += 1
 
         time.sleep(0.1)
 

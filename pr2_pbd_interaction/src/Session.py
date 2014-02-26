@@ -47,6 +47,11 @@ class Session:
 
         self._update_experiment_state()
 
+    def ping_state(self):
+        '''Used to push experiment service state more often (but not absurdly
+            often) to gui.'''
+        self._update_experiment_state()
+
     def _selected_step_cb(self, selected_step):
         '''Updates the selected step when interactive
         markers are clicked on'''
@@ -72,7 +77,9 @@ class Session:
                     self._get_gripper_states(1),
                     self._get_ref_frames(0),
                     self._get_ref_frames(1),
-                    self._object_list)
+                    self._object_list,
+                    self.actions[self.current_action_index].
+                        get_n_unreachable_markers())
 
     def _get_ref_frames(self, arm_index):
         ''' Returns the reference frames for the steps of the

@@ -47,13 +47,24 @@ class ActionStepMarker:
         self._menu_handler = None
         ActionStepMarker._marker_click_cb = marker_click_cb
 
-    def _is_reachable(self):
+        self._cached_ee_pose = None
+        self._cached_is_reachable = False
+
+    def is_reachable(self):
         '''Checks if there is an IK solution for action step'''
-        dummy, is_reachable = Arms.solve_ik_for_arm(self.arm_index,
-                                                    self.get_target())
-        rospy.loginfo('Reachability of pose in ActionStepMarker : ' +
-            str(is_reachable))
-        return is_reachable
+        # Cache to allow more frequent reporting (e.g. pinging to the GUI).
+        # NOTE(max): Only works with ee_poses currently (not trajectories).
+        cur_target = self.get_target()
+        cur_ee_pose = cur_target.ee_pose
+        if cur_ee_pose != self._cached_ee_pose:
+            dummy, is_reachable = Arms.solve_ik_for_arm(self.arm_index,
+                cur_target)
+            self._cached_ee_pose = cur_ee_pose
+            self._cached_is_reachable = is_reachable    
+        # NOTE(max): Commenting this out as it resulted in too much spam.
+        #rospy.loginfo('Reachability of pose in ActionStepMarker: ' +
+        #    str(self._cached_is_reachable))
+        return self._cached_is_reachable
 
     def get_uid(self):
         '''Returns a unique id of the marker'''
@@ -566,7 +577,7 @@ class ActionStepMarker:
         mesh.scale.x = 1.0
         mesh.scale.y = 1.0
         mesh.scale.z = 1.0
-        if self._is_reachable():
+        if self.is_reachable():
             # Original: some kinda orange
             # r,g,b = 1.0, 0.5, 0.0
 
