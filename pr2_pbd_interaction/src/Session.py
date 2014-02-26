@@ -142,6 +142,10 @@ class Session:
 
     def save_session_state(self, is_save_actions=True):
         '''Saves the session state onto hard drive'''
+        savemsg = 'Saving session state'
+        if is_save_actions:
+            savemsg += ' and all ' + str(len(self.actions)) + ' actions'
+        rospy.loginfo(savemsg)
         exp_state = dict()
         exp_state['nProgrammedActions'] = self.n_actions()
         exp_state['currentProgrammedActionIndex'] = self.current_action_index
@@ -150,8 +154,8 @@ class Session:
         state_file.close()
 
         if (is_save_actions):
-            for i in range(self.n_actions()):
-                self.actions[i].save(self._data_dir)
+            for num, action in self.actions.iteritems():
+                action.save(self._data_dir)
 
     def _load_session_state(self, object_list):
         '''Loads the experiment state from the hard drive'''

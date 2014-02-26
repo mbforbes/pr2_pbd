@@ -47,7 +47,7 @@ class Interaction:
         self._undo_function = None
         # NOTE(max): For counting frequency of pings... want to do not every 0.1
         # seconds.
-        self._ping_counter = 0
+        self._update_counter = 0
 
         self.responses = {
             Command.TEST_MICROPHONE: Response(Interaction.empty_response,
@@ -535,14 +535,20 @@ class Interaction:
                     self.world.get_frame_list(
                         self.session.current_action_index))
 
-        # Only ping every 1/2 second or so (this is w.r.t the time.sleep
-        # call below).
-        if self._ping_counter == 5:
+        # Only ping state every 1/2 second or so.
+        if self._update_counter % 5 == 0:
             self.session.ping_state()
-            self._ping_counter = 0
-        else:
-            self._ping_counter += 1
 
+        # Save all actions every 10 seconds or so.
+        if self._update_counter == 0:
+            self.session.save_session_state(True) # Save all actions.
+
+        # Loop every 10 seconds
+        self._update_counter = 0 if self._update_counter >= 100 else \
+            self._update_counter + 1
+
+        # Note that timings above depend on this... should probably make
+        # a constant.
         time.sleep(0.1)
 
     def _end_execution(self):
