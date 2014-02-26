@@ -37,9 +37,9 @@ class Interaction:
         # NOTE(max): Can't get the current action number from the session
         # becauase we're creating it, so just use action 1 as default.
         self.session = Session(object_list=self.world.get_frame_list(1),
-                               is_debug=True)
+            is_debug=False)
         self._viz_publisher = rospy.Publisher('visualization_marker_array',
-                                              MarkerArray)
+            MarkerArray)
 
         rospy.Subscriber('recognized_command', Command, self.speech_command_cb)
         rospy.Subscriber('gui_command', GuiCommand, self.gui_command_cb)
