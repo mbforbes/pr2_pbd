@@ -111,7 +111,7 @@ class World:
         # while the PR2 is running; we use these markers to place objects in the
         # positions they show, so these markers aren't actually used in the
         # interaction.
-        self._placeholder_pub = rospy.Publisher('visualization_marker',
+        self._placeholder_pub = rospy.Publisher('visualization_marker_array',
             MarkerArray)
         self._placeholder_markers = MarkerArray()
 
