@@ -195,7 +195,9 @@ class World:
 
         # Generation settings
         n_to_mock = 10
-        data_filename = 'samples-' + time.strftime('%y.%m.%d_%H.%M.%S') + '.txt'
+        filename = time.strftime('%y.%m.%d_%H.%M.%S') + '.txt'
+        data_filename = rospy.get_param('/pr2_pbd_interaction/dataRoot') + \
+            '/data/samples/' + filename
         fh = open(data_filename, 'a') # append if it exists, for safety
         rospy.loginfo("Sampling " + str(n_to_mock) + " objects; saving into " +
             data_filename)

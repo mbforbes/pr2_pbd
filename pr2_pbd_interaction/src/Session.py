@@ -27,13 +27,13 @@ class Session:
                                 '/pr2_pbd_interaction/experimentNumber')
             self._data_dir = self._get_data_dir(self._exp_number)
             if (not os.path.exists(self._data_dir)):
-                os.mkdirs(self._data_dir)
+                os.mkdir(self._data_dir)
         else:
             self._get_participant_id()
         rospy.set_param('data_directory', self._data_dir)
 
         self.actions = dict()
-        self.current_action_index = 0
+        self.current_action_index = 1
 
         if (self._is_reload):
             self._load_session_state(object_list)
@@ -123,7 +123,7 @@ class Session:
 
             self._data_dir = Session._get_data_dir(self._exp_number)
             if (not os.path.exists(self._data_dir)):
-                os.mkdirs(self._data_dir)
+                os.mkdir(self._data_dir)
                 # Copy particular seed's actions _n_tests times each
                 self._seed_dir = Session._get_seed_dir(self._exp_number)
                 seed_actions = os.listdir(self._seed_dir)
@@ -133,6 +133,14 @@ class Session:
                         shutil.copy(self._seed_dir + seed_action,
                             self._data_dir + 'Action' + str(cur_idx) + '.bag')
                         cur_idx += 1
+                # write experiment state
+                exp_state = dict()
+                exp_state['nProgrammedActions'] = cur_idx - 1
+                exp_state['currentProgrammedActionIndex'] = 1
+                # TODO(max): Need to save action completion (fix) state here?
+                state_file = open(self._data_dir + 'experimentState.yaml', 'w')
+                state_file.write(yaml.dump(exp_state))
+                state_file.close()
 
             else:
                 rospy.logwarn('A directory for this participant ' +
