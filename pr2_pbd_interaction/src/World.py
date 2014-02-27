@@ -3,6 +3,7 @@ import roslib
 roslib.load_manifest('pr2_pbd_interaction')
 
 # Generic libraries
+import os
 import time
 import threading
 from numpy.linalg import norm
@@ -196,8 +197,11 @@ class World:
         # Generation settings
         n_to_mock = 10
         filename = time.strftime('%y.%m.%d_%H.%M.%S') + '.txt'
-        data_filename = rospy.get_param('/pr2_pbd_interaction/dataRoot') + \
-            '/data/samples/' + filename
+        samples_dir = rospy.get_param('/pr2_pbd_interaction/dataRoot') + \
+        '/data/samples'
+        if (not os.path.exists(samples_dir)):
+            os.makedirs(samples_dir)
+        data_filename = samples_dir + filename
         fh = open(data_filename, 'a') # append if it exists, for safety
         rospy.loginfo("Sampling " + str(n_to_mock) + " objects; saving into " +
             data_filename)
