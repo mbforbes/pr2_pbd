@@ -130,11 +130,13 @@ class World:
                 lifetime=rospy.Duration(2),
                 scale=obj.object.dimensions,
                 header=Header(frame_id='base_link'),
-                color=ColorRGBA(0.9, 0.9, 0.9, 0.5),
+                color=ColorRGBA(0.8, 0.8, 0.8, 0.5),
                 pose=obj.object.pose)
             self._placeholder_markers.markers.append(marker)
 
         # TODO(max): Need to continuously republish like this?
+        rospy.loginfo('Publishing ' +
+            str(len(self._placeholder_markers.markers)) + ' placeholder(s).')
         self._placeholder_pub.publish(self._placeholder_markers)
 
     @staticmethod
