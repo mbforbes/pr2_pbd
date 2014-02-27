@@ -126,7 +126,7 @@ class World:
         objs = World.read_mocked_worldobjs_fom_file(obj_filename)
         for i, obj in enumerate(objs):
             marker = Marker(type=Marker.CUBE,
-                id=10 + i, # trying to avoid collisions with normal objects
+                id=100 + i, # avoid collisions with normal objects & markers
                 lifetime=rospy.Duration(2),
                 scale=obj.object.dimensions,
                 header=Header(frame_id='base_link'),
