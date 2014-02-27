@@ -1,7 +1,7 @@
 <launch>
 
   <!-- This is the main state machine for interaction and PbD -->
-  <arg name="isReload" value="False" />
+  <arg name="isReload" value="True" />
   <arg name="dataRoot" value="$(env HOME)" />
   <!-- The number of tests to generate per task. -->
   <arg name="nTests" value="10" />
