@@ -655,11 +655,11 @@ class World:
         text_pos.z = (World.objects[index].object.pose.position.z +
                      World.objects[index].object.dimensions.z / 2 + 0.06)
         # Remove object label
-        button_control.markers.append(Marker(type=Marker.TEXT_VIEW_FACING,
-                id=index, scale=Vector3(0, 0, 0.05),
-                text=int_marker.name, color=ColorRGBA(0.0, 0.0, 0.0, 1.0),
-                header=Header(frame_id='base_link'),
-                pose=Pose(text_pos, Quaternion(0, 0, 0, 1))))
+        #button_control.markers.append(Marker(type=Marker.TEXT_VIEW_FACING,
+        #        id=index, scale=Vector3(0, 0, 0.05),
+        #        text=int_marker.name, color=ColorRGBA(0.0, 0.0, 0.0, 1.0),
+        #        header=Header(frame_id='base_link'),
+        #        pose=Pose(text_pos, Quaternion(0, 0, 0, 1))))
         int_marker.controls.append(button_control)
         return int_marker
 
