@@ -34,7 +34,9 @@ class Interaction:
     def __init__(self):
         self.arms = Arms()
         self.world = World()
-        self.session = Session(object_list=self.world.get_frame_list(),
+        # NOTE(max): Can't get the current action number from the session
+        # becauase we're creating it, so just use action 1 as default.
+        self.session = Session(object_list=self.world.get_frame_list(1),
                                is_debug=True)
         self._viz_publisher = rospy.Publisher('visualization_marker_array',
                                               MarkerArray)
@@ -146,7 +148,8 @@ class Interaction:
     def next_action(self, dummy=None):
         '''Switches to next action'''
         if (self.session.n_actions() > 0):
-            if self.session.next_action(self.world.get_frame_list()):
+            if self.session.next_action(self.world.get_frame_list(
+                self.session.current_action_index + 1)):
                 return [RobotSpeech.SWITCH_SKILL + ' ' +
                         str(self.session.current_action_index), GazeGoal.NOD]
             else:
@@ -158,7 +161,8 @@ class Interaction:
     def previous_action(self, dummy=None):
         '''Switches to previous action'''
         if (self.session.n_actions() > 0):
-            if self.session.previous_action(self.world.get_frame_list()):
+            if self.session.previous_action(self.world.get_frame_list(
+                self.session.current_action_index - 1)):
                 return [RobotSpeech.SWITCH_SKILL + ' ' +
                         str(self.session.current_action_index), GazeGoal.NOD]
             else:
@@ -237,7 +241,8 @@ class Interaction:
                 actions[arm_index] = gripper_state
                 step.gripperAction = GripperAction(actions[0], actions[1])
                 self.session.add_step_to_action(step,
-                                                self.world.get_frame_list())
+                    self.world.get_frame_list(
+                        self.session.current_action_index))
 
     def start_recording(self, dummy=None):
         '''Starts recording continuous motion'''
@@ -283,7 +288,7 @@ class Interaction:
                                         self.arms.get_gripper_state(0),
                                         self.arms.get_gripper_state(1))
             self.session.add_step_to_action(traj_step,
-                                        self.world.get_frame_list())
+                self.world.get_frame_list(self.session.current_action_index))
             Interaction._arm_trajectory = None
             Interaction._trajectory_start_time = None
             return [RobotSpeech.STOPPED_RECORDING_MOTION + ' ' +
@@ -312,7 +317,7 @@ class Interaction:
     def _find_dominant_ref(self, arm_traj):
         '''Finds the most dominant reference frame
         in a continuous trajectory'''
-        ref_names = self.world.get_frame_list()
+        ref_names = self.world.get_frame_list(self.session.current_action_index)
         ref_counts = dict()
         for i in range(len(ref_names)):
             ref_counts[ref_names[i]] = 0
@@ -350,7 +355,8 @@ class Interaction:
                                             self.arms.get_gripper_state(0),
                                             self.arms.get_gripper_state(1))
                 self.session.add_step_to_action(step,
-                                            self.world.get_frame_list())
+                    self.world.get_frame_list(
+                        self.session.current_action_index))
                 return [RobotSpeech.STEP_RECORDED, GazeGoal.NOD]
             else:
                 return ['Action ' + str(self.session.current_action_index) +
@@ -403,7 +409,8 @@ class Interaction:
                 if (action.is_object_required()):
                     if (self.world.update_object_pose()):
                         self.session.get_current_action().update_objects(
-                                                self.world.get_frame_list())
+                            self.world.get_frame_list(
+                                self.session.current_action_index))
                         self.arms.start_execution(action, execution_z_offset)
                     else:
                         return [RobotSpeech.OBJECT_NOT_DETECTED,
@@ -446,7 +453,7 @@ class Interaction:
                 action_no = int(action_no)
                 if (self.session.n_actions() > 0):
                     self.session.switch_to_action(action_no,
-                                                  self.world.get_frame_list())
+                      self.world.get_frame_list(action_no))
                     response = Response(Interaction.empty_response,
                         [RobotSpeech.SWITCH_SKILL + str(action_no),
                          GazeGoal.NOD])
@@ -466,7 +473,7 @@ class Interaction:
                 if (command.command == GuiCommand.SWITCH_TO_ACTION):
                     action_no = command.param
                     self.session.switch_to_action(action_no,
-                                                  self.world.get_frame_list())
+                        self.world.get_frame_list(action_no))
                     response = Response(Interaction.empty_response,
                         [RobotSpeech.SWITCH_SKILL + str(action_no),
                          GazeGoal.NOD])
@@ -517,7 +524,8 @@ class Interaction:
             if (is_world_changed):
                 rospy.loginfo('The world has changed.')
                 self.session.get_current_action().update_objects(
-                                        self.world.get_frame_list())
+                    self.world.get_frame_list(
+                        self.session.current_action_index))
 
         time.sleep(0.1)
 
@@ -540,7 +548,8 @@ class Interaction:
         if (self.world.update_object_pose()):
             if (self.session.n_actions() > 0):
                 self.session.get_current_action().update_objects(
-                                            self.world.get_frame_list())
+                    self.world.get_frame_list(
+                        self.session.current_action_index))
             return [RobotSpeech.START_STATE_RECORDED, GazeGoal.NOD]
         else:
             return [RobotSpeech.OBJECT_NOT_DETECTED, GazeGoal.SHAKE]
