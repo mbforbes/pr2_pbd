@@ -127,7 +127,7 @@ class World:
         for i, obj in enumerate(objs):
             marker = Marker(type=Marker.CUBE,
                 id=100 + i, # avoid collisions with normal objects & markers
-                lifetime=rospy.Duration(2),
+                lifetime=0, # Needs to last forever. Uh oh... how to remove?
                 scale=obj.object.dimensions,
                 header=Header(frame_id='base_link'),
                 color=ColorRGBA(0.8, 0.8, 0.8, 0.5),
