@@ -115,8 +115,7 @@ class World:
             MarkerArray)
         self._placeholder_markers = MarkerArray()
 
-    @staticmethod
-    def _swap_placeholders(new_action_idx):
+    def _swap_placeholders(self, new_action_idx):
         ''' Loads in the placeholder makers for the given action index'''
         # Clear all of the markers
         self._placeholder_markers.markers[:] = []
