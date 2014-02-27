@@ -209,15 +209,15 @@ class World:
         # Dimension settings
         ds = []
         # fake-iron 
-        #dimensions.append(Vector3(0.140946324722, 0.0966388155749, 0.0660033226013)
+        #ds.append(Vector3(0.140946324722, 0.0966388155749, 0.0660033226013)
         # red-plate
-        #dimensions.append(Vector3(0.208253721282, 0.153458412609, 0.025651037693))
+        #ds.append(Vector3(0.208253721282, 0.153458412609, 0.025651037693))
         # brown-box
-        dimensions.append(Vector3(0.250331583552, 0.250164705599, 0.148873627186))
+        ds.append(Vector3(0.250331583552, 0.250164705599, 0.148873627186))
         # white-box
-        dimensions.append(Vector3(0.21396259923, 0.0538839277603, 0.107205629349))
+        ds.append(Vector3(0.21396259923, 0.0538839277603, 0.107205629349))
         # lava-moss
-        dimensions.append(Vector3(0.0967770918593, 0.0522750997274, 0.0276364684105))
+        ds.append(Vector3(0.0967770918593, 0.0522750997274, 0.0276364684105))
 
         # Generation settings
         filename = time.strftime('%y.%m.%d_%H.%M.%S') + '.txt'
@@ -250,7 +250,7 @@ class World:
 
                 # Construct the candidate object
                 pose = Pose(position, orientation)
-                candidate = WorldObject(pose, i, dimensions, False)
+                candidate = WorldObject(pose, i, d, False)
 
                 # Ensure it's reachable. Currently just doing with either arm but
                 # will likely have to change to a specific arm depending on what
