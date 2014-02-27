@@ -99,10 +99,10 @@ class ProgrammedAction:
 
         return Marker(type=Marker.ARROW, id=(2 * to_index + arm_index),
                       lifetime=rospy.Duration(2),
-                      scale=Vector3(0.01, 0.03, 0.07),
+                      scale=Vector3(0.004, 0.001, 0.001),
                       header=Header(frame_id='base_link'),
-                      color=ColorRGBA(0.8, 0.8, 0.5, 0.4),
-                      points=[new_start, new_end])
+                      color=ColorRGBA(0.8, 0.8, 0.8, 0.4),
+                      points=[start, end])
 
     def update_objects(self, object_list):
         '''Updates the object list for all action steps'''
