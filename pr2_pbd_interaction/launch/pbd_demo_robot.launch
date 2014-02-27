@@ -1,9 +1,19 @@
 <launch>
 
   <!-- This is the main state machine for interaction and PbD -->
-  <arg name="isReload" value="False" />
+  <arg name="isReload" value="True" />
   <arg name="dataRoot" value="$(env HOME)" />
-  <arg name="experimentNumber" value="3" />
+
+  <!-- 10's are for testing -->
+  <!-- 10 Action1 is 'unfixed' raw seed (pick and place lavamoss) -->
+  <!-- 10 Action2 is 'fixed' seed using mocked obj (pick and place lavamoss) -->
+
+  <!-- 11 is used for dummy object recording -->
+
+  <!-- 20's are for seeds -->
+
+  <!-- Here is our choice -->
+  <arg name="experimentNumber" value="1" />
   
   <!-- This runs the interactive manipulation -->
   
