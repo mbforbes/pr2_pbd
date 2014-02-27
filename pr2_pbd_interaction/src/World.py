@@ -152,10 +152,10 @@ class World:
         self._lock.acquire()
 
         # Either: load the sampled objects...
-        self._load_mock_objects(action_index)
+        #self._load_mock_objects(action_index)
 
         # OR do sampling...
-        #self._sample_objects()
+        self._sample_objects()
 
         # OR use hardcoded data.
         # if action_index == 1:
@@ -206,10 +206,15 @@ class World:
         #z = 0.615162938833 # lava-moss
 
         # Dimension settings
-        # Fake-iron 
+        # fake-iron 
         #dimensions = Vector3(0.140946324722, 0.0966388155749, 0.0660033226013)
         # red-plate
-        # Lavamoss
+        dimensions = Vector3(0.208253721282, 0.153458412609, 0.025651037693)
+        # brown-box
+        #dimensions = Vector3(0.250331583552, 0.250164705599, 0.148873627186)
+        # white-box
+        #dimensions = Vector3(0.21396259923, 0.0538839277603, 0.107205629349)
+        # lava-moss
         #dimensions = Vector3(0.0967770918593, 0.0522750997274, 0.0276364684105)
 
         # Generation settings
