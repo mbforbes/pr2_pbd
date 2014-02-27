@@ -124,8 +124,15 @@ class World:
         obj_filename = rospy.get_param('/pr2_pbd_interaction/dataRoot') + \
             '/data/objects/Action' + str(new_action_idx) + '.txt'
         objs = World.read_mocked_worldobjs_fom_file(obj_filename)
-        for obj in objs:
-            self._placeholder_markers.markers.append(obj)
+        for i, obj in enumerate(objs):
+            marker = Marker(type=Marker.CUBE,
+                id=10 + i, # trying to avoid collisions with normal objects
+                lifetime=rospy.Duration(2),
+                scale=obj.object.dimensions,
+                header=Header(frame_id='base_link'),
+                color=ColorRGBA(0.9, 0.9, 0.9, 0.5),
+                pose=obj.object.pose)
+            self._placeholder_markers.markers.append(marker)
 
         # TODO(max): Need to continuously republish like this?
         self._placeholder_pub.publish(self._placeholder_markers)
