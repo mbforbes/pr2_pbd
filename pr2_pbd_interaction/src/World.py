@@ -123,7 +123,7 @@ class World:
         # Get the new ones and add them
         obj_filename = rospy.get_param('/pr2_pbd_interaction/dataRoot') + \
             '/data/objects/Action' + str(new_action_idx) + '.txt'
-        objbs = World.read_mocked_worldobjs_fom_file(obj_filename)
+        objs = World.read_mocked_worldobjs_fom_file(obj_filename)
         for obj in objs:
             self._placeholder_markers.markers.append(obj)
 
