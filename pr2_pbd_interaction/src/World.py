@@ -136,13 +136,11 @@ class World:
 
         # Mock objects and table
         # set this constant based on how many objects we are mocking
-        self._max_mocked_action_idx = 2
+        self._max_mocked_action_idx = 30
+
         # this stores the current saved mocked objects so we don't re-mock
         # unnecessarily. start with an invalid one
         self._cur_action_idx = 0
-        # we're going to try not mocking to start
-        #self._mock_objects_for_action()
-        # self.mock_table()
 
     def _mock_objects_for_action(self, action_index):
         '''Add fake objects to the interaction / rviz. Should eventually do this
@@ -150,10 +148,16 @@ class World:
         # Clear current objects /table
         self._reset_objects()
 
-        # Doing sampling!
-        self._sample_objects()
+        # Avoid races while swapping out underlying array
+        self._lock.acquire()
 
-        # Use hardcoded data for now; will load chosen data later.
+        # Either: load the sampled objects...
+        self._load_mock_objects(action_index)
+
+        # OR do sampling...
+        #self._sample_objects()
+
+        # OR use hardcoded data.
         # if action_index == 1:
         #     position = Point(0.407702162213, 0.448435729551, 0.596100389957)
         #     orientation = Quaternion(0.0, 0.0, 0.621998629232, 0.783018330075)
@@ -169,8 +173,21 @@ class World:
         #         0.0323750972748)
         #     self._add_new_object(pose, dimensions, False)
 
+        # Release
+        self._lock.release()
+
         # Create the standard table
         self._mock_table()
+
+    def _load_mock_objects(self, action_index):
+        ''' Loads saved mocked objects for the given action index. Assumes they
+        exist, so you won't get any if they don't!'''
+        objects_dir = rospy.get_param('/pr2_pbd_interaction/dataRoot') + \
+            '/data/objects/'
+        obj_file = objects_dir + 'Action' + str(action_index) + '.txt'
+        mocked_objs = World.read_mocked_worldobjs_fom_file(obj_file)
+        for mocked_obj in mocked_objs:
+            self._add_new_object_internal(mocked_obj)
 
     def _sample_objects(self):
         '''Generate sample positions of objects.'''
@@ -189,16 +206,16 @@ class World:
 
 
         # Dimension settings
-        # Will change this based on experiment we're generating objects for.
-        # Currently: just lavamoss. Even these dimensions vary greatly in the
-        # observed data; just picking one.
-        dimensions = Vector3(0.0967770918593, 0.0522750997274, 0.0276364684105)
+        # Fake-iron 
+        dimensions = Vector3(0.140946324722, 0.0966388155749, 0.0660033226013)
+        # Lavamoss
+        #dimensions = Vector3(0.0967770918593, 0.0522750997274, 0.0276364684105)
 
         # Generation settings
-        n_to_mock = 10
+        n_to_mock = 1
         filename = time.strftime('%y.%m.%d_%H.%M.%S') + '.txt'
         samples_dir = rospy.get_param('/pr2_pbd_interaction/dataRoot') + \
-        '/data/samples/'
+            '/data/samples/'
         if (not os.path.exists(samples_dir)):
             os.makedirs(samples_dir)
         data_filename = samples_dir + filename
@@ -208,7 +225,6 @@ class World:
 
         # Actually do the generation
         # First clear the other objects and add the table back
-        self._reset_objects()
         self._mock_table()
         while len(World.objects) < n_to_mock:
             # Sample for position
@@ -329,7 +345,7 @@ class World:
         fileHandle.write(line + '\n')
 
     @staticmethod
-    def read_mocked_worldobjs_fom_file(worldObject, fileName):
+    def read_mocked_worldobjs_fom_file(fileName):
         '''Read's the lines from the file specified by fileName and attempts to
         turn them into WorldObjects. Only restores the pose (position and
         orentation) and dimensions. Use with write_mocked_worldobj_to_file()
@@ -349,7 +365,7 @@ class World:
         lines = [line.strip() for line in open(fileName)]
         for line in lines:
             pieces = [float(piece) for piece in line.split(sep)]
-            position = Position(pieces[0], pieces[1], pieces[2])
+            position = Point(pieces[0], pieces[1], pieces[2])
             orientation = Quaternion(pieces[3], pieces[4], pieces[5], pieces[6])
             pose = Pose(position, orientation)
             dimensions = Vector3(pieces[7], pieces[8], pieces[9])
@@ -635,11 +651,11 @@ class World:
         text_pos.z = (World.objects[index].object.pose.position.z +
                      World.objects[index].object.dimensions.z / 2 + 0.06)
         # Remove object label
-        #button_control.markers.append(Marker(type=Marker.TEXT_VIEW_FACING,
-        #        id=index, scale=Vector3(0, 0, 0.05),
-        #        text=int_marker.name, color=ColorRGBA(0.0, 0.0, 0.0, 1.0),
-        #        header=Header(frame_id='base_link'),
-        #        pose=Pose(text_pos, Quaternion(0, 0, 0, 1))))
+        button_control.markers.append(Marker(type=Marker.TEXT_VIEW_FACING,
+                id=index, scale=Vector3(0, 0, 0.05),
+                text=int_marker.name, color=ColorRGBA(0.0, 0.0, 0.0, 1.0),
+                header=Header(frame_id='base_link'),
+                pose=Pose(text_pos, Quaternion(0, 0, 0, 1))))
         int_marker.controls.append(button_control)
         return int_marker
 
@@ -931,6 +947,10 @@ class World:
             rospy.logwarn("arm_pose passed to World::get_nearest_object is None")
             return None
         distances = []
+        toRet = None
+        # NOTE(max): Race conditions can happen on world objects when they're
+        # being swapped out during mocking.
+        self._lock.acquire()
         for i in range(len(World.objects)):
             dist = World.pose_distance(World.objects[i].object.pose,
                                                             arm_pose)
@@ -939,11 +959,9 @@ class World:
         if (len(distances) > 0):
             if (min(distances) < dist_threshold):
                 chosen = distances.index(min(distances))
-                return World.objects[chosen].object
-            else:
-                return None
-        else:
-            return None
+                toRet = World.objects[chosen].object
+        self._lock.release()
+        return toRet
 
     @staticmethod
     def pose_distance(pose1, pose2, is_on_table=True):

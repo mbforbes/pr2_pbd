@@ -122,12 +122,37 @@ class Session:
                 continue
 
             self._data_dir = Session._get_data_dir(self._exp_number)
-            if (not os.path.exists(self._data_dir)):
+            generate_files = False
+            if (os.path.exists(self._data_dir)):
+                rospy.logwarn('A directory for this participant ' +
+                  'ID already exists: ' + self._data_dir)
+                overwrite = raw_input('Do you want to overwrite? ' +
+                  'Type r to reload the last state ' +
+                  'of the experiment. [y/n/r]')
+                if (overwrite == 'y'):
+                    # Generate the files and overwrite existing data
+                    generate_files = True
+                elif (overwrite == 'n'):
+                    # Ask for number again
+                    self._exp_number = None
+                    continue
+                elif (overwrite == 'r'):
+                    # Don't generate files; reload them
+                    self._is_reload = True
+                else:
+                    # Ask for number again
+                    rospy.logerr('Invalid response, try again.')
+                    self._exp_number = None
+                    continue
+            else:
+                # If the directory doesn't exist, make it and generate files.
                 os.makedirs(self._data_dir)
+                generate_files = True
+            if generate_files:
                 # Copy particular seed's actions _n_tests times each
                 self._seed_dir = Session._get_seed_dir(self._exp_number)
-                seed_actions = os.listdir(self._seed_dir)
-                rospy.loginfo(seed_actions)
+                seed_actions = sorted(os.listdir(self._seed_dir))
+                rospy.loginfo("SEED ACTIONS: " + str(seed_actions))
                 cur_idx = 1
                 for seed_action in seed_actions:
                     for i in range(self._n_tests):
@@ -142,21 +167,6 @@ class Session:
                 state_file = open(self._data_dir + 'experimentState.yaml', 'w')
                 state_file.write(yaml.dump(exp_state))
                 state_file.close()
-
-            else:
-                rospy.logwarn('A directory for this participant ' +
-                              'ID already exists: ' + self._data_dir)
-                overwrite = raw_input('Do you want to overwrite? ' +
-                                      'Type r to reload the last state ' +
-                                      'of the experiment. [y/n/r]')
-                if (overwrite == 'y'):
-                    continue
-                elif (overwrite == 'n'):
-                    self._exp_number = None
-                elif (overwrite == 'r'):
-                    self._is_reload = True
-                else:
-                    rospy.logerr('Invalid response, try again.')
 
     @staticmethod
     def _get_data_dir(exp_number):

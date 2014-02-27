@@ -229,7 +229,7 @@ class PbDGUI(Plugin):
             self.action_pressed(state.i_current_action - 1, False)
 
         # Get icon
-        curset = self.action_icon_sets[state.i_current_action / self.n_tests]
+        curset = self.action_icon_sets[(state.i_current_action-1)/ self.n_tests]
         # TODO(max): Indexing hack...
         icon = curset[state.i_current_action - 1]
 
