@@ -479,7 +479,8 @@ class World:
     def get_frame_list(self, action_index):
         '''Function that returns the list of ref. frames; we also use it to
         signal the placement of placeholder object markers.'''
-        self._swap_placeholders(action_index)
+        # Not swapping for now as we're just measuring z-coordinates...
+        #self._swap_placeholders(action_index)
         objects = []
         for i in range(len(World.objects)):
             objects.append(World.objects[i].object)
