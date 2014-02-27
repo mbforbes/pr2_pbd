@@ -152,10 +152,10 @@ class World:
         self._lock.acquire()
 
         # Either: load the sampled objects...
-        #self._load_mock_objects(action_index)
+        self._load_mock_objects(action_index)
 
         # OR do sampling...
-        self._sample_objects()
+        #self._sample_objects()
 
         # OR use hardcoded data.
         # if action_index == 1:
