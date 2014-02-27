@@ -20,7 +20,7 @@ from pr2_interactive_object_detection.msg import UserCommandAction
 from pr2_interactive_object_detection.msg import UserCommandGoal
 from geometry_msgs.msg import Quaternion, Vector3, Point, Pose, PoseStamped
 from std_msgs.msg import ColorRGBA, Header
-from visualization_msgs.msg import Marker, InteractiveMarker
+from visualization_msgs.msg import Marker, InteractiveMarker, MarkerArray
 from visualization_msgs.msg import InteractiveMarkerControl
 from visualization_msgs.msg import InteractiveMarkerFeedback
 from interactive_markers.interactive_marker_server import InteractiveMarkerServer
@@ -79,6 +79,8 @@ class World:
 
     tf_listener = None
     objects = []
+    # Separator for reading / writing mocked objects to / from files.
+    _sep = ','
 
     def __init__(self):
 
@@ -103,6 +105,59 @@ class World:
         # The following is to get the table information
         rospy.Subscriber('tabletop_segmentation_markers',
                          Marker, self.receive_table_marker)
+
+        # Placeholder publisher publishes the locations of objects that were
+        # mocked and then fixed by the 'crowd' so that they can be visualized
+        # while the PR2 is running; we use these markers to place objects in the
+        # positions they show, so these markers aren't actually used in the
+        # interaction.
+        self._placeholder_pub = rospy.Publisher('visualization_marker',
+            MarkerArray)
+        self._placeholder_markers = MarkerArray()
+
+    @staticmethod
+    def _swap_placeholders(new_action_idx):
+        ''' Loads in the placeholder makers for the given action index'''
+        # Clear all of the markers
+        self._placeholder_markers.markers[:] = []
+
+        # Get the new ones and add them
+        obj_filename = rospy.get_param('/pr2_pbd_interaction/dataRoot') + \
+            '/data/objects/Action' + str(new_action_idx) + '.txt'
+        objbs = World.read_mocked_worldobjs_fom_file(obj_filename)
+        for obj in objs:
+            self._placeholder_markers.markers.append(obj)
+
+        # TODO(max): Need to continuously republish like this?
+        self._placeholder_pub.publish(self._placeholder_markers)
+
+    @staticmethod
+    def read_mocked_worldobjs_fom_file(fileName):
+        '''Read's the lines from the file specified by fileName and attempts to
+        turn them into WorldObjects. Only restores the pose (position and
+        orentation) and dimensions. Use with write_mocked_worldobj_to_file()
+        to save and restore objects.
+
+        Returns a list of WorldObjects.
+
+        Note that this assumes these are the only objects in the scene, so it
+        auto-numbers them this way (starting at 0).
+
+        Note: Creates file handle from the provided fileName, so this DOES
+        manage opening/closing of file for you.'''
+        # Settings
+        sep = World._sep
+
+        objects = []
+        lines = [line.strip() for line in open(fileName)]
+        for line in lines:
+            pieces = [float(piece) for piece in line.split(sep)]
+            position = Point(pieces[0], pieces[1], pieces[2])
+            orientation = Quaternion(pieces[3], pieces[4], pieces[5], pieces[6])
+            pose = Pose(position, orientation)
+            dimensions = Vector3(pieces[7], pieces[8], pieces[9])
+            objects.append(WorldObject(pose, len(objects), dimensions, False))
+        return objects
 
     def _reset_objects(self):
         '''Function that removes all objects'''
@@ -414,9 +469,10 @@ class World:
         int_marker.controls.append(button_control)
         return int_marker
 
-    @staticmethod
-    def get_frame_list():
-        '''Function that returns the list of ref. frames'''
+    def get_frame_list(self, action_index):
+        '''Function that returns the list of ref. frames; we also use it to
+        signal the placement of placeholder object markers.'''
+        self._swap_placeholders(action_index)
         objects = []
         for i in range(len(World.objects)):
             objects.append(World.objects[i].object)
@@ -539,7 +595,6 @@ class World:
          - Vector3 (e.g. boudning box dimensions)
          - etc.
          '''
-        # TODO(max): Actually write this.
         w = '' if not hasattr(vector_like, 'w') else ', ' + str(vector_like.w)
         return '[' + str(vector_like.x) + ', ' + str(vector_like.y) + ', ' + \
             str(vector_like.z) + w + ']'
