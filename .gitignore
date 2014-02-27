@@ -1,5 +1,5 @@
 *.pyc
-*.bag
+#*.bag # we do want to track data now
 # in .mybag, I save them as text
 *.mybag
 

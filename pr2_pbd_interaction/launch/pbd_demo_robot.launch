@@ -2,7 +2,7 @@
 
   <!-- This is the main state machine for interaction and PbD -->
   <arg name="isReload" value="True" />
-  <arg name="dataRoot" value="$(env HOME)" />
+  <arg name="dataRoot" value="$(find pr2_pbd_interaction)" />
   <!-- The number of tests to generate per task. -->
   <arg name="nTests" value="10" />
   <!-- NOTE(max): 10s are for testing. -->
