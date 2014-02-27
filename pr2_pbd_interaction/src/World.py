@@ -199,12 +199,16 @@ class World:
         max_y = 0.57 # highest observed y value is 0.56...
 
         # Z values will depend on the object ...
-        z = 0.638032227755 # Fake-iron
-
+        #z = 0.638032227755 # fake-iron
+        z = 0.607358753681 # red-plate
+        #z = 0.666624039412 # brown-box
+        #z = 0.642685890198 # white-box
+        #z = 0.615162938833 # lava-moss
 
         # Dimension settings
         # Fake-iron 
-        dimensions = Vector3(0.140946324722, 0.0966388155749, 0.0660033226013)
+        #dimensions = Vector3(0.140946324722, 0.0966388155749, 0.0660033226013)
+        # red-plate
         # Lavamoss
         #dimensions = Vector3(0.0967770918593, 0.0522750997274, 0.0276364684105)
 
