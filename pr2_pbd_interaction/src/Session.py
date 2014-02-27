@@ -127,6 +127,7 @@ class Session:
                 # Copy particular seed's actions _n_tests times each
                 self._seed_dir = Session._get_seed_dir(self._exp_number)
                 seed_actions = os.listdir(self._seed_dir)
+                rospy.loginfo(seed_actions)
                 cur_idx = 1
                 for seed_action in seed_actions:
                     for i in range(self._n_tests):
@@ -199,6 +200,7 @@ class Session:
         if (is_save_actions):
             for num, action in self.actions.iteritems():
                 action.save(self._data_dir)
+        rospy.loginfo('...done saving')
 
     def _log_action_switch(self, new_action_idx):
         '''Dumps user action switch in a log file.'''

@@ -198,7 +198,7 @@ class World:
         n_to_mock = 10
         filename = time.strftime('%y.%m.%d_%H.%M.%S') + '.txt'
         samples_dir = rospy.get_param('/pr2_pbd_interaction/dataRoot') + \
-        '/data/samples'
+        '/data/samples/'
         if (not os.path.exists(samples_dir)):
             os.makedirs(samples_dir)
         data_filename = samples_dir + filename
@@ -634,6 +634,7 @@ class World:
         text_pos.y = World.objects[index].object.pose.position.y
         text_pos.z = (World.objects[index].object.pose.position.z +
                      World.objects[index].object.dimensions.z / 2 + 0.06)
+        # Remove object label
         #button_control.markers.append(Marker(type=Marker.TEXT_VIEW_FACING,
         #        id=index, scale=Vector3(0, 0, 0.05),
         #        text=int_marker.name, color=ColorRGBA(0.0, 0.0, 0.0, 1.0),

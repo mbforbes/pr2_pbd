@@ -535,9 +535,12 @@ class Interaction:
                     self.world.get_frame_list(
                         self.session.current_action_index))
 
-        # Only ping state every 1/2 second or so.
-        if self._update_counter % 5 == 0:
-            self.session.ping_state()
+        # Only ping state every 1 second or so.
+        if self._update_counter % 10 == 0:
+            #rospy.loginfo('pinging...')
+            #self.session.ping_state()
+            #rospy.loginfo('...done pinging')
+            pass
 
         # Save all actions every 10 seconds or so.
         if self._update_counter == 0:
