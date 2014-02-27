@@ -199,26 +199,27 @@ class World:
         max_y = 0.57 # highest observed y value is 0.56...
 
         # Z values will depend on the object ...
-        #z = 0.638032227755 # fake-iron
-        z = 0.607358753681 # red-plate
-        #z = 0.666624039412 # brown-box
-        #z = 0.642685890198 # white-box
-        #z = 0.615162938833 # lava-moss
+        zs = []
+        #zs.append(0.638032227755) # fake-iron
+        #zs.append(0.607358753681) # red-plate
+        zs.append(0.666624039412) # brown-box
+        zs.append(0.642685890198) # white-box
+        zs.append(0.615162938833) # lava-moss
 
         # Dimension settings
+        ds = []
         # fake-iron 
-        #dimensions = Vector3(0.140946324722, 0.0966388155749, 0.0660033226013)
+        #dimensions.append(Vector3(0.140946324722, 0.0966388155749, 0.0660033226013)
         # red-plate
-        dimensions = Vector3(0.208253721282, 0.153458412609, 0.025651037693)
+        #dimensions.append(Vector3(0.208253721282, 0.153458412609, 0.025651037693))
         # brown-box
-        #dimensions = Vector3(0.250331583552, 0.250164705599, 0.148873627186)
+        dimensions.append(Vector3(0.250331583552, 0.250164705599, 0.148873627186))
         # white-box
-        #dimensions = Vector3(0.21396259923, 0.0538839277603, 0.107205629349)
+        dimensions.append(Vector3(0.21396259923, 0.0538839277603, 0.107205629349))
         # lava-moss
-        #dimensions = Vector3(0.0967770918593, 0.0522750997274, 0.0276364684105)
+        dimensions.append(Vector3(0.0967770918593, 0.0522750997274, 0.0276364684105))
 
         # Generation settings
-        n_to_mock = 1
         filename = time.strftime('%y.%m.%d_%H.%M.%S') + '.txt'
         samples_dir = rospy.get_param('/pr2_pbd_interaction/dataRoot') + \
             '/data/samples/'
@@ -226,43 +227,42 @@ class World:
             os.makedirs(samples_dir)
         data_filename = samples_dir + filename
         fh = open(data_filename, 'a') # append if it exists, for safety
-        rospy.loginfo("Sampling " + str(n_to_mock) + " objects; saving into " +
+        rospy.loginfo("Sampling " + str(len(zs)) + " objects; saving into " +
             data_filename)
 
         # Actually do the generation
         # First clear the other objects and add the table back
         self._mock_table()
-        while len(World.objects) < n_to_mock:
-            # Sample for position
-            x = uniform(min_x, max_x)
-            y = uniform(min_y, max_y)
-            # We don't want to sample z; object should be on table.
-            position = Point(x,y,z)
+        for i, z in enumerate(zs):
+            d = ds[i]
+            # Have to keep sampling till we get a good point for this object
+            while True:
+                # Sample for position
+                x = uniform(min_x, max_x)
+                y = uniform(min_y, max_y)
+                # We don't want to sample z; object should be on table.
+                position = Point(x,y,z)
 
-            # Orientation we assume only 1 DOF, so qx == qy == 0.0
-            qz = uniform(0, 1)
-            qw = sqrt(1.0 - qz**2)
-            orientation = Quaternion(0.0, 0.0, qz, qw)
+                # Orientation we assume only 1 DOF, so qx == qy == 0.0
+                qz = uniform(0, 1)
+                qw = sqrt(1.0 - qz**2)
+                orientation = Quaternion(0.0, 0.0, qz, qw)
 
-            # Construct the candidate object
-            pose = Pose(position, orientation)
-            n_objects = len(World.objects)
-            candidate = WorldObject(pose, n_objects, dimensions, False)
+                # Construct the candidate object
+                pose = Pose(position, orientation)
+                candidate = WorldObject(pose, i, dimensions, False)
 
-            # Ensure it's reachable. Currently just doing with either arm but
-            # will likely have to change to a specific arm depending on what
-            # the action is.
-            if not World.is_object_within_reach(candidate):
-                continue
+                # Ensure it's reachable. Currently just doing with either arm but
+                # will likely have to change to a specific arm depending on what
+                # the action is.
+                if not World.is_object_within_reach(candidate):
+                    continue
 
-            # Actually add it
-            self._add_new_object_internal(candidate)
-            rospy.loginfo('Generated ' + str(len(World.objects)) + '/' +
-                str(n_to_mock) + ' objects.')
-
-            # Save to file for bookkeeping
-            World.write_mocked_worldobj_to_file(candidate, fh)
-
+                # Actually add it
+                self._add_new_object_internal(candidate)
+                # Save to file for bookkeeping
+                World.write_mocked_worldobj_to_file(candidate, fh)
+                break
         # Cleanup
         fh.close()
 
