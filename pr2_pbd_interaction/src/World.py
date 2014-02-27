@@ -609,7 +609,7 @@ class World:
         int_marker.scale = 1
 
         button_control = InteractiveMarkerControl()
-        button_control.interaction_mode = InteractiveMarkerControl.BUTTON
+        button_control.interaction_mode = InteractiveMarkerControl.NONE
         button_control.always_visible = True
 
         object_marker = Marker(type=Marker.CUBE, id=index,
@@ -645,7 +645,7 @@ class World:
         int_marker.pose = pose
         int_marker.scale = 1
         button_control = InteractiveMarkerControl()
-        button_control.interaction_mode = InteractiveMarkerControl.BUTTON
+        button_control.interaction_mode = InteractiveMarkerControl.NONE
         button_control.always_visible = True
         object_marker = Marker(type=Marker.CUBE, id=2000,
                             lifetime=rospy.Duration(2),
@@ -665,7 +665,7 @@ class World:
                 color=ColorRGBA(0.0, 0.0, 0.0, 1.0),
                 header=Header(frame_id='base_link'),
                 pose=Pose(text_pos, Quaternion(0, 0, 0, 1)))
-        button_control.markers.append(text_marker)
+        #button_control.markers.append(text_marker)
         int_marker.controls.append(button_control)
         return int_marker
 
