@@ -199,10 +199,7 @@ class World:
         max_y = 0.57 # highest observed y value is 0.56...
 
         # Z values will depend on the object ...
-        # These are for lavamoss
-        min_z = 0.598 # lowest observed z value is 0.598...
-        max_z = 0.623 # highest observed z value is 0.598...
-        # TODO other objects
+        z = 0.638032227755 # Fake-iron
 
 
         # Dimension settings
@@ -230,9 +227,7 @@ class World:
             # Sample for position
             x = uniform(min_x, max_x)
             y = uniform(min_y, max_y)
-            # We don't want to sample z... we want the objects sitting on the
-            # table!
-            z = uniform(min_z, max_z)
+            # We don't want to sample z; object should be on table.
             position = Point(x,y,z)
 
             # Orientation we assume only 1 DOF, so qx == qy == 0.0
