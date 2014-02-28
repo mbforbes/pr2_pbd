@@ -134,13 +134,23 @@ class World:
         # rospy.Subscriber('tabletop_segmentation_markers',
         #                 Marker, self.receive_table_marker)
 
-        # Mock objects and table
-        # set this constant based on how many objects we are mocking
-        self._max_mocked_action_idx = 30
+        # How many actions we are mocking        
+        n_tasks = int(rospy.get_param('/pr2_pbd_interaction/nTasks'))
+        n_tests = int(rospy.get_param('/pr2_pbd_interaction/nTests'))
+        self._max_mocked_action_idx = n_tasks * n_tests
 
         # this stores the current saved mocked objects so we don't re-mock
         # unnecessarily. start with an invalid one
         self._cur_action_idx = 0
+
+    @staticmethod
+    def _get_task_n_from_action(action_index):
+        # Right now
+        # 1-5  : task 1
+        # 6-10 : task 2
+        # 11-15: task 3
+        # TODO(max): Change to loaded constant!
+        return ((action_index - 1) / 5) + 1
 
     def _mock_objects_for_action(self, action_index):
         '''Add fake objects to the interaction / rviz. Should eventually do this
@@ -152,10 +162,10 @@ class World:
         self._lock.acquire()
 
         # Either: load the sampled objects...
-        self._load_mock_objects(action_index)
+        #self._load_mock_objects(action_index)
 
         # OR do sampling...
-        #self._sample_objects()
+        self._sample_objects(action_index)
 
         # OR use hardcoded data.
         # if action_index == 1:
@@ -189,7 +199,7 @@ class World:
         for mocked_obj in mocked_objs:
             self._add_new_object_internal(mocked_obj)
 
-    def _sample_objects(self):
+    def _sample_objects(self, action_index):
         '''Generate sample positions of objects.'''
 
         # Position settings
@@ -198,26 +208,45 @@ class World:
         min_y = -0.48 # lowest observed y value is -0.47...
         max_y = 0.57 # highest observed y value is 0.56...
 
+        # Get task number from the action
+        task_n = World._get_task_n_from_action(action_index)
+
         # Z values will depend on the object ...
         zs = []
-        #zs.append(0.638032227755) # fake-iron
-        #zs.append(0.607358753681) # red-plate
-        zs.append(0.666624039412) # brown-box
-        zs.append(0.642685890198) # white-box
-        zs.append(0.615162938833) # lava-moss
+        if task_n == 1:
+            zs.append(0.638032227755) # fake-iron
+        elif task_n == 2:
+            zs.append(0.607358753681) # red-plate
+        elif task_n == 3:
+            zs.append(0.666624039412) # brown-box
+            zs.append(0.642685890198) # white-box
+            zs.append(0.615162938833) # lava-moss
+        else:
+            # Bad index...
+            rospy.logwarn("Bad task number (" + str(task_n) +") for sampling.")
+            return None
 
         # Dimension settings
         ds = []
-        # fake-iron 
-        #ds.append(Vector3(0.140946324722, 0.0966388155749, 0.0660033226013)
-        # red-plate
-        #ds.append(Vector3(0.208253721282, 0.153458412609, 0.025651037693))
-        # brown-box
-        ds.append(Vector3(0.250331583552, 0.250164705599, 0.148873627186))
-        # white-box
-        ds.append(Vector3(0.21396259923, 0.0538839277603, 0.107205629349))
-        # lava-moss
-        ds.append(Vector3(0.0967770918593, 0.0522750997274, 0.0276364684105))
+        if task_n == 1:
+            # fake-iron 
+            ds.append(Vector3(0.140946324722, 0.0966388155749, 0.0660033226013))
+        elif task_n == 2:
+            # red-plate
+            ds.append(Vector3(0.208253721282, 0.153458412609, 0.025651037693))
+        elif task_n == 3:
+            # brown-box
+            ds.append(Vector3(0.250331583552, 0.250164705599, 0.148873627186))
+            # white-box
+            ds.append(Vector3(0.21396259923, 0.0538839277603, 0.107205629349))
+            # lava-moss
+            ds.append(Vector3(0.0967770918593, 0.0522750997274,
+                0.0276364684105))
+        else:
+            # Bad index... this was caught before but it's easier to be
+            # consistent with code structure.
+            rospy.logwarn("Bad task number (" + str(task_n) +") for sampling.")
+            return None
 
         # Generation settings
         filename = time.strftime('%y.%m.%d_%H.%M.%S') + '.txt'
@@ -231,7 +260,7 @@ class World:
             data_filename)
 
         # Actually do the generation
-        # First clear the other objects and add the table back
+        # First add the table back
         self._mock_table()
         for i, z in enumerate(zs):
             d = ds[i]
@@ -258,6 +287,10 @@ class World:
                 if not World.is_object_within_reach(candidate):
                     continue
 
+                # Ensure it doesn't collide with any other object added so far
+                if World.collides_with_any_world_obj(candidate):
+                    continue
+
                 # Actually add it
                 self._add_new_object_internal(candidate)
                 # Save to file for bookkeeping
@@ -265,6 +298,26 @@ class World:
                 break
         # Cleanup
         fh.close()
+
+    @staticmethod
+    def collides_with_any_world_obj(obj):
+        '''Returns whether the provided object collides with any of the objects
+        that world is currently tracking.
+
+        Does very rudimentary (generous) collision detection, where it ignores
+        orientation. Also ignores z-dimension entirely as we assume everything
+        is sitting on the table plane.'''
+        p1 = obj.object.pose.position
+        d1 = obj.object.dimensions
+        for other_obj in World.objects:
+            p2 = other_obj.object.pose.position
+            d2 = other_obj.object.dimensions
+            center_dist = norm(array([p1.x - p2.x, p1.y - p2.y]))
+            corner_dist = norm(array([d1.x, d1.y])) / 2 + \
+                norm(array([d2.x, d2.y])) / 2
+            if center_dist < corner_dist:
+                return True
+        return False
 
     @staticmethod
     def get_planar_distance_from_arm(ref_object, arm_index):

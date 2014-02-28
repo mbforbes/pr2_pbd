@@ -152,8 +152,13 @@ class Session:
                 # Copy particular seed's actions _n_tests times each
                 self._seed_dir = Session._get_seed_dir(self._exp_number)
                 seed_actions = sorted(os.listdir(self._seed_dir))
-                rospy.loginfo("SEED ACTIONS: " + str(seed_actions))
+                n_tasks = int(rospy.get_param('/pr2_pbd_interaction/nTasks'))
+                if len(seed_actions) != n_tasks:                    
+                    rospy.logwarn("Have specified " + str(n_tasks) " but " +
+                        "there are " + str(len(seed_actions)) " seeds...")
                 cur_idx = 1
+                # Note that seed_actions should have the same length as the
+                # rospy param
                 for seed_action in seed_actions:
                     for i in range(self._n_tests):
                         shutil.copy(self._seed_dir + seed_action,
