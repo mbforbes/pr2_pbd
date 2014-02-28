@@ -6,6 +6,7 @@ roslib.load_manifest('pr2_pbd_interaction')
 # Generic libraries
 import rospy
 import os
+import shutil
 import time
 from visualization_msgs.msg import MarkerArray
 
@@ -33,6 +34,22 @@ class Interaction:
     _trajectory_start_time = None
 
     def __init__(self):
+        # We need the participant ID before we construct the Session as it's
+        # used in world.get_frame_list, so we're migrating part of it here.
+        is_reload = rospy.get_param('/pr2_pbd_interaction/isReload')
+        is_debug = False # Manually set this
+        if (is_debug):
+            exp_number = rospy.get_param(
+                '/pr2_pbd_interaction/experimentNumber')
+            data_dir = Interaction._get_data_dir(exp_number)
+            rospy.set_param('data_directory', data_dir)
+            if (not os.path.exists(data_dir)):
+                os.makedirs(data_dir)
+        else:
+            is_reload = True
+            self._get_participant_id()
+
+        # Old init starts here
         self.arms = Arms()
         self.world = World()
         # NOTE(max): Can't get the current action number from the session
@@ -41,7 +58,7 @@ class Interaction:
         # happens in get_frame_list()) and it's can't yet, so just use action 0
         # to return an empty object list back.
         self.session = Session(object_list=self.world.get_frame_list(1),
-            is_debug=False)
+            is_reload=is_reload)
         self._viz_publisher = rospy.Publisher('visualization_marker_array',
             MarkerArray)
 
@@ -81,6 +98,103 @@ class Interaction:
             }
 
         rospy.loginfo('Interaction initialized.')
+
+    @staticmethod
+    def _get_participant_id():
+        '''Gets the experiment number from the command line'''
+        # NOTE(max): We always either reload data that's already been generated,
+        # ore we generate it ourselves and then 'reload' it.
+        exp_number = None
+        while (exp_number == None):
+            try:
+                exp_number = int(raw_input(
+                                    'Please enter participant ID:'))
+            except ValueError:
+                rospy.logerr("Participant ID needs to be a number")
+                exp_number = None
+                continue
+
+            data_dir = Interaction._get_data_dir(exp_number)
+            generate_files = False
+            if (os.path.exists(data_dir)):
+                rospy.logwarn('A directory for this participant ' +
+                  'ID already exists: ' + data_dir)
+                overwrite = raw_input('Do you want to overwrite? ' +
+                  'Type r to reload the last state ' +
+                  'of the experiment. [y/n/r]')
+                if (overwrite == 'y'):
+                    # Generate the files and overwrite existing data
+                    generate_files = True
+                elif (overwrite == 'n'):
+                    # Ask for number again
+                    exp_number = None
+                    continue
+                elif (overwrite == 'r'):
+                    # Don't generate files; reload them
+                    pass
+                else:
+                    # Ask for number again
+                    rospy.logerr('Invalid response, try again.')
+                    exp_number = None
+                    continue
+            else:
+                # If the directory doesn't exist, make it and generate files.
+                os.makedirs(data_dir)
+                generate_files = True
+            if generate_files:
+                # Copy particular seed's actions n_tests times each
+                n_tests = rospy.get_param('/pr2_pbd_interaction/nTests')
+                seed_dir = Interaction._get_seed_dir(exp_number)
+                seed_actions = sorted(os.listdir(seed_dir))
+                n_tasks = int(rospy.get_param('/pr2_pbd_interaction/nTasks'))
+                if len(seed_actions) != n_tasks:                    
+                    rospy.logwarn("Have specified " + str(n_tasks) + " but " +
+                        "there are " + str(len(seed_actions)) + " seeds...")
+                cur_idx = 1
+                # Note that seed_actions should have the same length as the
+                # rospy param
+                for seed_action in seed_actions:
+                    for i in range(n_tests):
+                        shutil.copy(seed_dir + seed_action,
+                            data_dir + 'Action' + str(cur_idx) + '.bag')
+                        cur_idx += 1
+                # write experiment state
+                exp_state = dict()
+                exp_state['nProgrammedActions'] = cur_idx - 1
+                exp_state['currentProgrammedActionIndex'] = 1
+                state_file = open(data_dir + 'experimentState.yaml', 'w')
+                state_file.write(yaml.dump(exp_state))
+                state_file.close()
+        # Save the parameters for global access
+        rospy.set_param('data_directory', data_dir)
+        rospy.set_param('seed_directory', seed_dir)
+        rospy.set_param('experiment_number', exp_number)
+    
+    @staticmethod
+    def _get_data_dir(exp_number):
+        '''Returns the directory where action information is saved'''
+        return (rospy.get_param('/pr2_pbd_interaction/dataRoot') +
+                    '/data/experiment' + str(exp_number) + '/')
+
+    @staticmethod
+    def _get_seed_number(exp_number):
+        ''' Maps experiment number to seed nubmer'''
+        options = os.listdir(Interaction._get_root_seed_dir())
+        n_seeds = len(options)
+        return (exp_number % n_seeds) + 1
+
+    @staticmethod
+    def _get_root_seed_dir():
+        '''Gets the directory that contains seed directories'''
+        return rospy.get_param('/pr2_pbd_interaction/dataRoot') + '/data/seed/'
+
+    @staticmethod
+    def _get_seed_dir(exp_number):
+        '''Gets the seed directory (containing the seed files) for the
+        given experiment number'''
+        return Interaction._get_root_seed_dir() + \
+            str(Interaction._get_seed_number(exp_number)) + '/'
+
 
     def open_hand(self, arm_index):
         '''Opens gripper on the indicated side'''
