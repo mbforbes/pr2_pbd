@@ -106,6 +106,7 @@ class Interaction:
         # NOTE(max): We always either reload data that's already been generated,
         # ore we generate it ourselves and then 'reload' it.
         exp_number = None
+        data_dir = None
         while (exp_number == None):
             try:
                 exp_number = int(raw_input(
@@ -168,7 +169,6 @@ class Interaction:
                 state_file.close()
         # Save the parameters for global access
         rospy.set_param('data_directory', data_dir)
-        rospy.set_param('seed_directory', seed_dir)
         rospy.set_param('experiment_number', exp_number)
     
     @staticmethod
