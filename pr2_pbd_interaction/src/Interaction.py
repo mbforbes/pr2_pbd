@@ -8,6 +8,7 @@ import rospy
 import os
 import shutil
 import time
+import yaml
 from visualization_msgs.msg import MarkerArray
 
 # Local stuff
