@@ -5,6 +5,7 @@ roslib.load_manifest('pr2_pbd_interaction')
 
 # Generic libraries
 import rospy
+import os
 import time
 from visualization_msgs.msg import MarkerArray
 
@@ -39,7 +40,7 @@ class Interaction:
         # access the fully-initialized session before it can mock objects (which
         # happens in get_frame_list()) and it's can't yet, so just use action 0
         # to return an empty object list back.
-        self.session = Session(object_list=self.world.get_frame_list(0),
+        self.session = Session(object_list=self.world.get_frame_list(1),
             is_debug=False)
         self._viz_publisher = rospy.Publisher('visualization_marker_array',
             MarkerArray)
@@ -78,10 +79,6 @@ class Interaction:
                                             self.start_recording, None),
             Command.STOP_RECORDING_MOTION: Response(self.stop_recording, None)
             }
-
-        # Hand the power of querying n unreachable markers to the world
-        self.world.enable_n_unreachable_call(
-            self.session.get_cur_n_unreachable_markers)
 
         rospy.loginfo('Interaction initialized.')
 
@@ -482,13 +479,41 @@ class Interaction:
 
     def gui_command_cb(self, command):
         '''Callback for when a GUI command is received'''
-
         if (not self.arms.is_executing()):
             if (self.session.n_actions() > 0):
                 if (command.command == GuiCommand.SWITCH_TO_ACTION):
+                    # NOTE(max): I'm doing the fixing up here but not in the
+                    # speech_command_cb hook or any of the others... this is
+                    # what we got for having non-refactored code... I would
+                    # refactor now but don't have time.
                     action_no = command.param
-                    self.session.switch_to_action(action_no,
-                        self.world.get_frame_list(action_no))
+                    obj_filename = World.get_objfilename_for_action(
+                        action_no)
+                    if os.path.exists(obj_filename):
+                        # We've already mocked the objects, so we just load it
+                        # up and let the user keep working on them.
+                        self.session.switch_to_action(action_no,
+                            self.world.get_frame_list(action_no))
+                    else:
+                        # We need to mock the objects until we get the desired
+                        # number of fixable poses.
+                        desired_n_unreachable = World._get_desired_n_unreachable(
+                            action_no)                        
+                        rospy.loginfo("Sampling until " + str(
+                            desired_n_unreachable) + " unreachables.")
+                        while True:
+                            self.session.switch_to_action(action_no,
+                                self.world.get_frame_list(action_no))
+                            n_unreachable = self.session\
+                                .get_cur_n_unreachable_markers()
+                            if n_unreachable == desired_n_unreachable:
+                                break
+                            else:
+                                rospy.loginfo("Sampled with " + str(
+                                    n_unreachable) + " unreachable, but " +
+                                    "wanted " + str(desired_n_unreachable))
+                        # Save the objects so we don't have to sample again.
+                        self.world.write_cur_objs_to_file(action_no)
                     response = Response(Interaction.empty_response,
                         [RobotSpeech.SWITCH_SKILL + str(action_no),
                          GazeGoal.NOD])

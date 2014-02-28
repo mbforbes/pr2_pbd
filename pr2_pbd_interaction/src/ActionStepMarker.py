@@ -54,18 +54,19 @@ class ActionStepMarker:
         '''Checks if there is an IK solution for action step'''
         # Cache to allow more frequent reporting (e.g. pinging to the GUI).
         # NOTE(max): Only works with ee_poses currently (not trajectories).
-        cur_target = self.get_target()
+        #cur_target = self.get_target()
         #cur_ee_pose = cur_target.ee_pose
         #if cur_ee_pose != self._cached_ee_pose:
         dummy, is_reachable = Arms.solve_ik_for_arm(self.arm_index,
-            cur_target)
+            self.get_target()) # I had put cur_target here...
         #self._cached_ee_pose = cur_ee_pose
-        self._cached_is_reachable = is_reachable    
+        #self._cached_is_reachable = is_reachable    
 
         # NOTE(max): Commenting this out as it resulted in too much spam.
         #rospy.loginfo('Reachability of pose in ActionStepMarker: ' +
         #    str(self._cached_is_reachable))
-        return self._cached_is_reachable
+        #return self._cached_is_reachable
+        return is_reachable
 
     def get_uid(self):
         '''Returns a unique id of the marker'''

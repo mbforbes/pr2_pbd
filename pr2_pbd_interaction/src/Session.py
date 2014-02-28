@@ -51,8 +51,8 @@ class Session:
         self._update_experiment_state()
 
     def get_cur_n_unreachable_markers(self):
-        '''Function to be passed to World to allow external querying of number
-        of unreachable markers.'''
+        '''Function to allow external querying of number of unreachable
+        markers.'''
         return (self.actions[self.current_action_index]
             .get_n_unreachable_markers())
 
