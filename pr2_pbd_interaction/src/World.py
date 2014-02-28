@@ -10,6 +10,7 @@ from numpy.linalg import norm
 from numpy import array
 from random import uniform
 from math import sqrt
+import traceback
 
 # ROS libraries
 #from actionlib_msgs.msg import
@@ -101,6 +102,9 @@ class World:
     objects = []
     # Separator for reading / writing mocked objects to / from files.
     _sep = ','
+    _get_n_unreachable_fn = None
+    _n_tasks = None
+    _n_tests = None
 
     def __init__(self):
 
@@ -135,13 +139,22 @@ class World:
         #                 Marker, self.receive_table_marker)
 
         # How many actions we are mocking        
-        n_tasks = int(rospy.get_param('/pr2_pbd_interaction/nTasks'))
-        n_tests = int(rospy.get_param('/pr2_pbd_interaction/nTests'))
-        self._max_mocked_action_idx = n_tasks * n_tests
+        World._n_tasks = int(rospy.get_param('/pr2_pbd_interaction/nTasks'))
+        World._n_tests = int(rospy.get_param('/pr2_pbd_interaction/nTests'))
+        self._max_mocked_action_idx = World._n_tasks * World._n_tests
 
         # this stores the current saved mocked objects so we don't re-mock
         # unnecessarily. start with an invalid one
         self._cur_action_idx = 0
+
+    @staticmethod
+    def enable_n_unreachable_call(fn):
+        '''This is called to provide the World with a function that it can use
+        to query the number of unreachable markers from the current
+        ProgrammedAction. Only the Session knows about the ProgrammedAction, and
+        only the Interaction knows about both the World and the Session (they
+        don't know about eachother), so we're doing a bit of plumbing here...'''
+        World._get_n_unreachable_fn = fn
 
     @staticmethod
     def _get_task_n_from_action(action_index):
@@ -155,33 +168,27 @@ class World:
     def _mock_objects_for_action(self, action_index):
         '''Add fake objects to the interaction / rviz. Should eventually do this
         smartly, i.e. w.r.t current test.'''
+        rospy.loginfo('Mocking objts for action' + str(action_index))
         # Clear current objects /table
         self._reset_objects()
 
         # Avoid races while swapping out underlying array
         self._lock.acquire()
 
-        # Either: load the sampled objects...
-        #self._load_mock_objects(action_index)
-
-        # OR do sampling...
-        self._sample_objects(action_index)
-
-        # OR use hardcoded data.
-        # if action_index == 1:
-        #     position = Point(0.407702162213, 0.448435729551, 0.596100389957)
-        #     orientation = Quaternion(0.0, 0.0, 0.621998629232, 0.783018330075)
-        #     pose = Pose(position, orientation)
-        #     dimensions = Vector3(0.0885568181956, 0.0448812849838,
-        #         0.030891418457)
-        #     self._add_new_object(pose, dimensions, False)
-        # elif action_index == 2:
-        #     position = Point(0.829287886892, -0.46793514682, 0.618727564812)
-        #     orientation = Quaternion(0.0, 0.0, 0.0455530206745, 0.998961922351)
-        #     pose = Pose(position, orientation)
-        #     dimensions = Vector3(0.102971868856, 0.0529677164712,
-        #         0.0323750972748)
-        #     self._add_new_object(pose, dimensions, False)
+        # Try to load from previously generated points.
+        filename = 'Action' + str(action_index) + '.txt'
+        objects_dir = rospy.get_param('data_directory') + 'objects/'
+        if (not os.path.exists(objects_dir)):
+            os.makedirs(objects_dir)
+        data_filename = objects_dir + filename
+        if (os.path.exists(data_filename)):
+            # We've already generated for this action! Just load.
+            mocked_objs = World.read_mocked_worldobjs_fom_file(data_filename)
+            for mocked_obj in mocked_objs:
+                self._add_new_object_internal(mocked_obj)
+        else:
+            # Not sampled yet; we have to sapmle and save.
+            self._sample_objects(action_index, data_filename)
 
         # Release
         self._lock.release()
@@ -189,19 +196,29 @@ class World:
         # Create the standard table
         self._mock_table()
 
-    def _load_mock_objects(self, action_index):
-        ''' Loads saved mocked objects for the given action index. Assumes they
-        exist, so you won't get any if they don't!'''
-        objects_dir = rospy.get_param('/pr2_pbd_interaction/dataRoot') + \
-            '/data/objects/'
-        obj_file = objects_dir + 'Action' + str(action_index) + '.txt'
-        mocked_objs = World.read_mocked_worldobjs_fom_file(obj_file)
-        for mocked_obj in mocked_objs:
-            self._add_new_object_internal(mocked_obj)
+    @staticmethod
+    def _get_desired_n_unreachable(action_index):
+        '''Gets the desired number of unreachable markers for the given action
+        index. Current scheme:
+         1 -> 1
+         2 -> 2
+         3 -> 3
+         4 -> 4
+         5 -> 5
+         6 -> 1 ...'''                                             
+        if World._n_tests is None:
+            rospy.logwarn("Tried to get diesred n unreachable before setting" +
+                " n tests...")
+            return 0
+        mod_tests = action_index % World._n_tests
+        return mod_tests if mod_tests > 0 else World._n_tests
 
-    def _sample_objects(self, action_index):
-        '''Generate sample positions of objects.'''
+    def _sample_objects(self, action_index, data_filename):
+        '''Generate sample positions of objects for action_index, and write into
+        data_filename.
 
+        pre: data_filename must be a full path whose file should not exist, but
+        all directories before and including it should.'''
         # Position settings
         min_x = 0.40 # lowest observed x value is 0.404...
         max_x = 1.0 #0.81 # highest observed x value is 0.809...
@@ -249,54 +266,68 @@ class World:
             return None
 
         # Generation settings
-        filename = time.strftime('%y.%m.%d_%H.%M.%S') + '.txt'
-        samples_dir = rospy.get_param('/pr2_pbd_interaction/dataRoot') + \
-            '/data/samples/'
-        if (not os.path.exists(samples_dir)):
-            os.makedirs(samples_dir)
-        data_filename = samples_dir + filename
-        fh = open(data_filename, 'a') # append if it exists, for safety
-        rospy.loginfo("Sampling " + str(len(zs)) + " objects; saving into " +
-            data_filename)
+        rospy.loginfo("Sampling " + str(len(zs)) + " objects...")
+        desired_n_unreachable = World._get_desired_n_unreachable(action_index)
+        # Generate untill success
+        while True:
+            # Actually do the generation
+            # First clear the old objects
+            self._reset_objects_unlocked()
+            for i, z in enumerate(zs):
+                d = ds[i]
+                # Have to keep sampling till we get a good point for this object
+                while True:
+                    # Sample for position
+                    x = uniform(min_x, max_x)
+                    y = uniform(min_y, max_y)
+                    # We don't want to sample z; object should be on table.
+                    position = Point(x,y,z)
 
-        # Actually do the generation
-        # First add the table back
-        self._mock_table()
-        for i, z in enumerate(zs):
-            d = ds[i]
-            # Have to keep sampling till we get a good point for this object
-            while True:
-                # Sample for position
-                x = uniform(min_x, max_x)
-                y = uniform(min_y, max_y)
-                # We don't want to sample z; object should be on table.
-                position = Point(x,y,z)
+                    # Orientation we assume only 1 DOF, so qx == qy == 0.0
+                    qz = uniform(0, 1)
+                    qw = sqrt(1.0 - qz**2)
+                    orientation = Quaternion(0.0, 0.0, qz, qw)
 
-                # Orientation we assume only 1 DOF, so qx == qy == 0.0
-                qz = uniform(0, 1)
-                qw = sqrt(1.0 - qz**2)
-                orientation = Quaternion(0.0, 0.0, qz, qw)
+                    # Construct the candidate object
+                    pose = Pose(position, orientation)
+                    candidate = WorldObject(pose, i, d, False)
 
-                # Construct the candidate object
-                pose = Pose(position, orientation)
-                candidate = WorldObject(pose, i, d, False)
+                    # Ensure it's reachable. Currently just doing with either arm but
+                    # will likely have to change to a specific arm depending on what
+                    # the action is.
+                    if not World.is_object_within_reach(candidate):
+                        continue
 
-                # Ensure it's reachable. Currently just doing with either arm but
-                # will likely have to change to a specific arm depending on what
-                # the action is.
-                if not World.is_object_within_reach(candidate):
-                    continue
+                    # Ensure it doesn't collide with any other object added so far
+                    if World.collides_with_any_world_obj(candidate):
+                        continue
 
-                # Ensure it doesn't collide with any other object added so far
-                if World.collides_with_any_world_obj(candidate):
-                    continue
+                    # Actually add it
+                    self._add_new_object_internal(candidate)
+                    break
 
-                # Actually add it
-                self._add_new_object_internal(candidate)
-                # Save to file for bookkeeping
-                World.write_mocked_worldobj_to_file(candidate, fh)
+            # Check to see if unreachable requirements are met with objects
+            if World._get_n_unreachable_fn is None:
+                rospy.logwarn("Unable to check reachability requirements " +
+                    "becuase World has not yet been provided with the " +
+                    "callback function _get_n_unreachable_fn...")
+                # Reluctantly exit...
                 break
-        # Cleanup
+            n_unreachable = World._get_n_unreachable_fn()
+            if n_unreachable == desired_n_unreachable:
+                # We got a match!
+                break
+            else:
+                rospy.loginfo("got: " + str(n_unreachable) + ", wanted: " +
+                    str(desired_n_unreachable))
+            # If not, we clear the objects and sample them all again (by
+            # continuing in the while loop).
+
+        # We got them! Save to file for future use.
+        rospy.loginfo("Saving objects to " + data_filename)
+        fh = open(data_filename, 'w')
+        for obj in World.objects:
+            World.write_mocked_worldobj_to_file(candidate, fh)
         fh.close()
 
     @staticmethod
@@ -451,6 +482,11 @@ class World:
     def _reset_objects(self):
         '''Function that removes all objects'''
         self._lock.acquire()
+        self._reset_objects_unlocked()
+        self._lock.release()
+
+    def _reset_objects_unlocked(self):
+        '''Call to remove all objects if you have the lock already.'''
         for i in range(len(World.objects)):
             self._im_server.erase(World.objects[i].int_marker.name)
             self._im_server.applyChanges()
@@ -459,7 +495,6 @@ class World:
         self._im_server.clear()
         self._im_server.applyChanges()
         World.objects = []
-        self._lock.release()
 
     def receive_table_marker(self, marker):
         '''Callback function for markers to determine table'''
@@ -870,7 +905,7 @@ class World:
                 return pose
         else:
             rospy.logwarn('One of the frame objects might not exist: ' +
-                          from_frame + ' or ' + to_frame)
+                from_frame + ' or ' + to_frame)
             return pose
 
     @staticmethod

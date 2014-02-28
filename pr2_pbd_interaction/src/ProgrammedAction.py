@@ -42,10 +42,8 @@ class ProgrammedAction:
         '''Returns the current number of markers for which the IK solver cannot
         find a solution.'''
         self.lock.acquire()
-        rospy.loginfo('Computing reachability...')
         res = sum([not m.is_reachable() for m in self.l_markers]) + \
             sum([not m.is_reachable() for m in self.r_markers])
-        rospy.loginfo('...done computing reachability')
         self.lock.release()
         return res
 

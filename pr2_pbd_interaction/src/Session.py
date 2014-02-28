@@ -50,6 +50,12 @@ class Session:
 
         self._update_experiment_state()
 
+    def get_cur_n_unreachable_markers(self):
+        '''Function to be passed to World to allow external querying of number
+        of unreachable markers.'''
+        return (self.actions[self.current_action_index]
+            .get_n_unreachable_markers())
+
     def ping_state(self):
         '''Used to push experiment service state more often (but not absurdly
             often) to gui.'''
@@ -112,6 +118,9 @@ class Session:
 
     def _get_participant_id(self):
         '''Gets the experiment number from the command line'''
+        # NOTE(max): We always either reload data that's already been generated,
+        # ore we generate it ourselves and then 'reload' it.
+        self._is_reload = True
         while (self._exp_number == None):
             try:
                 self._exp_number = int(raw_input(
@@ -138,7 +147,7 @@ class Session:
                     continue
                 elif (overwrite == 'r'):
                     # Don't generate files; reload them
-                    self._is_reload = True
+                    pass
                 else:
                     # Ask for number again
                     rospy.logerr('Invalid response, try again.')
@@ -154,8 +163,8 @@ class Session:
                 seed_actions = sorted(os.listdir(self._seed_dir))
                 n_tasks = int(rospy.get_param('/pr2_pbd_interaction/nTasks'))
                 if len(seed_actions) != n_tasks:                    
-                    rospy.logwarn("Have specified " + str(n_tasks) " but " +
-                        "there are " + str(len(seed_actions)) " seeds...")
+                    rospy.logwarn("Have specified " + str(n_tasks) + " but " +
+                        "there are " + str(len(seed_actions)) + " seeds...")
                 cur_idx = 1
                 # Note that seed_actions should have the same length as the
                 # rospy param

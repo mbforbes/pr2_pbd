@@ -35,8 +35,11 @@ class Interaction:
         self.arms = Arms()
         self.world = World()
         # NOTE(max): Can't get the current action number from the session
-        # becauase we're creating it, so just use action 1 as default.
-        self.session = Session(object_list=self.world.get_frame_list(1),
+        # becauase we're creating it. More importantly, the world needs to
+        # access the fully-initialized session before it can mock objects (which
+        # happens in get_frame_list()) and it's can't yet, so just use action 0
+        # to return an empty object list back.
+        self.session = Session(object_list=self.world.get_frame_list(0),
             is_debug=False)
         self._viz_publisher = rospy.Publisher('visualization_marker_array',
             MarkerArray)
@@ -75,6 +78,10 @@ class Interaction:
                                             self.start_recording, None),
             Command.STOP_RECORDING_MOTION: Response(self.stop_recording, None)
             }
+
+        # Hand the power of querying n unreachable markers to the world
+        self.world.enable_n_unreachable_call(
+            self.session.get_cur_n_unreachable_markers)
 
         rospy.loginfo('Interaction initialized.')
 

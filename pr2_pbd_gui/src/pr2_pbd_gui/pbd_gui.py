@@ -117,7 +117,7 @@ class PbDGUI(Plugin):
         task_names = ['Pick and Place', 'Constrained Pick and Place',
             'Multi-Object Move']
         if len(task_names) != self.n_tasks:
-            rospy.logwarn("Have specified " + str(len(task_names)) " task " +
+            rospy.logwarn("Have specified " + str(len(task_names)) + " task " +
                 "names but only " + str(self.n_tasks) + " tasks in params...")
         self.n_tests = int(rospy.get_param('/pr2_pbd_interaction/nTests'))
 
