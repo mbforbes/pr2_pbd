@@ -10,6 +10,7 @@ from numpy.linalg import norm
 from numpy import array
 from random import uniform
 from math import sqrt
+import traceback
 
 # ROS libraries
 #from actionlib_msgs.msg import
@@ -101,6 +102,8 @@ class World:
     objects = []
     # Separator for reading / writing mocked objects to / from files.
     _sep = ','
+    _n_tasks = None
+    _n_tests = None
 
     def __init__(self):
 
@@ -134,44 +137,44 @@ class World:
         # rospy.Subscriber('tabletop_segmentation_markers',
         #                 Marker, self.receive_table_marker)
 
-        # Mock objects and table
-        # set this constant based on how many objects we are mocking
-        self._max_mocked_action_idx = 30
+        # How many actions we are mocking        
+        World._n_tasks = int(rospy.get_param('/pr2_pbd_interaction/nTasks'))
+        World._n_tests = int(rospy.get_param('/pr2_pbd_interaction/nTests'))
+        self._max_mocked_action_idx = World._n_tasks * World._n_tests
 
-        # this stores the current saved mocked objects so we don't re-mock
-        # unnecessarily. start with an invalid one
-        self._cur_action_idx = 0
+    @staticmethod
+    def _get_task_n_from_action(action_index):
+        '''Maps an action index (like 12) to its task number (like 3)'''
+        # Right now
+        # 1-5  : task 1
+        # 6-10 : task 2
+        # 11-15: task 3
+        # TODO(max): Change to loaded constant!
+        return ((action_index - 1) / 5) + 1
+
+    @staticmethod
+    def _get_trial_idx_from_action(action_index):
+        '''Maps an action index (like 12) to its index into its task (like 2)'''
+        return ((action_index - 1) % 5) + 1
 
     def _mock_objects_for_action(self, action_index):
-        '''Add fake objects to the interaction / rviz. Should eventually do this
-        smartly, i.e. w.r.t current test.'''
+        '''Add fake objects to the interaction / rviz'''
         # Clear current objects /table
         self._reset_objects()
 
         # Avoid races while swapping out underlying array
         self._lock.acquire()
 
-        # Either: load the sampled objects...
-        self._load_mock_objects(action_index)
-
-        # OR do sampling...
-        #self._sample_objects()
-
-        # OR use hardcoded data.
-        # if action_index == 1:
-        #     position = Point(0.407702162213, 0.448435729551, 0.596100389957)
-        #     orientation = Quaternion(0.0, 0.0, 0.621998629232, 0.783018330075)
-        #     pose = Pose(position, orientation)
-        #     dimensions = Vector3(0.0885568181956, 0.0448812849838,
-        #         0.030891418457)
-        #     self._add_new_object(pose, dimensions, False)
-        # elif action_index == 2:
-        #     position = Point(0.829287886892, -0.46793514682, 0.618727564812)
-        #     orientation = Quaternion(0.0, 0.0, 0.0455530206745, 0.998961922351)
-        #     pose = Pose(position, orientation)
-        #     dimensions = Vector3(0.102971868856, 0.0529677164712,
-        #         0.0323750972748)
-        #     self._add_new_object(pose, dimensions, False)
+        # Try to load from previously generated points.
+        data_filename = World.get_objfilename_for_action(action_index)
+        if (os.path.exists(data_filename)):
+            # We've already generated for this action! Just load.
+            mocked_objs = World.read_mocked_worldobjs_fom_file(data_filename)
+            for mocked_obj in mocked_objs:
+                self._add_new_object_internal(mocked_obj)
+        else:
+            # Not sampled yet; we have to sapmle.
+            self._sample_objects(action_index)
 
         # Release
         self._lock.release()
@@ -179,60 +182,90 @@ class World:
         # Create the standard table
         self._mock_table()
 
-    def _load_mock_objects(self, action_index):
-        ''' Loads saved mocked objects for the given action index. Assumes they
-        exist, so you won't get any if they don't!'''
-        objects_dir = rospy.get_param('/pr2_pbd_interaction/dataRoot') + \
-            '/data/objects/'
-        obj_file = objects_dir + 'Action' + str(action_index) + '.txt'
-        mocked_objs = World.read_mocked_worldobjs_fom_file(obj_file)
-        for mocked_obj in mocked_objs:
-            self._add_new_object_internal(mocked_obj)
+    @staticmethod
+    def get_objfilename_for_action(action_index):
+        '''Gets the filename where the current action's generated objects will
+        be saved (experiment-specific)'''
+        filename = 'Action' + str(action_index) + '.txt'
+        objects_dir = rospy.get_param('data_directory') + 'objects/'
+        if (not os.path.exists(objects_dir)):
+            os.makedirs(objects_dir)
+        return objects_dir + filename
 
-    def _sample_objects(self):
-        '''Generate sample positions of objects.'''
 
+    @staticmethod
+    def _get_desired_n_unreachable(action_index):
+        '''Gets the desired number of unreachable markers for the given action
+        index. Current scheme:
+
+        - For task 1, there are only three markers that can be unreachable, so
+        we must go from 1 through 3. I'm doing 2, 1, 3, 1, 2
+
+        - For task 2, there are several that can be unreachable, so we will go
+        from 1 through 5. I'm doing 4, 2, 3, 5, 1.
+
+        - For task 3, there are also several that can be unreachable, so we'll
+        go 1 through 5 again, this time 3, 1, 2, 5, 4. '''
+        task_num = World._get_task_n_from_action(action_index)
+        trial_idx = World._get_trial_idx_from_action(action_index)
+        if task_num == 1:
+            return [0, 2, 1, 3, 1, 2][trial_idx]
+        elif task_num == 2:
+            return [0, 4, 2, 3, 5, 1][trial_idx]
+        else:
+            return [0, 3, 1, 2, 5, 4][trial_idx]
+
+    def _sample_objects(self, action_index):
+        '''Generate sample positions of objects for action_index, and write into
+        data_filename.'''
         # Position settings
         min_x = 0.40 # lowest observed x value is 0.404...
         max_x = 1.0 #0.81 # highest observed x value is 0.809...
         min_y = -0.48 # lowest observed y value is -0.47...
         max_y = 0.57 # highest observed y value is 0.56...
 
+        # Get task number from the action
+        task_n = World._get_task_n_from_action(action_index)
+
         # Z values will depend on the object ...
         zs = []
-        #zs.append(0.638032227755) # fake-iron
-        #zs.append(0.607358753681) # red-plate
-        zs.append(0.666624039412) # brown-box
-        zs.append(0.642685890198) # white-box
-        zs.append(0.615162938833) # lava-moss
+        if task_n == 1:
+            zs.append(0.638032227755) # fake-iron
+        elif task_n == 2:
+            zs.append(0.607358753681) # red-plate
+        elif task_n == 3:
+            zs.append(0.666624039412) # brown-box
+            zs.append(0.642685890198) # white-box
+            zs.append(0.615162938833) # lava-moss
+        else:
+            # Bad index...
+            rospy.logwarn("Bad task number (" + str(task_n) +") for sampling.")
+            return
 
         # Dimension settings
         ds = []
-        # fake-iron 
-        #ds.append(Vector3(0.140946324722, 0.0966388155749, 0.0660033226013)
-        # red-plate
-        #ds.append(Vector3(0.208253721282, 0.153458412609, 0.025651037693))
-        # brown-box
-        ds.append(Vector3(0.250331583552, 0.250164705599, 0.148873627186))
-        # white-box
-        ds.append(Vector3(0.21396259923, 0.0538839277603, 0.107205629349))
-        # lava-moss
-        ds.append(Vector3(0.0967770918593, 0.0522750997274, 0.0276364684105))
-
-        # Generation settings
-        filename = time.strftime('%y.%m.%d_%H.%M.%S') + '.txt'
-        samples_dir = rospy.get_param('/pr2_pbd_interaction/dataRoot') + \
-            '/data/samples/'
-        if (not os.path.exists(samples_dir)):
-            os.makedirs(samples_dir)
-        data_filename = samples_dir + filename
-        fh = open(data_filename, 'a') # append if it exists, for safety
-        rospy.loginfo("Sampling " + str(len(zs)) + " objects; saving into " +
-            data_filename)
+        if task_n == 1:
+            # fake-iron 
+            ds.append(Vector3(0.140946324722, 0.0966388155749, 0.0660033226013))
+        elif task_n == 2:
+            # red-plate
+            ds.append(Vector3(0.208253721282, 0.153458412609, 0.025651037693))
+        elif task_n == 3:
+            # brown-box
+            ds.append(Vector3(0.250331583552, 0.250164705599, 0.148873627186))
+            # white-box
+            ds.append(Vector3(0.21396259923, 0.0538839277603, 0.107205629349))
+            # lava-moss
+            ds.append(Vector3(0.0967770918593, 0.0522750997274,
+                0.0276364684105))
+        else:
+            # Bad index... this was caught before but it's easier to be
+            # consistent with code structure.
+            rospy.logwarn("Bad task number (" + str(task_n) +") for sampling.")
+            return
 
         # Actually do the generation
-        # First clear the other objects and add the table back
-        self._mock_table()
+        rospy.loginfo("Sampling " + str(len(zs)) + " objects...")
         for i, z in enumerate(zs):
             d = ds[i]
             # Have to keep sampling till we get a good point for this object
@@ -258,13 +291,37 @@ class World:
                 if not World.is_object_within_reach(candidate):
                     continue
 
+                # Ensure it doesn't collide with any other object added so far.
+                # Note that if one objects gets placed badly and there is no
+                # room for the other objects, we could infinite loop here.
+                # Fortunately for our tasks the table is big enough that this
+                # won't happen.
+                if World.collides_with_any_world_obj(candidate):
+                    continue
+
                 # Actually add it
                 self._add_new_object_internal(candidate)
-                # Save to file for bookkeeping
-                World.write_mocked_worldobj_to_file(candidate, fh)
                 break
-        # Cleanup
-        fh.close()
+
+    @staticmethod
+    def collides_with_any_world_obj(obj):
+        '''Returns whether the provided object collides with any of the objects
+        that world is currently tracking.
+
+        Does very rudimentary (generous) collision detection, where it ignores
+        orientation. Also ignores z-dimension entirely as we assume everything
+        is sitting on the table plane.'''
+        p1 = obj.object.pose.position
+        d1 = obj.object.dimensions
+        for other_obj in World.objects:
+            p2 = other_obj.object.pose.position
+            d2 = other_obj.object.dimensions
+            center_dist = norm(array([p1.x - p2.x, p1.y - p2.y]))
+            corner_dist = norm(array([d1.x, d1.y])) / 2 + \
+                norm(array([d2.x, d2.y])) / 2
+            if center_dist < corner_dist:
+                return True
+        return False
 
     @staticmethod
     def get_planar_distance_from_arm(ref_object, arm_index):
@@ -324,6 +381,16 @@ class World:
                 tf.ExtrapolationException):
             rospy.logwarn('Something wrong with transform request.')
             return None
+
+    def write_cur_objs_to_file(self, action_index):
+        data_filename = World.get_objfilename_for_action(action_index)
+        rospy.loginfo("Saving objects to " + data_filename)
+        fh = open(data_filename, 'w')
+        self._lock.acquire()
+        for obj in World.objects:
+            World.write_mocked_worldobj_to_file(obj, fh)
+        self._lock.release()
+        fh.close()
 
     @staticmethod
     def write_mocked_worldobj_to_file(worldObject, fileHandle):
@@ -398,6 +465,11 @@ class World:
     def _reset_objects(self):
         '''Function that removes all objects'''
         self._lock.acquire()
+        self._reset_objects_unlocked()
+        self._lock.release()
+
+    def _reset_objects_unlocked(self):
+        '''Call to remove all objects if you have the lock already.'''
         for i in range(len(World.objects)):
             self._im_server.erase(World.objects[i].int_marker.name)
             self._im_server.applyChanges()
@@ -406,7 +478,6 @@ class World:
         self._im_server.clear()
         self._im_server.applyChanges()
         World.objects = []
-        self._lock.release()
 
     def receive_table_marker(self, marker):
         '''Callback function for markers to determine table'''
@@ -706,12 +777,10 @@ class World:
         # object list, but we want to use it as a trigger for mocking in the new
         # objects. This is because the world isn't notified when you switch
         # actions, so this method call is the best of a notification we get!
-        if action_index > 0 and action_index <= self._max_mocked_action_idx \
-            and action_index != self._cur_action_idx:
+        if action_index > 0 and action_index <= self._max_mocked_action_idx:
             # valid new action, so we mock the new objects
             rospy.loginfo("Mocking objects for action " + str(action_index))
             self._mock_objects_for_action(action_index)
-            self._cur_action_idx = action_index
         return self._get_underlying_objects()
 
     def _get_underlying_objects(self):
@@ -817,7 +886,7 @@ class World:
                 return pose
         else:
             rospy.logwarn('One of the frame objects might not exist: ' +
-                          from_frame + ' or ' + to_frame)
+                from_frame + ' or ' + to_frame)
             return pose
 
     @staticmethod

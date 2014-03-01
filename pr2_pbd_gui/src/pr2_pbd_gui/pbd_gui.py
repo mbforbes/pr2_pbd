@@ -113,10 +113,13 @@ class PbDGUI(Plugin):
         self.currentStep = -1
 
         # Settings
-        self.n_tasks = 3 # How many different action groups we'll have
+        self.n_tasks = int(rospy.get_param('/pr2_pbd_interaction/nTasks'))
         task_names = ['Pick and Place', 'Constrained Pick and Place',
             'Multi-Object Move']
-        self.n_tests = 10 # How many 'actions' we'll have per task
+        if len(task_names) != self.n_tasks:
+            rospy.logwarn("Have specified " + str(len(task_names)) + " task " +
+                "names but only " + str(self.n_tasks) + " tasks in params...")
+        self.n_tests = int(rospy.get_param('/pr2_pbd_interaction/nTests'))
 
         # Main box
         allWidgetsBox = QtGui.QVBoxLayout()
@@ -141,7 +144,7 @@ class PbDGUI(Plugin):
         instructionsBox.addWidget(i2)
         instructionsGroupBox.setLayout(instructionsBox)
 
-        # Create one box per task (3 tasks, 10 actions each)
+        # Create one box per test (x tasks, y tests each; x * y = num actions)
         task_boxes = []
         self.action_grids = []
         self.action_icon_sets = []

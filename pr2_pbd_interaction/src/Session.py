@@ -2,8 +2,6 @@
 
 from ProgrammedAction import ProgrammedAction
 import rospy
-import os
-import shutil
 import time
 import yaml
 from pr2_pbd_interaction.msg import ExperimentState
@@ -14,23 +12,12 @@ from pr2_pbd_interaction.srv import GetExperimentStateResponse
 class Session:
     '''This class holds and maintains experimental data'''
 
-    def __init__(self, object_list, is_debug=False):
-        self._is_reload = rospy.get_param('/pr2_pbd_interaction/isReload')
-        self._n_tests = rospy.get_param('/pr2_pbd_interaction/nTests')
+    def __init__(self, object_list, is_reload=False):
+        self._is_reload = is_reload
+        self._data_dir = rospy.get_param('data_directory')
         self._seed_number = None
-        self._exp_number = None
         self._selected_step = 0
         self._object_list = object_list
-
-        if (is_debug):
-            self._exp_number = rospy.get_param(
-                                '/pr2_pbd_interaction/experimentNumber')
-            self._data_dir = self._get_data_dir(self._exp_number)
-            if (not os.path.exists(self._data_dir)):
-                os.makedirs(self._data_dir)
-        else:
-            self._get_participant_id()
-        rospy.set_param('data_directory', self._data_dir)
 
         self.actions = dict()
         self.current_action_index = 0
@@ -49,6 +36,12 @@ class Session:
                       self.get_experiment_state_cb)
 
         self._update_experiment_state()
+
+    def get_cur_n_unreachable_markers(self):
+        '''Function to allow external querying of number of unreachable
+        markers.'''
+        return (self.actions[self.current_action_index]
+            .get_n_unreachable_markers())
 
     def ping_state(self):
         '''Used to push experiment service state more often (but not absurdly
@@ -109,89 +102,6 @@ class Session:
         step selected, by showing the 6D controls'''
         self.actions[self.current_action_index].select_step(step_id)
         self._selected_step = step_id
-
-    def _get_participant_id(self):
-        '''Gets the experiment number from the command line'''
-        while (self._exp_number == None):
-            try:
-                self._exp_number = int(raw_input(
-                                    'Please enter participant ID:'))
-            except ValueError:
-                rospy.logerr("Participant ID needs to be a number")
-                self._exp_number = None
-                continue
-
-            self._data_dir = Session._get_data_dir(self._exp_number)
-            generate_files = False
-            if (os.path.exists(self._data_dir)):
-                rospy.logwarn('A directory for this participant ' +
-                  'ID already exists: ' + self._data_dir)
-                overwrite = raw_input('Do you want to overwrite? ' +
-                  'Type r to reload the last state ' +
-                  'of the experiment. [y/n/r]')
-                if (overwrite == 'y'):
-                    # Generate the files and overwrite existing data
-                    generate_files = True
-                elif (overwrite == 'n'):
-                    # Ask for number again
-                    self._exp_number = None
-                    continue
-                elif (overwrite == 'r'):
-                    # Don't generate files; reload them
-                    self._is_reload = True
-                else:
-                    # Ask for number again
-                    rospy.logerr('Invalid response, try again.')
-                    self._exp_number = None
-                    continue
-            else:
-                # If the directory doesn't exist, make it and generate files.
-                os.makedirs(self._data_dir)
-                generate_files = True
-            if generate_files:
-                # Copy particular seed's actions _n_tests times each
-                self._seed_dir = Session._get_seed_dir(self._exp_number)
-                seed_actions = sorted(os.listdir(self._seed_dir))
-                rospy.loginfo("SEED ACTIONS: " + str(seed_actions))
-                cur_idx = 1
-                for seed_action in seed_actions:
-                    for i in range(self._n_tests):
-                        shutil.copy(self._seed_dir + seed_action,
-                            self._data_dir + 'Action' + str(cur_idx) + '.bag')
-                        cur_idx += 1
-                # write experiment state
-                exp_state = dict()
-                exp_state['nProgrammedActions'] = cur_idx - 1
-                exp_state['currentProgrammedActionIndex'] = 1
-                # TODO(max): Need to save action completion (fix) state here?
-                state_file = open(self._data_dir + 'experimentState.yaml', 'w')
-                state_file.write(yaml.dump(exp_state))
-                state_file.close()
-
-    @staticmethod
-    def _get_data_dir(exp_number):
-        '''Returns the directory where action information is saved'''
-        return (rospy.get_param('/pr2_pbd_interaction/dataRoot') +
-                    '/data/experiment' + str(exp_number) + '/')
-
-    @staticmethod
-    def _get_seed_number(exp_number):
-        ''' Maps experiment number to seed nubmer'''
-        options = os.listdir(Session._get_root_seed_dir())
-        n_seeds = len(options)
-        return (exp_number % n_seeds) + 1
-
-    @staticmethod
-    def _get_root_seed_dir():
-        '''Gets the directory that contains seed directories'''
-        return rospy.get_param('/pr2_pbd_interaction/dataRoot') + '/data/seed/'
-
-    @staticmethod
-    def _get_seed_dir(exp_number):
-        '''Gets the seed directory (containing the seed files) for the
-        given experiment number'''
-        return Session._get_root_seed_dir() + \
-            str(Session._get_seed_number(exp_number)) + '/'
 
     def save_session_state(self, is_save_actions=True):
         '''Saves the session state onto hard drive'''
