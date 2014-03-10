@@ -3,6 +3,7 @@ import roslib
 roslib.load_manifest('pr2_pbd_interaction')
 
 # Generic libraries
+import glob
 import os
 import time
 import threading
@@ -105,6 +106,11 @@ class World:
     _n_tasks = None
     _n_tests = None
 
+    # For generation
+    gen_obj_dir = rospy.get_param('/pr2_pbd_interaction/dataRoot') + \
+        '/data/objects/'
+    gen_no = 1 # start looking here
+
     def __init__(self):
 
         if World.tf_listener == None:
@@ -183,11 +189,29 @@ class World:
         self._mock_table()
 
     @staticmethod
+    def maybe_inc_gen_no():
+        '''Possibly increments World.gen_no. It will check to see if the
+        directory of generated objects specified by the current World.gen_no has
+        all required objects, and if not, increments it. Otherwise, it leaves it
+        be.'''
+        while len(glob.glob(World.gen_obj_dir + 'generated_' + str(World.gen_no)
+            + '/*')) == 15:
+            World.gen_no += 1
+        rospy.loginfo('Generating objects in generated_' + str(World.gen_no) +
+            '/')
+
+    @staticmethod
     def get_objfilename_for_action(action_index):
         '''Gets the filename where the current action's generated objects will
         be saved (experiment-specific)'''
         filename = 'Action' + str(action_index) + '.txt'
-        objects_dir = rospy.get_param('data_directory') + 'objects/'
+
+        # For use in actions
+        #objects_dir = rospy.get_param('data_directory') + 'objects/'
+
+        # For generation
+        objects_dir = World.gen_obj_dir + 'generated_' + str(World.gen_no) + '/'
+
         if (not os.path.exists(objects_dir)):
             os.makedirs(objects_dir)
         return objects_dir + filename

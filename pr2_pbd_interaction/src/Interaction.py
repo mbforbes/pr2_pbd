@@ -597,42 +597,44 @@ class Interaction:
         if (not self.arms.is_executing()):
             if (self.session.n_actions() > 0):
                 if (command.command == GuiCommand.SWITCH_TO_ACTION):
-                    # NOTE(max): I'm doing the fixing up here but not in the
-                    # speech_command_cb hook or any of the others... this is
-                    # what we got for having non-refactored code... I would
-                    # refactor now but don't have time.
-                    action_no = command.param
-                    obj_filename = World.get_objfilename_for_action(
-                        action_no)
-                    if os.path.exists(obj_filename):
-                        # We've already mocked the objects, so we just load it
-                        # up and let the user keep working on them.
-                        self.session.switch_to_action(action_no,
-                            self.world.get_frame_list(action_no))
-                    else:
-                        # We need to mock the objects until we get the desired
-                        # number of fixable poses.
-                        desired_n_unreachable = World._get_desired_n_unreachable(
-                            action_no)                        
-                        rospy.loginfo("Sampling until " + str(
-                            desired_n_unreachable) + " unreachables.")
-                        while True:
+                    # Possibly increment gen. directory (if all objects
+                    # generated)
+                    World.maybe_inc_gen_no()
+
+                    # Now looping to generate everything
+                    for action_no in range(1, 16):
+                        obj_filename = World.get_objfilename_for_action(
+                            action_no)
+                        if os.path.exists(obj_filename):
+                            # We've already mocked the objects, so we just load it
+                            # up and let the user keep working on them.
                             self.session.switch_to_action(action_no,
                                 self.world.get_frame_list(action_no))
-                            n_unreachable = self.session\
-                                .get_cur_n_unreachable_markers()
-                            if n_unreachable == desired_n_unreachable:
-                                break
-                            else:
-                                rospy.loginfo("Sampled with " + str(
-                                    n_unreachable) + " unreachable, but " +
-                                    "wanted " + str(desired_n_unreachable))
-                        # Save the objects so we don't have to sample again.
-                        self.world.write_cur_objs_to_file(action_no)
-                    response = Response(Interaction.empty_response,
-                        [RobotSpeech.SWITCH_SKILL + str(action_no),
-                         GazeGoal.NOD])
-                    response.respond()
+                        else:
+                            # We need to mock the objects until we get the desired
+                            # number of fixable poses.
+                            desired_n_unreachable = World._get_desired_n_unreachable(
+                                action_no)                        
+                            rospy.loginfo("Sampling until " + str(
+                                desired_n_unreachable) + " unreachables.")
+                            while True:
+                                self.session.switch_to_action(action_no,
+                                    self.world.get_frame_list(action_no))
+                                n_unreachable = self.session\
+                                    .get_cur_n_unreachable_markers()
+                                if n_unreachable == desired_n_unreachable:
+                                    break
+                                else:
+                                    rospy.loginfo("Sampled with " + str(
+                                        n_unreachable) + " unreachable, but " +
+                                        "wanted " + str(desired_n_unreachable))
+                            # Save the objects so we don't have to sample again.
+                            self.world.write_cur_objs_to_file(action_no)
+                        response = Response(Interaction.empty_response,
+                            [RobotSpeech.SWITCH_SKILL + str(action_no),
+                             GazeGoal.NOD])
+                        response.respond()
+                    rospy.lgoinfo('Finished all 15 action switches.')
                 elif (command.command == GuiCommand.SELECT_ACTION_STEP):
                     step_no = command.param
                     self.session.select_action_step(step_no)
