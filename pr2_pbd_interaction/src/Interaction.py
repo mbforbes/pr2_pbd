@@ -42,6 +42,7 @@ class Interaction:
         if (is_debug):
             exp_number = rospy.get_param(
                 '/pr2_pbd_interaction/experimentNumber')
+            rospy.set_param('experiment_number', exp_number)
             data_dir = Interaction._get_data_dir(exp_number)
             rospy.set_param('data_directory', data_dir)
             if (not os.path.exists(data_dir)):
