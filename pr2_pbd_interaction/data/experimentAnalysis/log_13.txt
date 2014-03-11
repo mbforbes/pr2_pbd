@@ -1,0 +1,19 @@
+testfile 	 datafile 	 n_unreachable
+TASK 1
+Debugging...Action1.txt	/home/mbforbes/rosbuild_ws/pr2_pbd/pr2_pbd_interaction/data/seed/1/Action1.bag	0
+Debugging...Action2.txt	/home/mbforbes/rosbuild_ws/pr2_pbd/pr2_pbd_interaction/data/seed/1/Action1.bag	0
+Debugging...Action3.txt	/home/mbforbes/rosbuild_ws/pr2_pbd/pr2_pbd_interaction/data/seed/1/Action1.bag	0
+Debugging...Action4.txt	/home/mbforbes/rosbuild_ws/pr2_pbd/pr2_pbd_interaction/data/seed/1/Action1.bag	0
+Debugging...Action5.txt	/home/mbforbes/rosbuild_ws/pr2_pbd/pr2_pbd_interaction/data/seed/1/Action1.bag	0
+TASK 2
+Debugging...Action6.txt	/home/mbforbes/rosbuild_ws/pr2_pbd/pr2_pbd_interaction/data/seed/1/Action2.bag	4
+Debugging...Action7.txt	/home/mbforbes/rosbuild_ws/pr2_pbd/pr2_pbd_interaction/data/seed/1/Action2.bag	4
+Debugging...Action8.txt	/home/mbforbes/rosbuild_ws/pr2_pbd/pr2_pbd_interaction/data/seed/1/Action2.bag	4
+Debugging...Action9.txt	/home/mbforbes/rosbuild_ws/pr2_pbd/pr2_pbd_interaction/data/seed/1/Action2.bag	4
+Debugging...Action10.txt	/home/mbforbes/rosbuild_ws/pr2_pbd/pr2_pbd_interaction/data/seed/1/Action2.bag	4
+TASK 3
+Debugging...Action11.txt	/home/mbforbes/rosbuild_ws/pr2_pbd/pr2_pbd_interaction/data/seed/1/Action3.bag	0
+Debugging...Action12.txt	/home/mbforbes/rosbuild_ws/pr2_pbd/pr2_pbd_interaction/data/seed/1/Action3.bag	0
+Debugging...Action13.txt	/home/mbforbes/rosbuild_ws/pr2_pbd/pr2_pbd_interaction/data/seed/1/Action3.bag	0
+Debugging...Action14.txt	/home/mbforbes/rosbuild_ws/pr2_pbd/pr2_pbd_interaction/data/seed/1/Action3.bag	0
+Debugging...Action15.txt	/home/mbforbes/rosbuild_ws/pr2_pbd/pr2_pbd_interaction/data/seed/1/Action3.bag	0

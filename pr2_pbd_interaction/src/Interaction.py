@@ -220,6 +220,8 @@ class Interaction:
         directory for this task, loads it, and then checks and logs how many
         unreachable markers there are.'''
         # Set the objects to be mocked as those in the testfile
+        raw_input('Testing:\n\ttest: ' + testfile + '\n\tbag: ' + bagfile +
+            '\n\t' + 'press ENTER to continue...')
         rospy.set_param('da_obj_filename', testfile)
 
         # We always copy into Action1.bag
