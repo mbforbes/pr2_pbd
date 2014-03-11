@@ -93,7 +93,7 @@ class Legend:
         # NOTE(max): Publishing once doesn't work, but publishing infinitely
         # or sleeping before publishing does. Strange.
         # self.marker_pub.publish(marker)
-        rospy.loginfo("Published legend")
+        #rospy.loginfo("Published legend")
 
 class World:
     '''Object recognition and localization related stuff'''
@@ -185,12 +185,23 @@ class World:
     @staticmethod
     def get_objfilename_for_action(action_index):
         '''Gets the filename where the current action's generated objects will
-        be saved (experiment-specific)'''
-        filename = 'Action' + str(action_index) + '.txt'
-        objects_dir = rospy.get_param('data_directory') + 'objects/'
+        be loaded or saved (experiment-specific)'''
+        # For analysis mode, we go into the objects test directory and ignore
+        # the provided action_index.
+        if rospy.get_param('/pr2_pbd_interaction/mode') == 'analysis':
+            objects_dir = rospy.get_param('/pr2_pbd_interaction/dataRoot') + \
+                '/data/objects/test/' 
+            filename = rospy.get_param('da_obj_filename')
+        else:
+            # For debug and study modes, we go into the experiment directory
+            # (and actually make use of the action_index!).
+            objects_dir = rospy.get_param('data_directory') + 'objects/'
+            filename = 'Action' + str(action_index) + '.txt'
         if (not os.path.exists(objects_dir)):
             os.makedirs(objects_dir)
-        return objects_dir + filename
+        result = objects_dir + filename
+        rospy.loginfo('Using objects from ' + result)
+        return result
 
 
     @staticmethod
@@ -586,13 +597,15 @@ class World:
             rospy.logwarn('Did not find a similar object..')
             return None
         else:
-            print 'Object dissimilarity is --- ', best_dist
+            # Print?
+            # print 'Object dissimilarity is --- ', best_dist
             if best_dist > 0.075:
                 rospy.logwarn('Found some objects, but not similar enough.')
                 return None
             else:
-                rospy.loginfo('Most similar to new object '
-                                        + str(chosen_obj_index))
+                # Commenting out for spam.
+                #rospy.loginfo('Most similar to new object '
+                #                        + str(chosen_obj_index))
                 return ref_frame_list[chosen_obj_index]
 
     @staticmethod
@@ -692,7 +705,8 @@ class World:
 
     def _remove_surface(self):
         '''Function to request removing surface'''
-        rospy.loginfo('Removing surface')
+        # Spam
+        #rospy.loginfo('Removing surface')
         self._im_server.erase('surface')
         self._im_server.applyChanges()
         self.surface = None
@@ -779,7 +793,8 @@ class World:
         # actions, so this method call is the best of a notification we get!
         if action_index > 0 and action_index <= self._max_mocked_action_idx:
             # valid new action, so we mock the new objects
-            rospy.loginfo("Mocking objects for action " + str(action_index))
+            # Note: commenting out to reduce spam.
+            #rospy.loginfo("Mocking objects for action " + str(action_index))
             self._mock_objects_for_action(action_index)
         return self._get_underlying_objects()
 
@@ -879,7 +894,10 @@ class World:
                                                               pose_stamped)
                 return rel_ee_pose.pose
             except tf.Exception:
-                rospy.logerr('TF exception during transform.')
+                # This is so common during normal execution it shouldn't be an
+                # error or even logged (IMHO). Anyway, commenting out now to
+                # reduce spam.
+                #rospy.logerr('TF exception during transform.')
                 return pose
             except rospy.ServiceException:
                 rospy.logerr('Exception during transform.')

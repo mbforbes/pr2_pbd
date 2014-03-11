@@ -15,7 +15,6 @@ class Session:
     def __init__(self, object_list, is_reload=False):
         self._is_reload = is_reload
         self._data_dir = rospy.get_param('data_directory')
-        self._seed_number = None
         self._selected_step = 0
         self._object_list = object_list
 
@@ -26,16 +25,24 @@ class Session:
             self._load_session_state(object_list)
             rospy.loginfo("Session state loaded.")
 
-        n_actions = dict()
-        for k in self.actions.keys():
-            n_actions[str(k)] = self.actions[k].n_frames()
-
         self._state_publisher = rospy.Publisher('experiment_state',
                                                 ExperimentState)
         rospy.Service('get_experiment_state', GetExperimentState,
                       self.get_experiment_state_cb)
 
-        self._update_experiment_state()
+        # Commenting out here to avoid having to fully init
+        #self._update_experiment_state()
+
+    def reload_session_state(self, object_list):
+        '''Forces a load from disk. Resets actions.'''
+        # Clearing stuff (as in constructor)
+        self._selected_step = 0
+        self._object_list = object_list
+        self.actions = dict()
+        self.current_action_index = 0
+
+        # Loading and updating (as in constructor)
+        self._load_session_state(object_list)
 
     def get_cur_n_unreachable_markers(self):
         '''Function to allow external querying of number of unreachable
@@ -59,7 +66,10 @@ class Session:
         return GetExperimentStateResponse(self._get_experiment_state())
 
     def _update_experiment_state(self):
-        ''' Publishes a message with the latest state'''
+        ''' Publishes a message with the latest state.
+        TODO: this name is kind of misleading. From reading it it seems like
+        something you call to make sure things are up to date; it actually just 
+        reports the current state rather than changing anything.'''
         state = self._get_experiment_state()
         self._state_publisher.publish(state)
 
@@ -108,7 +118,8 @@ class Session:
         savemsg = 'Saving session state'
         if is_save_actions:
             savemsg += ' and all ' + str(len(self.actions)) + ' actions'
-        rospy.loginfo(savemsg)
+        # Eliminating spam messages...
+        #rospy.loginfo(savemsg)
         exp_state = dict()
         exp_state['nProgrammedActions'] = self.n_actions()
         exp_state['currentProgrammedActionIndex'] = self.current_action_index
@@ -120,7 +131,8 @@ class Session:
         if (is_save_actions):
             for num, action in self.actions.iteritems():
                 action.save(self._data_dir)
-        rospy.loginfo('...done saving')
+        # Eliminating spam messages...
+        #rospy.loginfo('...done saving')
 
     def _log_action_switch(self, new_action_idx):
         '''Dumps user action switch in a log file.'''

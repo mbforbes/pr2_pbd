@@ -1,0 +1,19 @@
+testfile 	 datafile 	 n_unreachable
+TASK 1
+Got user dirs: []Action1.txt	/home/mbforbes/rosbuild_ws/pr2_pbd/pr2_pbd_interaction/data/seed/1/Action1.bag	0
+Got user dirs: []Action2.txt	/home/mbforbes/rosbuild_ws/pr2_pbd/pr2_pbd_interaction/data/seed/1/Action1.bag	0
+Got user dirs: []Action3.txt	/home/mbforbes/rosbuild_ws/pr2_pbd/pr2_pbd_interaction/data/seed/1/Action1.bag	0
+Got user dirs: []Action4.txt	/home/mbforbes/rosbuild_ws/pr2_pbd/pr2_pbd_interaction/data/seed/1/Action1.bag	0
+Got user dirs: []Action5.txt	/home/mbforbes/rosbuild_ws/pr2_pbd/pr2_pbd_interaction/data/seed/1/Action1.bag	0
+TASK 2
+Got user dirs: []Action6.txt	/home/mbforbes/rosbuild_ws/pr2_pbd/pr2_pbd_interaction/data/seed/1/Action2.bag	4
+Got user dirs: []Action7.txt	/home/mbforbes/rosbuild_ws/pr2_pbd/pr2_pbd_interaction/data/seed/1/Action2.bag	4
+Got user dirs: []Action8.txt	/home/mbforbes/rosbuild_ws/pr2_pbd/pr2_pbd_interaction/data/seed/1/Action2.bag	4
+Got user dirs: []Action9.txt	/home/mbforbes/rosbuild_ws/pr2_pbd/pr2_pbd_interaction/data/seed/1/Action2.bag	4
+Got user dirs: []Action10.txt	/home/mbforbes/rosbuild_ws/pr2_pbd/pr2_pbd_interaction/data/seed/1/Action2.bag	4
+TASK 3
+Got user dirs: []Action11.txt	/home/mbforbes/rosbuild_ws/pr2_pbd/pr2_pbd_interaction/data/seed/1/Action3.bag	0
+Got user dirs: []Action12.txt	/home/mbforbes/rosbuild_ws/pr2_pbd/pr2_pbd_interaction/data/seed/1/Action3.bag	0
+Got user dirs: []Action13.txt	/home/mbforbes/rosbuild_ws/pr2_pbd/pr2_pbd_interaction/data/seed/1/Action3.bag	0
+Got user dirs: []Action14.txt	/home/mbforbes/rosbuild_ws/pr2_pbd/pr2_pbd_interaction/data/seed/1/Action3.bag	0
+Got user dirs: []Action15.txt	/home/mbforbes/rosbuild_ws/pr2_pbd/pr2_pbd_interaction/data/seed/1/Action3.bag	0

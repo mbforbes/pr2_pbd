@@ -1,0 +1,16 @@
+testfile 	 datafile 	 n_unreachable
+	Action1.txt	/home/mbforbes/rosbuild_ws/pr2_pbd/pr2_pbd_interaction/data/seed/1/Action1.bag	0
+	Action2.txt	/home/mbforbes/rosbuild_ws/pr2_pbd/pr2_pbd_interaction/data/seed/1/Action1.bag	0
+	Action3.txt	/home/mbforbes/rosbuild_ws/pr2_pbd/pr2_pbd_interaction/data/seed/1/Action1.bag	0
+	Action4.txt	/home/mbforbes/rosbuild_ws/pr2_pbd/pr2_pbd_interaction/data/seed/1/Action1.bag	0
+	Action5.txt	/home/mbforbes/rosbuild_ws/pr2_pbd/pr2_pbd_interaction/data/seed/1/Action1.bag	0
+	Action6.txt	/home/mbforbes/rosbuild_ws/pr2_pbd/pr2_pbd_interaction/data/seed/1/Action2.bag	4
+	Action7.txt	/home/mbforbes/rosbuild_ws/pr2_pbd/pr2_pbd_interaction/data/seed/1/Action2.bag	4
+	Action8.txt	/home/mbforbes/rosbuild_ws/pr2_pbd/pr2_pbd_interaction/data/seed/1/Action2.bag	4
+	Action9.txt	/home/mbforbes/rosbuild_ws/pr2_pbd/pr2_pbd_interaction/data/seed/1/Action2.bag	4
+	Action10.txt	/home/mbforbes/rosbuild_ws/pr2_pbd/pr2_pbd_interaction/data/seed/1/Action2.bag	4
+	Action11.txt	/home/mbforbes/rosbuild_ws/pr2_pbd/pr2_pbd_interaction/data/seed/1/Action3.bag	0
+	Action12.txt	/home/mbforbes/rosbuild_ws/pr2_pbd/pr2_pbd_interaction/data/seed/1/Action3.bag	0
+	Action13.txt	/home/mbforbes/rosbuild_ws/pr2_pbd/pr2_pbd_interaction/data/seed/1/Action3.bag	0
+	Action14.txt	/home/mbforbes/rosbuild_ws/pr2_pbd/pr2_pbd_interaction/data/seed/1/Action3.bag	0
+	Action15.txt	/home/mbforbes/rosbuild_ws/pr2_pbd/pr2_pbd_interaction/data/seed/1/Action3.bag	0

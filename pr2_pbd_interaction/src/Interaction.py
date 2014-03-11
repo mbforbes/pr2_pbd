@@ -4,6 +4,7 @@ import roslib
 roslib.load_manifest('pr2_pbd_interaction')
 
 # Generic libraries
+import glob
 import rospy
 import os
 import shutil
@@ -36,31 +37,63 @@ class Interaction:
 
     def __init__(self):
         # We need the participant ID before we construct the Session as it's
-        # used in world.get_frame_list, so we're migrating part of it here.
-        is_reload = rospy.get_param('/pr2_pbd_interaction/isReload')
-        is_debug = False # Manually set this
-        if (is_debug):
+        # used in world.get_frame_list, so we're migrating part of it here.        
+        mode = rospy.get_param('/pr2_pbd_interaction/mode')
+        if mode == 'debug':
+            is_reload = rospy.get_param('/pr2_pbd_interaction/isReload')
             exp_number = rospy.get_param(
                 '/pr2_pbd_interaction/experimentNumber')
-            rospy.set_param('experiment_number', exp_number)
             data_dir = Interaction._get_data_dir(exp_number)
-            rospy.set_param('data_directory', data_dir)
             if (not os.path.exists(data_dir)):
                 os.makedirs(data_dir)
-        else:
+            rospy.set_param('data_directory', data_dir)
+        elif mode == 'study':
+            # We always reload becuase we are either (a) actually realoading, or
+            # (b) copying in the seeds and then 'reloading' them for editing.
             is_reload = True
+            # This function sets the rospy params experiment_number and
+            # data_directory.
             self._get_participant_id()
+        elif mode == 'analysis':
+            # We'll pretty much only be doing reloading, but not at first :-)
+            is_reload = False
+            data_dir = rospy.get_param('/pr2_pbd_interaction/dataRoot') + \
+                '/data/experimentAnalysis/'
+            if (not os.path.exists(data_dir)):
+                os.makedirs(data_dir)
+            rospy.set_param('data_directory', data_dir)
+
+            # Make logfile
+            lognum = 1
+            while os.path.exists(data_dir + 'log_' + str(lognum) + '.txt'):
+                lognum += 1
+            self.logfile = data_dir + 'log_' + str(lognum) + '.txt'
+
+            # Generate the experimentState.yaml (dummy; just 1,1)
+            exp_state = dict()
+            exp_state['nProgrammedActions'] = 1
+            exp_state['currentProgrammedActionIndex'] = 1
+            state_file = open(data_dir + 'experimentState.yaml', 'w')
+            state_file.write(yaml.dump(exp_state))
+            state_file.close()
+        else:
+            # This may be overkill, but I'd rather this for now that dealing
+            # with weird errors later.
+            rospy.logfatal('Must specify program mode. Killing node.')
+            exit(1)
 
         # Old init starts here
         self.arms = Arms()
         self.world = World()
+
         # NOTE(max): Can't get the current action number from the session
         # becauase we're creating it. More importantly, the world needs to
         # access the fully-initialized session before it can mock objects (which
-        # happens in get_frame_list()) and it's can't yet, so just use action 0
+        # happens in get_frame_list()) and it can't yet, so just use action 0
         # to return an empty object list back.
-        self.session = Session(object_list=self.world.get_frame_list(1),
-            is_reload=is_reload)
+        self.session = Session(object_list=[], is_reload=is_reload)
+
+
         self._viz_publisher = rospy.Publisher('visualization_marker_array',
             MarkerArray)
 
@@ -99,7 +132,111 @@ class Interaction:
             Command.STOP_RECORDING_MOTION: Response(self.stop_recording, None)
             }
 
+        if mode == 'analysis':
+            self._run_feasibility_analysis()
+
         rospy.loginfo('Interaction initialized.')
+
+    def _run_feasibility_analysis(self):
+        ''' Runs feasibility analysis on collected data to objects in 
+        [data root]/data/objects/test/'''
+        # settings
+        tasks = [1,2,3]
+        # Implict: only one seed (so there is just a single seed directory 1/)
+        # Implict: test objects are numbered 1-15, 5 each for each task
+        dirs_to_remove = [
+            './experiment1/', # my 'experiment' for testing things out
+            './experimentAnaylsis/' # where the analysis data is cached
+        ]
+        root_dir = rospy.get_param('/pr2_pbd_interaction/dataRoot') + '/'
+
+        # Print format
+        self.log = open(self.logfile, 'w')
+        self.log.write('testfile \t datafile \t n_unreachable\n')
+
+        # Loop tasks
+        for task in tasks:
+            rospy.loginfo('- Running task ' + str(task) + ' of ' +
+                str(max(tasks)))
+            self.log.write("TASK " + str(task) + '\n')
+            # Maps 1 -> 1,2,3,4,5, 2 - > 6,7,8,9,10, etc.
+            filenames = ['Action' + str(i) + '.txt' for i in
+                range((task - 1) * 5 + 1, task * 5 + 1)]
+            # Loop test cases
+            for testfile in filenames:
+                # Get user data
+                globpath = root_dir + 'data/experiment*'
+                user_dirs = [d + '/' for d in glob.glob(globpath)]
+                # Debug...
+                #self.log.write('Globbing ' + globpath + '; got: ' +
+                #    str(user_dirs) + '\n')
+
+                # Clean
+                for user_dir in user_dirs:
+                    for dir_to_remove in dirs_to_remove:
+                        # Using 'endswith' becuase glob can return different
+                        # things depending on how you specify the path.
+                        if user_dir.endswith(dir_to_remove):
+                            user_dirs.remove(user_dir)
+                # Loop users
+                for user_dir in user_dirs:
+                    bags = glob.glob(user_dir + '*.bag')
+                    if len(bags) == 30:
+                        # Case for just user 2; map 1->1,2,...10, 2->11-20, ...
+                        multiplier = 10
+                    elif len(bags) == 15:
+                        # Case for rest of users; 5 bags / action (1->1-5, etc.)
+                        multiplier = 5
+                    else:
+                        # Sometimes not done yet or empty dir or something; skip
+                        continue
+                    valid_bag_endings = ['Action' + str(i) + '.bag' for i in \
+                        range((task - 1) * multiplier + 1,
+                            task * multiplier + 1)]
+                    valid_bags = []
+                    for b in bags:
+                        for vbe in valid_bag_endings:
+                            if b.endswith(vbe):
+                                valid_bags += [b]
+                                break
+                    # Loop user's fixes (scenarios)
+                    for bag in valid_bags:
+                        pass
+                        # Normally do! Just running seeds for now :-)
+                        #self._do_feasability_test(testfile, bag)
+
+                # Test the seed (currently assuming just one seed directory 1/)
+                seed_bag = Interaction._get_root_seed_dir() + '1/Action' + \
+                    str(task) + '.bag'
+                # Note: as a sanity check, for good test cases (e.g. those we
+                # auto-generate), THESE SHOULD NEVER RETURN 0 (for a seed).
+                self._do_feasability_test(testfile, seed_bag)
+
+        # Cleanup
+        self.log.close()
+
+    def _do_feasability_test(self, testfile, bagfile):
+        '''Copies bagfile (either fixed data from user or seed) into the data
+        directory for this task, loads it, and then checks and logs how many
+        unreachable markers there are.'''
+        # Set the objects to be mocked as those in the testfile
+        rospy.set_param('da_obj_filename', testfile)
+
+        # We always copy into Action1.bag
+        dest = rospy.get_param('data_directory') + 'Action1.bag'
+        shutil.copy(bagfile, dest)
+
+        # Provide dummy val (1) for action_index to get_frame_list because it's
+        # just going to use the rospy setting above (the parameter
+        # da_obj_filename).
+        self.session.reload_session_state(self.world.get_frame_list(1))
+        # I think I need to actually call switch_to_action in order to get any
+        # kind of results?
+        self.session.switch_to_action(1, self.world.get_frame_list(1))
+        n_unreachable = self.session.get_cur_n_unreachable_markers()
+        self.log.write('Debugging...')
+        self.log.write(testfile + '\t' + bagfile + '\t' +
+            str(n_unreachable) + '\n')
 
     @staticmethod
     def _get_participant_id():
@@ -170,7 +307,6 @@ class Interaction:
                 state_file.close()
         # Save the parameters for global access
         rospy.set_param('data_directory', data_dir)
-        rospy.set_param('experiment_number', exp_number)
     
     @staticmethod
     def _get_data_dir(exp_number):
