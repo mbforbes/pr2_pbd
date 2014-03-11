@@ -1,3 +1,0 @@
-testfile 	 datafile 	 n_unreachable
-TASK 1
-Debugging...Action1.txt	/home/mbforbes/rosbuild_ws/pr2_pbd/pr2_pbd_interaction/data/seed/1/Action1.bag	0

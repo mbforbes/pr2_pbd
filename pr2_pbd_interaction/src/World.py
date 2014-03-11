@@ -200,7 +200,8 @@ class World:
         if (not os.path.exists(objects_dir)):
             os.makedirs(objects_dir)
         result = objects_dir + filename
-        rospy.loginfo('Using objects from ' + result)
+        # Spam...
+        #rospy.loginfo('Using objects from ' + result)
         return result
 
 
