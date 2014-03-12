@@ -635,7 +635,7 @@ class Interaction:
                             [RobotSpeech.SWITCH_SKILL + str(action_no),
                              GazeGoal.NOD])
                         response.respond()
-                    rospy.lgoinfo('Finished all 15 action switches.')
+                    rospy.loginfo('Finished all 15 action switches.')
                 elif (command.command == GuiCommand.SELECT_ACTION_STEP):
                     step_no = command.param
                     self.session.select_action_step(step_no)
