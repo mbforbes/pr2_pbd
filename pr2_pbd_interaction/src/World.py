@@ -204,7 +204,7 @@ class World:
     def get_objfilename_for_action(action_index):
         '''Gets the filename where the current action's generated objects will
         be saved (experiment-specific)'''
-        
+        filename = 'Action' + str(action_index) + '.txt'
 
         # For use in actions
         #objects_dir = rospy.get_param('data_directory') + 'objects/'
