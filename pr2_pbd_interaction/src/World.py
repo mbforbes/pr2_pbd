@@ -204,7 +204,7 @@ class World:
     def get_objfilename_for_action(action_index):
         '''Gets the filename where the current action's generated objects will
         be saved (experiment-specific)'''
-        filename = 'Action' + str(action_index) + '.txt'
+        
 
         # For use in actions
         #objects_dir = rospy.get_param('data_directory') + 'objects/'
@@ -215,6 +215,17 @@ class World:
         if (not os.path.exists(objects_dir)):
             os.makedirs(objects_dir)
         return objects_dir + filename
+
+    @staticmethod
+    def get_expfilename(action_index):
+        '''Save generated objects in exp directory as well; always 3 more than
+        gen. dir'''
+        filename = 'Action' + str(action_index) + '.txt'
+        exp_dir = rospy.get_param('pr2_pbd_interaction/dataRoot') + \
+            '/data/experiment' + str(World.gen_no + 3) + '/objects/'
+        if (not os.path.exists(exp_dir)):
+            os.makedirs(exp_dir)
+        return exp_dir + filename
 
 
     @staticmethod
@@ -407,14 +418,17 @@ class World:
             return None
 
     def write_cur_objs_to_file(self, action_index):
-        data_filename = World.get_objfilename_for_action(action_index)
-        rospy.loginfo("Saving objects to " + data_filename)
-        fh = open(data_filename, 'w')
-        self._lock.acquire()
-        for obj in World.objects:
-            World.write_mocked_worldobj_to_file(obj, fh)
-        self._lock.release()
-        fh.close()
+        gen_file = World.get_objfilename_for_action(action_index)
+        exp_file = World.get_expfilename(action_index)
+        filenames = [gen_file, exp_file]
+        for data_filename in filenames:
+            rospy.loginfo("Saving objects to " + data_filename)
+            fh = open(data_filename, 'w')
+            self._lock.acquire()
+            for obj in World.objects:
+                World.write_mocked_worldobj_to_file(obj, fh)
+            self._lock.release()
+            fh.close()
 
     @staticmethod
     def write_mocked_worldobj_to_file(worldObject, fileHandle):
