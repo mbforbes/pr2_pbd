@@ -4,6 +4,7 @@ import roslib
 roslib.load_manifest('pr2_pbd_interaction')
 
 # Generic libraries
+import glob
 import rospy
 import os
 import shutil
@@ -35,32 +36,78 @@ class Interaction:
     _trajectory_start_time = None
 
     def __init__(self):
-        # We need the participant ID before we construct the Session as it's
-        # used in world.get_frame_list, so we're migrating part of it here.
-        is_reload = rospy.get_param('/pr2_pbd_interaction/isReload')
-        is_debug = False # Manually set this
-        if (is_debug):
-            exp_number = rospy.get_param(
-                '/pr2_pbd_interaction/experimentNumber')
-            rospy.set_param('experiment_number', exp_number)
-            data_dir = Interaction._get_data_dir(exp_number)
-            rospy.set_param('data_directory', data_dir)
-            if (not os.path.exists(data_dir)):
-                os.makedirs(data_dir)
-        else:
-            is_reload = True
-            self._get_participant_id()
-
-        # Old init starts here
+        # Moving items from old init up here so we can use world in conditional
+        # init code below.
         self.arms = Arms()
         self.world = World()
+
+        # We need the participant ID before we construct the Session as it's
+        # used in world.get_frame_list, so we're migrating part of it here.        
+        mode = rospy.get_param('/pr2_pbd_interaction/mode')
+        objects = []
+        if mode == 'debug':
+            is_reload = rospy.get_param('/pr2_pbd_interaction/isReload')
+            exp_number = rospy.get_param(
+                '/pr2_pbd_interaction/experimentNumber')
+            data_dir = Interaction._get_data_dir(exp_number)
+            if (not os.path.exists(data_dir)):
+                os.makedirs(data_dir)
+            rospy.set_param('data_directory', data_dir)
+        elif mode == 'study':
+            # We always reload becuase we are either (a) actually realoading, or
+            # (b) copying in the seeds and then 'reloading' them for editing.
+            is_reload = True
+            # This function sets the rospy params experiment_number and
+            # data_directory.
+            self._get_participant_id()
+        elif mode == 'analysis':
+            # We'll be reloading some deafult / dummy action first.
+            is_reload = True
+            data_dir = rospy.get_param('/pr2_pbd_interaction/dataRoot') + \
+                '/data/experimentAnalysis/'
+            if (not os.path.exists(data_dir)):
+                os.makedirs(data_dir)
+            rospy.set_param('data_directory', data_dir)
+
+            # Copy over default first test so that things work.
+            rospy.set_param('da_obj_filename', 'Action1.txt')
+            objects = self.world.get_frame_list(1)
+
+            # Copy over seed action to load so that things like getting the
+            # experiment state in the session work. (Otherwise GUI can't start,
+            # etc.)
+            default_bag = Interaction._get_root_seed_dir() + '1/Action1.bag'
+            shutil.copy(default_bag, data_dir + 'Action1.bag')
+
+            # Make logfile
+            lognum = 1
+            while os.path.exists(data_dir + 'log_' + str(lognum) + '.txt'):
+                lognum += 1
+            self.logfile = data_dir + 'log_' + str(lognum) + '.txt'
+
+            # Generate the experimentState.yaml (dummy; just 1,1)
+            exp_state = dict()
+            exp_state['nProgrammedActions'] = 1
+            exp_state['currentProgrammedActionIndex'] = 1
+            state_file = open(data_dir + 'experimentState.yaml', 'w')
+            state_file.write(yaml.dump(exp_state))
+            state_file.close()
+        else:
+            # This may be overkill, but I'd rather this for now that dealing
+            # with weird errors later.
+            rospy.logfatal('Must specify program mode. Killing node.')
+            exit(1)
+
+
+        # Old init continues here...
+
         # NOTE(max): Can't get the current action number from the session
         # becauase we're creating it. More importantly, the world needs to
         # access the fully-initialized session before it can mock objects (which
-        # happens in get_frame_list()) and it's can't yet, so just use action 0
+        # happens in get_frame_list()) and it can't yet, so just use action 0
         # to return an empty object list back.
-        self.session = Session(object_list=self.world.get_frame_list(1),
-            is_reload=is_reload)
+        self.session = Session(object_list=objects, is_reload=is_reload)
+
         self._viz_publisher = rospy.Publisher('visualization_marker_array',
             MarkerArray)
 
@@ -99,7 +146,126 @@ class Interaction:
             Command.STOP_RECORDING_MOTION: Response(self.stop_recording, None)
             }
 
+        # NOTE: running on GUI click instead
+        #if mode == 'analysis':
+        #    self._run_feasibility_analysis()
+
         rospy.loginfo('Interaction initialized.')
+
+    def _run_feasibility_analysis(self):
+        ''' Runs feasibility analysis on collected data to objects in 
+        [data root]/data/objects/test/'''
+        # settings
+        tasks = [1,2,3]
+        # Implict: only one seed (so there is just a single seed directory 1/)
+        # Implict: test objects are numbered 1-15, 5 each for each task
+        dirs_to_remove = [
+            './experiment1/', # my 'experiment' for testing things out
+            './experimentAnaylsis/' # where the analysis data is cached
+        ]
+        root_dir = rospy.get_param('/pr2_pbd_interaction/dataRoot') + '/'
+
+        # Print format
+        self.log = open(self.logfile, 'w')
+        self.log.write('test_no,user_no,scenario_no,n_unreachable\n')
+
+        # Loop tasks
+        for task in tasks:
+            rospy.loginfo('- Running task ' + str(task) + ' of ' +
+                str(max(tasks)))
+            self.log.write("TASK " + str(task) + '\n')
+            # Maps 1 -> 1,2,3,4,5, 2 - > 6,7,8,9,10, etc.
+            filenames = ['Action' + str(i) + '.txt' for i in
+                range((task - 1) * 5 + 1, task * 5 + 1)]
+            # Loop test cases
+            for testfile in filenames:
+                # Get user data
+                globpath = root_dir + 'data/experiment*'
+                user_dirs = sorted([d + '/' for d in glob.glob(globpath)])
+                # Debug...
+                #self.log.write('Globbing ' + globpath + '; got: ' +
+                #    str(user_dirs) + '\n')
+
+                # Clean
+                for user_dir in user_dirs:
+                    for dir_to_remove in dirs_to_remove:
+                        # Using 'endswith' becuase glob can return different
+                        # things depending on how you specify the path.
+                        if user_dir.endswith(dir_to_remove):
+                            user_dirs.remove(user_dir)
+
+                # Test the seed (currently assuming just one seed directory 1/)
+                seed_bag = Interaction._get_root_seed_dir() + '1/Action' + \
+                    str(task) + '.bag'
+                # Note: as a sanity check, for good test cases (e.g. those we
+                # auto-generate), THESE SHOULD NEVER RETURN 0 (for a seed).
+                self._do_feasability_test(testfile, seed_bag)
+
+                # Loop users
+                for user_dir in user_dirs:
+                    bags = sorted(glob.glob(user_dir + '*.bag'))
+                    if len(bags) == 30:
+                        # Case for just user 2; map 1->1,2,...10, 2->11-20, ...
+                        multiplier = 10
+                    elif len(bags) == 15:
+                        # Case for rest of users; 5 bags / action (1->1-5, etc.)
+                        multiplier = 5
+                    else:
+                        # Sometimes not done yet or empty dir or something; skip
+                        continue
+                    valid_bag_endings = ['Action' + str(i) + '.bag' for i in \
+                        range((task - 1) * multiplier + 1,
+                            task * multiplier + 1)]
+                    valid_bags = []
+                    for b in bags:
+                        for vbe in valid_bag_endings:
+                            if b.endswith(vbe):
+                                valid_bags += [b]
+                                break
+                    # Loop user's fixes (scenarios)
+                    for bag in sorted(valid_bags):
+                        pass
+                        self._do_feasability_test(testfile, bag)
+
+        # Cleanup
+        self.log.close()
+
+    def _do_feasability_test(self, testfile, bagfile):
+        '''Copies bagfile (either fixed data from user or seed) into the data
+        directory for this task, loads it, and then checks and logs how many
+        unreachable markers there are.'''
+        # Set the objects to be mocked as those in the testfile
+        #raw_input('Testing:\n\ttest: ' + testfile + '\n\tbag: ' + bagfile +
+        #    '\n\t' + 'press ENTER to continue...')
+        rospy.set_param('da_obj_filename', testfile)
+
+        # We always copy into Action1.bag
+        dest = rospy.get_param('data_directory') + 'Action1.bag'
+        shutil.copy(bagfile, dest)
+
+        # Provide dummy val (1) for action_index to get_frame_list because it's
+        # just going to use the rospy setting above (the parameter
+        # da_obj_filename).
+        self.session.reload_session_state(self.world.get_frame_list(1))
+        # I think I need to actually call switch_to_action in order to get any
+        # kind of results?
+        self.session.switch_to_action(1, self.world.get_frame_list(1))
+        n_unreachable = self.session.get_cur_n_unreachable_markers()
+
+        # extract info for logging
+        # 'Action14.txt' -> '14'
+        test_no = testfile.split('.')[0].split('n')[1] 
+        if bagfile.find('seed') > -1:
+            # Seed
+            self.log.write(test_no + ',seed,' + str(n_unreachable) + '\n')            
+        else:
+            # User / scenario
+            # '.../experiment12/Action11.bag' -> '12'
+            user_no = bagfile.split('/')[-2].split('t')[1]
+            # '.../experiment12/Action11.bag' -> '11'
+            scenario_no = bagfile.split('/')[-1].split('.')[0].split('n')[1]
+            self.log.write(test_no + ',' + user_no + ',' + scenario_no + ',' +
+                str(n_unreachable) + '\n')
 
     @staticmethod
     def _get_participant_id():
@@ -170,7 +336,6 @@ class Interaction:
                 state_file.close()
         # Save the parameters for global access
         rospy.set_param('data_directory', data_dir)
-        rospy.set_param('experiment_number', exp_number)
     
     @staticmethod
     def _get_data_dir(exp_number):
@@ -598,38 +763,45 @@ class Interaction:
         if (not self.arms.is_executing()):
             if (self.session.n_actions() > 0):
                 if (command.command == GuiCommand.SWITCH_TO_ACTION):
-                    # NOTE(max): I'm doing the fixing up here but not in the
-                    # speech_command_cb hook or any of the others... this is
-                    # what we got for having non-refactored code... I would
-                    # refactor now but don't have time.
                     action_no = command.param
-                    obj_filename = World.get_objfilename_for_action(
-                        action_no)
-                    if os.path.exists(obj_filename):
-                        # We've already mocked the objects, so we just load it
-                        # up and let the user keep working on them.
-                        self.session.switch_to_action(action_no,
-                            self.world.get_frame_list(action_no))
+                    mode = rospy.get_param('/pr2_pbd_interaction/mode')
+                    if mode == 'analysis':
+                        # Hack: in analysis mode, clicking on any action runs
+                        # the full feasability analysis (all tasks, all tests,
+                        # all user / seed data).
+                        self._run_feasibility_analysis()
                     else:
-                        # We need to mock the objects until we get the desired
-                        # number of fixable poses.
-                        desired_n_unreachable = World._get_desired_n_unreachable(
-                            action_no)                        
-                        rospy.loginfo("Sampling until " + str(
-                            desired_n_unreachable) + " unreachables.")
-                        while True:
+                        # NOTE(max): I'm doing the fixing up here but not in the
+                        # speech_command_cb hook or any of the others... this is
+                        # what we got for having non-refactored code... I would
+                        # refactor now but don't have time.
+                        obj_filename = World.get_objfilename_for_action(
+                            action_no)
+                        if os.path.exists(obj_filename):
+                            # We've already mocked the objects, so we just load it
+                            # up and let the user keep working on them.
                             self.session.switch_to_action(action_no,
                                 self.world.get_frame_list(action_no))
-                            n_unreachable = self.session\
-                                .get_cur_n_unreachable_markers()
-                            if n_unreachable == desired_n_unreachable:
-                                break
-                            else:
-                                rospy.loginfo("Sampled with " + str(
-                                    n_unreachable) + " unreachable, but " +
-                                    "wanted " + str(desired_n_unreachable))
-                        # Save the objects so we don't have to sample again.
-                        self.world.write_cur_objs_to_file(action_no)
+                        else:
+                            # We need to mock the objects until we get the desired
+                            # number of fixable poses.
+                            desired_n_unreachable = World._get_desired_n_unreachable(
+                                action_no)                        
+                            rospy.loginfo("Sampling until " + str(
+                                desired_n_unreachable) + " unreachables.")
+                            while True:
+                                self.session.switch_to_action(action_no,
+                                    self.world.get_frame_list(action_no))
+                                n_unreachable = self.session\
+                                    .get_cur_n_unreachable_markers()
+                                if n_unreachable == desired_n_unreachable:
+                                    break
+                                else:
+                                    rospy.loginfo("Sampled with " + str(
+                                        n_unreachable) + " unreachable, but " +
+                                        "wanted " + str(desired_n_unreachable))
+                            # Save the objects so we don't have to sample again.
+                            self.world.write_cur_objs_to_file(action_no)
                     response = Response(Interaction.empty_response,
                         [RobotSpeech.SWITCH_SKILL + str(action_no),
                          GazeGoal.NOD])
