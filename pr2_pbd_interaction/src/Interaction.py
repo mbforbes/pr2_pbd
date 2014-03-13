@@ -173,7 +173,12 @@ class Interaction:
 
         # Print format
         self.log = open(self.logfile, 'w')
-        self.log.write('test_no,user_no,scenario_no,n_unreachable\n')
+        # New format
+        self.log.write('task_no,no_unreachable_before_fixing,test_dir_no,' +
+            'test_action_no,user_no,user_action_no,no_unreachable_result,' +
+            'user_orig_no_unreachable\n')
+        # Original format
+        #self.log.write('test_no,user_no,scenario_no,n_unreachable\n')
 
         # Loop tasks
         for task in tasks:
@@ -271,14 +276,14 @@ class Interaction:
 
         # extract info for logging (one line each, comma-separated)
         # format:
-        #  - task [yes]
-        #  - no. unreachable before fixing [yes]
-        #  - test dir no. [yes]
-        #  - test action no. (test_no) [yes]
-        #  - user no. [yes]
-        #  - user action no. (scenario no.) [yes]
-        #  - no. unreachable with this fix (n_unreachable) [yes]
-        #  - orig. no. unreachable (for user's action) [yes]
+        #  - task
+        #  - no. unreachable before fixing
+        #  - test dir no.
+        #  - test action no. (test_no)
+        #  - user no.
+        #  - user action no. (scenario no.)
+        #  - no. unreachable result (n_unreachable)
+        #  - user orig. no. unreachable (for user's action)
 
         # '.../gentest_5/' -> '5'
         test_dir_no = test_dir.split('/')[-2].split('_')[-1]
@@ -309,7 +314,7 @@ class Interaction:
 
             self.log.write(str(task) + ',' + str(n_unreachable_before_fix) +
                 ',' + test_dir_no + ',' + test_no + ',' + user_no + ',' + 
-                scenario_no + ',' + n_unreachable + ',' +
+                scenario_no + ',' + str(n_unreachable) + ',' +
                 str(n_unreachable_user_orig) + '\n')
 
             # Original format
