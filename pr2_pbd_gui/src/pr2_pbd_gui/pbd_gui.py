@@ -40,7 +40,10 @@ class ActionIcon(QtGui.QGridLayout):
         path = path[0:len(path)-1]
         self.notSelectedIconPath = path + '/icons/actions0.png'
         self.selectedIconPath = path + '/icons/actions1.png'
+        self.notSelectedDoneIconPath = path + '/icons/actions0_done.png'
+        self.selectedDoneIconPath = path + '/icons/actions1_done.png'
         self.selected = True
+        self.all_reachable = False
         self.actionIconWidth = 50
         self.index = index
         self.icon = ClickableLabel(parent, index, clickCallback)
@@ -55,10 +58,17 @@ class ActionIcon(QtGui.QGridLayout):
     
     def updateView(self):
         if self.selected:
-            pixmap = QtGui.QPixmap(self.selectedIconPath)
+            if self.all_reachable:
+                pixmap = QtGui.QPixmap(self.selectedDoneIconPath)
+            else:
+                pixmap = QtGui.QPixmap(self.selectedIconPath)
         else:
-            pixmap = QtGui.QPixmap(self.notSelectedIconPath)
-        self.icon.setPixmap(pixmap.scaledToWidth(self.actionIconWidth, QtCore.Qt.SmoothTransformation))
+            if self.all_reachable:
+                pixmap = QtGui.QPixmap(self.notSelectedDoneIconPath)
+            else:
+                pixmap = QtGui.QPixmap(self.notSelectedIconPath)
+        self.icon.setPixmap(pixmap.scaledToWidth(self.actionIconWidth,
+            QtCore.Qt.SmoothTransformation))
 
 
 class PbDGUI(Plugin):
@@ -74,7 +84,6 @@ class PbDGUI(Plugin):
         self.gui_cmd_publisher = rospy.Publisher('gui_command', GuiCommand)
         
         rospy.Subscriber('experiment_state', ExperimentState, self.exp_state_cb)
-        rospy.Subscriber('robotsound', SoundRequest, self.robotSoundReceived)
         
         QtGui.QToolTip.setFont(QtGui.QFont('SansSerif', 10))
         self.exp_state_sig.connect(self.update_state)
@@ -103,104 +112,63 @@ class PbDGUI(Plugin):
         self.currentAction = -1
         self.currentStep = -1
 
+        # Settings
+        self.n_tasks = int(rospy.get_param('/pr2_pbd_interaction/nTasks'))
+        task_names = ['Pick and Place', 'Constrained Pick and Place',
+            'Multi-Object Move']
+        if len(task_names) != self.n_tasks:
+            rospy.logwarn("Have specified " + str(len(task_names)) + " task " +
+                "names but only " + str(self.n_tasks) + " tasks in params...")
+        self.n_tests = int(rospy.get_param('/pr2_pbd_interaction/nTests'))
+
+        # Main box
         allWidgetsBox = QtGui.QVBoxLayout()
-        actionBox = QGroupBox('Actions', self._widget)
-        self.actionGrid = QtGui.QGridLayout()
-        self.actionGrid.setHorizontalSpacing(0)
-        for i in range(6):
-            self.actionGrid.addItem(QtGui.QSpacerItem(90, 90), 0, i, QtCore.Qt.AlignCenter)
-            self.actionGrid.setColumnStretch(i, 0)
-        self.actionIcons = dict()
-        actionBoxLayout = QtGui.QHBoxLayout()
-        actionBoxLayout.addLayout(self.actionGrid)
-        actionBox.setLayout(actionBoxLayout)
-        
-        actionButtonGrid = QtGui.QHBoxLayout()
-        actionButtonGrid.addWidget(self.create_button(
-                                        Command.CREATE_NEW_ACTION))
-        self.stepsBox = QGroupBox('No actions created yet', self._widget)
-        self.stepsGrid = QtGui.QGridLayout()
-        
-        self.l_model = QtGui.QStandardItemModel(self)
-        self.l_view = self._create_table_view(self.l_model,
-                                              self.l_row_clicked_cb)
-        self.r_model = QtGui.QStandardItemModel(self)
-        self.r_view = self._create_table_view(self.r_model,
-                                              self.r_row_clicked_cb)
 
-        self.stepsGrid.addItem(QtGui.QSpacerItem(280, 10), 0, 0, 2, 3)
-        self.stepsGrid.addItem(QtGui.QSpacerItem(10, 10), 0, 1, 2, 3)
-        self.stepsGrid.addItem(QtGui.QSpacerItem(280, 10), 0, 2, 2, 3)
-        
-        self.stepsGrid.addWidget(QtGui.QLabel('Left Arm'), 0, 0)
-        self.stepsGrid.addWidget(QtGui.QLabel('Right Arm'), 0, 2)
+        # Instructions area
+        instructionsGroupBox = QGroupBox('Instructions', self._widget)
+        instructionsGroupBox.setObjectName('InstructionsGroup')
+        instructionsBox = QtGui.QVBoxLayout()
+        i3 = QtGui.QLabel('Please make sure the robot can reach all saved ' +
+            'poses')
+        self.i4 = QtGui.QLabel('\t- (waiting to load action)')
+        i1 = QtGui.QLabel('Please make sure the robot will correctly perform ' +
+            'the action')
+        i2 = QtGui.QLabel('\t- you must check this manually')
 
-        self.stepsGrid.addWidget(self.l_view, 1, 0)
-        self.stepsGrid.addWidget(self.r_view, 1, 2)
-        
-        stepsBoxLayout = QtGui.QHBoxLayout()
-        stepsBoxLayout.addLayout(self.stepsGrid)
-        self.stepsBox.setLayout(stepsBoxLayout)
+        self.palette = QtGui.QPalette()
+        self.palette.setColor(QtGui.QPalette.Foreground,QtCore.Qt.red)
+        self.i4.setPalette(self.palette)
+        instructionsBox.addWidget(i3)
+        instructionsBox.addWidget(self.i4)
+        instructionsBox.addWidget(i1)
+        instructionsBox.addWidget(i2)
+        instructionsGroupBox.setLayout(instructionsBox)
 
-        stepsButtonGrid = QtGui.QHBoxLayout()
-        stepsButtonGrid.addWidget(self.create_button(Command.SAVE_POSE))
-        stepsButtonGrid.addWidget(self.create_button(Command.EXECUTE_ACTION))
-        stepsButtonGrid.addWidget(self.create_button(Command.STOP_EXECUTION))
-        stepsButtonGrid.addWidget(self.create_button(Command.DELETE_ALL_STEPS))
-        stepsButtonGrid.addWidget(self.create_button(Command.DELETE_LAST_STEP))
+        # Create one box per test (x tasks, y tests each; x * y = num actions)
+        task_boxes = []
+        self.action_grids = []
+        self.action_icon_sets = []
+        for i in range(self.n_tasks):
+            task_boxes.append(QGroupBox(task_names[i], self._widget))
+            grid = QtGui.QGridLayout()
+            self.action_grids.append(QtGui.QGridLayout())
+            self.action_grids[i].setHorizontalSpacing(0)
+            for j in range(self.n_tests):
+                self.action_grids[i].addItem(QtGui.QSpacerItem(90, 90), 0, j, QtCore.Qt.AlignCenter)
+                self.action_grids[i].setColumnStretch(j, 0)
+            self.action_icon_sets.append(dict())
+            actionBoxLayout = QtGui.QHBoxLayout()
+            actionBoxLayout.addLayout(self.action_grids[i])
+            task_boxes[i].setLayout(actionBoxLayout)        
 
-        misc_grid = QtGui.QHBoxLayout()
-        misc_grid.addWidget(self.create_button(Command.TEST_MICROPHONE))
-        misc_grid.addWidget(self.create_button(Command.RECORD_OBJECT_POSE))
-        misc_grid.addStretch(1)
+        # add instructions to main area
+        allWidgetsBox.addWidget(instructionsGroupBox)
+        allWidgetsBox.addStretch(1)        
         
-        misc_grid2 = QtGui.QHBoxLayout()
-        misc_grid2.addWidget(self.create_button(Command.RELAX_RIGHT_ARM))
-        misc_grid2.addWidget(self.create_button(Command.RELAX_LEFT_ARM))
-        misc_grid2.addWidget(self.create_button(Command.FREEZE_RIGHT_ARM))
-        misc_grid2.addWidget(self.create_button(Command.FREEZE_LEFT_ARM))
-        misc_grid2.addStretch(1)
+        # add the three action sections
+        for i in range(self.n_tasks):
+            allWidgetsBox.addWidget(task_boxes[i])
 
-        misc_grid3 = QtGui.QHBoxLayout()
-        misc_grid3.addWidget(self.create_button(Command.OPEN_RIGHT_HAND))
-        misc_grid3.addWidget(self.create_button(Command.OPEN_LEFT_HAND))
-        misc_grid3.addWidget(self.create_button(Command.CLOSE_RIGHT_HAND))
-        misc_grid3.addWidget(self.create_button(Command.CLOSE_LEFT_HAND))
-        misc_grid3.addStretch(1)
-        
-        misc_grid4 = QtGui.QHBoxLayout()
-        misc_grid4.addWidget(self.create_button(Command.PREV_ACTION))
-        misc_grid4.addWidget(self.create_button(Command.NEXT_ACTION))
-        misc_grid4.addStretch(1)
-
-        speechGroupBox = QGroupBox('Robot Speech', self._widget)
-        speechGroupBox.setObjectName('RobotSpeechGroup')
-        speechBox = QtGui.QHBoxLayout()
-        self.speechLabel = QtGui.QLabel('Robot has not spoken yet')
-        palette = QtGui.QPalette()
-        palette.setColor(QtGui.QPalette.Foreground,QtCore.Qt.blue)
-        self.speechLabel.setPalette(palette)
-        speechBox.addWidget(self.speechLabel)
-        speechGroupBox.setLayout(speechBox)
-
-        allWidgetsBox.addWidget(actionBox)
-        allWidgetsBox.addLayout(actionButtonGrid)
-        
-        allWidgetsBox.addWidget(self.stepsBox)
-        allWidgetsBox.addLayout(stepsButtonGrid)
-        
-        allWidgetsBox.addItem(QtGui.QSpacerItem(100, 20))
-        allWidgetsBox.addLayout(misc_grid)
-        allWidgetsBox.addItem(QtGui.QSpacerItem(100, 20))
-        allWidgetsBox.addLayout(misc_grid2)
-        allWidgetsBox.addLayout(misc_grid3)
-        allWidgetsBox.addItem(QtGui.QSpacerItem(100, 20))
-        allWidgetsBox.addLayout(misc_grid4)
-        allWidgetsBox.addItem(QtGui.QSpacerItem(100, 20))
-        
-        allWidgetsBox.addWidget(speechGroupBox)
-        allWidgetsBox.addStretch(1)
-        
         # Fix layout and add main widget to the user interface
         QtGui.QApplication.setStyle(QtGui.QStyleFactory.create('plastique'))
         vAllBox = QtGui.QVBoxLayout()
@@ -251,15 +219,10 @@ class PbDGUI(Plugin):
     def l_row_clicked_cb(self, logicalIndex):
         self.step_pressed(self.get_uid(1, logicalIndex))
 
-    def create_button(self, command):
-        btn = QtGui.QPushButton(self.commands[command], self._widget)
-        btn.clicked.connect(self.command_cb)
-        return btn
-
     def update_state(self, state):
-        qWarning('Received new state')
-        
-        n_actions = len(self.actionIcons.keys())
+        # NOTE(max): Too spammy...
+        # qWarning('Received new state')
+        n_actions = self.n_actions()
         if n_actions < state.n_actions:
             for i in range(n_actions, state.n_actions):
                 self.new_action()
@@ -268,96 +231,65 @@ class PbDGUI(Plugin):
             self.delete_all_steps()
             self.action_pressed(state.i_current_action - 1, False)
 
-        n_steps = self.n_steps()
-        if (n_steps < state.n_steps):
-            for i in range(n_steps, state.n_steps):
-                self.save_pose()
-        elif (n_steps > state.n_steps):
-            n_to_remove = n_steps - state.n_steps
-            self.r_model.invisibleRootItem().removeRows(state.n_steps,
-                                                      n_to_remove)
-            self.l_model.invisibleRootItem().removeRows(state.n_steps,
-                                                      n_to_remove)
-        
-        ## TODO: DEAL with the following arrays!!!
-        state.r_gripper_states
-        state.l_gripper_states
-        state.r_ref_frames
-        state.l_ref_frames
-        state.objects
-            
-        if (self.currentStep != state.i_current_step):
-            if (self.n_steps() > 0):
-                self.currentStep = state.i_current_step
-                arm_index, index = self.get_arm_and_index(self.currentStep)
-                if (arm_index == 0):
-                    self.r_view.selectRow(index)
-                else:
-                    self.l_view.selectRow(index)
+        # Get icon
+        curset = self.action_icon_sets[(state.i_current_action-1)/ self.n_tests]
+        # TODO(max): Indexing hack...
+        icon = curset[state.i_current_action - 1]
 
-    def save_pose(self, actionIndex=None):
-        nColumns = 9
-        if actionIndex is None:
-            actionIndex = self.currentAction
-        stepIndex = self.n_steps(actionIndex)
-        r_step = [QtGui.QStandardItem('Step' + str(stepIndex + 1)),
-                    QtGui.QStandardItem('Go to pose'), 
-                    QtGui.QStandardItem('Absolute')]
-        l_step = [QtGui.QStandardItem('Step' + str(stepIndex + 1)),
-                    QtGui.QStandardItem('Go to pose'), 
-                    QtGui.QStandardItem('Absolute')]
-        self.r_model.invisibleRootItem().appendRow(r_step)
-        self.l_model.invisibleRootItem().appendRow(l_step)
-        self.update_table_view()
-        self.currentStep = stepIndex
-        
-    def update_table_view(self):
-        self.l_view.setColumnWidth(0, 50)
-        self.l_view.setColumnWidth(1, 100)
-        self.l_view.setColumnWidth(2, 70)
-        self.r_view.setColumnWidth(0, 50)
-        self.r_view.setColumnWidth(1, 100)
-        self.r_view.setColumnWidth(2, 70)
-        
-    def n_steps(self, actionIndex=None):
-        return self.l_model.invisibleRootItem().rowCount()
-        
+        # NOTE(max): Trying to extract number of unreachable markers.
+        nu = state.n_unreachable_markers
+        self.i4.setText('\t - number of unreachable markers: ' +
+            str(nu))
+        if nu > 0:
+            self.palette.setColor(QtGui.QPalette.Foreground,QtCore.Qt.red)
+            icon.all_reachable = False
+        else:
+            self.palette.setColor(QtGui.QPalette.Foreground,QtCore.Qt.green)
+            icon.all_reachable = True
+        self.i4.setPalette(self.palette)
+        icon.updateView()
+
+        # TODO: Deal with the following arrays:
+        # state.r_gripper_states
+        # state.l_gripper_states
+        # state.r_ref_frames
+        # state.l_ref_frames
+        # state.objects
+            
     def delete_all_steps(self, actionIndex=None):
         if actionIndex is None:
             actionIndex = self.currentAction
-        n_steps = self.n_steps()
-        if (n_steps > 0):
-            self.l_model.invisibleRootItem().removeRows(0, n_steps)
-            self.r_model.invisibleRootItem().removeRows(0, n_steps)
 
     def n_actions(self):
-        return len(self.actionIcons.keys())
+        return sum([len(a.keys()) for a in self.action_icon_sets])
 
     def new_action(self):
-        nColumns = 6
+        nColumns = self.n_tests
         actionIndex = self.n_actions()
-        for key in self.actionIcons.keys():
-             self.actionIcons[key].selected = False
-             self.actionIcons[key].updateView()
+        taskIdx = actionIndex / self.n_tests
+        if taskIdx >= self.n_tasks:
+            rospy.logwarn('Cannot add more actions; this study is fixed!')
+            return
+        for s in self.action_icon_sets:
+            for key, icon in s.iteritems():
+               icon.selected = False
+               icon.updateView()
         actIcon = ActionIcon(self._widget, actionIndex, self.action_pressed)
-        self.actionGrid.addLayout(actIcon, int(actionIndex/nColumns), 
-                                  actionIndex%nColumns)
-        self.actionIcons[actionIndex] = actIcon
+        actionGrid = self.action_grids[taskIdx]
+        actionGrid.addLayout(actIcon, actionIndex / nColumns,
+            actionIndex % nColumns)
+        self.action_icon_sets[taskIdx][actionIndex] = actIcon
 
     def step_pressed(self, step_index):
         gui_cmd = GuiCommand(GuiCommand.SELECT_ACTION_STEP, step_index)
         self.gui_cmd_publisher.publish(gui_cmd)
 
     def action_pressed(self, actionIndex, isPublish=True):
-        for i in range(len(self.actionIcons.keys())):
-            key = self.actionIcons.keys()[i]
-            if key == actionIndex:
-                 self.actionIcons[key].selected = True
-            else:
-                 self.actionIcons[key].selected = False
-            self.actionIcons[key].updateView()
+        for s in self.action_icon_sets:
+            for key, icon in s.iteritems():
+                icon.selected = (key == actionIndex)
+                icon.updateView()
         self.currentAction = actionIndex
-        self.stepsBox.setTitle('Steps for Action ' + str(self.currentAction+1))
         if isPublish:
             gui_cmd = GuiCommand(GuiCommand.SWITCH_TO_ACTION, (actionIndex+1))
             self.gui_cmd_publisher.publish(gui_cmd)
@@ -371,13 +303,9 @@ class PbDGUI(Plugin):
                 command.command = key
                 self.speech_cmd_publisher.publish(command)
         
-    def robotSoundReceived(self, soundReq):
-        if (soundReq.command == SoundRequest.SAY):
-            qWarning('Robot said: ' + soundReq.arg)
-            self.speechLabel.setText('Robot sound: ' + soundReq.arg)
-    
     def exp_state_cb(self, state):
-        qWarning('Received new experiment state.')
+        # NOTE(max): Too spammy...
+        #qWarning('Received new experiment state.')
         self.exp_state_sig.emit(state)
         
     def shutdown_plugin(self):

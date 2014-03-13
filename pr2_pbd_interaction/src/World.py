@@ -3,10 +3,14 @@ import roslib
 roslib.load_manifest('pr2_pbd_interaction')
 
 # Generic libraries
+import os
 import time
 import threading
 from numpy.linalg import norm
 from numpy import array
+from random import uniform
+from math import sqrt
+import traceback
 
 # ROS libraries
 #from actionlib_msgs.msg import
@@ -73,12 +77,33 @@ class WorldObject:
         '''Function to decrese object index'''
         self.index -= 1
 
+class Legend:
+    '''Key for showing what various Rviz GUI objects and colors represent, such
+    as the different colors for gripper markers.'''
+
+    def __init__(self):
+        self.marker_pub = rospy.Publisher('visualization_marker', Marker)
+        marker = Marker(type=Marker.SPHERE, id=42424242,
+            #lifetime=rospy.Duration(1), # Assuming nothing makes infinite
+            scale=Vector3(1,1,1),
+            header=Header(frame_id='base_link'), # Seems like this will change
+            color=ColorRGBA(1.0, 0.0, 0.0, 0.5),
+            pose=Pose(Point(1,0,0), Quaternion(0,0,0,1)),
+            text='Legend')
+        # NOTE(max): Publishing once doesn't work, but publishing infinitely
+        # or sleeping before publishing does. Strange.
+        # self.marker_pub.publish(marker)
+        #rospy.loginfo("Published legend")
 
 class World:
     '''Object recognition and localization related stuff'''
 
     tf_listener = None
     objects = []
+    # Separator for reading / writing mocked objects to / from files.
+    _sep = ','
+    _n_tasks = None
+    _n_tests = None
 
     def __init__(self):
 
@@ -88,25 +113,375 @@ class World:
         self.surface = None
         self._tf_broadcaster = TransformBroadcaster()
         self._im_server = InteractiveMarkerServer('world_objects')
-        bb_service_name = 'find_cluster_bounding_box'
-        rospy.wait_for_service(bb_service_name)
-        self._bb_service = rospy.ServiceProxy(bb_service_name,
-                                            FindClusterBoundingBox)
-        rospy.Subscriber('interactive_object_recognition_result',
-            GraspableObjectList, self.receive_object_info)
-        self._object_action_client = actionlib.SimpleActionClient(
-            'object_detection_user_command', UserCommandAction)
-        self._object_action_client.wait_for_server()
-        rospy.loginfo('Interactive object detection action ' +
-                      'server has responded.')
+
+        # NOTE(max): The following is for detecting "real" objects, so we're
+        # disabling it for now while we mock them.
+        # bb_service_name = 'find_cluster_bounding_box'
+        # rospy.wait_for_service(bb_service_name)
+        # self._bb_service = rospy.ServiceProxy(bb_service_name,
+        #                                     FindClusterBoundingBox)
+        # rospy.Subscriber('interactive_object_recognition_result',
+        #     GraspableObjectList, self.receive_object_info)
+        # self._object_action_client = actionlib.SimpleActionClient(
+        #     'object_detection_user_command', UserCommandAction)
+        # self._object_action_client.wait_for_server()
+        # rospy.loginfo('Interactive object detection action ' +
+        #               'server has responded.')
+
+        # NOTE(max): I made this method not do anything, but am keeping the call
+        # here as a reminder.
         self.clear_all_objects()
+
+        # NOTE(max): We remove the table-getting subscription as well.
         # The following is to get the table information
-        rospy.Subscriber('tabletop_segmentation_markers',
-                         Marker, self.receive_table_marker)
+        # rospy.Subscriber('tabletop_segmentation_markers',
+        #                 Marker, self.receive_table_marker)
+
+        # How many actions we are mocking        
+        World._n_tasks = int(rospy.get_param('/pr2_pbd_interaction/nTasks'))
+        World._n_tests = int(rospy.get_param('/pr2_pbd_interaction/nTests'))
+        self._max_mocked_action_idx = World._n_tasks * World._n_tests
+
+    @staticmethod
+    def _get_task_n_from_action(action_index):
+        '''Maps an action index (like 12) to its task number (like 3)'''
+        # Right now
+        # 1-5  : task 1
+        # 6-10 : task 2
+        # 11-15: task 3
+        # TODO(max): Change to loaded constant!
+        return ((action_index - 1) / 5) + 1
+
+    @staticmethod
+    def _get_trial_idx_from_action(action_index):
+        '''Maps an action index (like 12) to its index into its task (like 2)'''
+        return ((action_index - 1) % 5) + 1
+
+    def _mock_objects_for_action(self, action_index):
+        '''Add fake objects to the interaction / rviz'''
+        # Clear current objects /table
+        self._reset_objects()
+
+        # Avoid races while swapping out underlying array
+        self._lock.acquire()
+
+        # Try to load from previously generated points.
+        data_filename = World.get_objfilename_for_action(action_index)
+        if (os.path.exists(data_filename)):
+            # We've already generated for this action! Just load.
+            mocked_objs = World.read_mocked_worldobjs_fom_file(data_filename)
+            for mocked_obj in mocked_objs:
+                self._add_new_object_internal(mocked_obj)
+        else:
+            # Not sampled yet; we have to sapmle.
+            self._sample_objects(action_index)
+
+        # Release
+        self._lock.release()
+
+        # Create the standard table
+        self._mock_table()
+
+    @staticmethod
+    def get_objfilename_for_action(action_index):
+        '''Gets the filename where the current action's generated objects will
+        be loaded or saved (experiment-specific)'''
+        # For analysis mode, we go into the objects test directory and ignore
+        # the provided action_index.
+        if rospy.get_param('/pr2_pbd_interaction/mode') == 'analysis':
+            objects_dir = rospy.get_param('/pr2_pbd_interaction/dataRoot') + \
+                '/data/objects/test/' 
+            filename = rospy.get_param('da_obj_filename')
+        else:
+            # For debug and study modes, we go into the experiment directory
+            # (and actually make use of the action_index!).
+            objects_dir = rospy.get_param('data_directory') + 'objects/'
+            filename = 'Action' + str(action_index) + '.txt'
+        if (not os.path.exists(objects_dir)):
+            os.makedirs(objects_dir)
+        result = objects_dir + filename
+        # Spam...
+        #rospy.loginfo('Using objects from ' + result)
+        return result
+
+
+    @staticmethod
+    def _get_desired_n_unreachable(action_index):
+        '''Gets the desired number of unreachable markers for the given action
+        index. Current scheme:
+
+        - For task 1, there are only three markers that can be unreachable, so
+        we must go from 1 through 3. I'm doing 2, 1, 3, 1, 2
+
+        - For task 2, there are several that can be unreachable, so we will go
+        from 1 through 5. I'm doing 4, 2, 3, 5, 1.
+
+        - For task 3, there are also several that can be unreachable, so we'll
+        go 1 through 5 again, this time 3, 1, 2, 5, 4. '''
+        task_num = World._get_task_n_from_action(action_index)
+        trial_idx = World._get_trial_idx_from_action(action_index)
+        if task_num == 1:
+            return [0, 2, 1, 3, 1, 2][trial_idx]
+        elif task_num == 2:
+            return [0, 4, 2, 3, 5, 1][trial_idx]
+        else:
+            return [0, 3, 1, 2, 5, 4][trial_idx]
+
+    def _sample_objects(self, action_index):
+        '''Generate sample positions of objects for action_index, and write into
+        data_filename.'''
+        # Position settings
+        min_x = 0.40 # lowest observed x value is 0.404...
+        max_x = 1.0 #0.81 # highest observed x value is 0.809...
+        min_y = -0.48 # lowest observed y value is -0.47...
+        max_y = 0.57 # highest observed y value is 0.56...
+
+        # Get task number from the action
+        task_n = World._get_task_n_from_action(action_index)
+
+        # Z values will depend on the object ...
+        zs = []
+        if task_n == 1:
+            zs.append(0.638032227755) # fake-iron
+        elif task_n == 2:
+            zs.append(0.607358753681) # red-plate
+        elif task_n == 3:
+            zs.append(0.666624039412) # brown-box
+            zs.append(0.642685890198) # white-box
+            zs.append(0.615162938833) # lava-moss
+        else:
+            # Bad index...
+            rospy.logwarn("Bad task number (" + str(task_n) +") for sampling.")
+            return
+
+        # Dimension settings
+        ds = []
+        if task_n == 1:
+            # fake-iron 
+            ds.append(Vector3(0.140946324722, 0.0966388155749, 0.0660033226013))
+        elif task_n == 2:
+            # red-plate
+            ds.append(Vector3(0.208253721282, 0.153458412609, 0.025651037693))
+        elif task_n == 3:
+            # brown-box
+            ds.append(Vector3(0.250331583552, 0.250164705599, 0.148873627186))
+            # white-box
+            ds.append(Vector3(0.21396259923, 0.0538839277603, 0.107205629349))
+            # lava-moss
+            ds.append(Vector3(0.0967770918593, 0.0522750997274,
+                0.0276364684105))
+        else:
+            # Bad index... this was caught before but it's easier to be
+            # consistent with code structure.
+            rospy.logwarn("Bad task number (" + str(task_n) +") for sampling.")
+            return
+
+        # Actually do the generation
+        rospy.loginfo("Sampling " + str(len(zs)) + " objects...")
+        for i, z in enumerate(zs):
+            d = ds[i]
+            # Have to keep sampling till we get a good point for this object
+            while True:
+                # Sample for position
+                x = uniform(min_x, max_x)
+                y = uniform(min_y, max_y)
+                # We don't want to sample z; object should be on table.
+                position = Point(x,y,z)
+
+                # Orientation we assume only 1 DOF, so qx == qy == 0.0
+                qz = uniform(0, 1)
+                qw = sqrt(1.0 - qz**2)
+                orientation = Quaternion(0.0, 0.0, qz, qw)
+
+                # Construct the candidate object
+                pose = Pose(position, orientation)
+                candidate = WorldObject(pose, i, d, False)
+
+                # Ensure it's reachable. Currently just doing with either arm but
+                # will likely have to change to a specific arm depending on what
+                # the action is.
+                if not World.is_object_within_reach(candidate):
+                    continue
+
+                # Ensure it doesn't collide with any other object added so far.
+                # Note that if one objects gets placed badly and there is no
+                # room for the other objects, we could infinite loop here.
+                # Fortunately for our tasks the table is big enough that this
+                # won't happen.
+                if World.collides_with_any_world_obj(candidate):
+                    continue
+
+                # Actually add it
+                self._add_new_object_internal(candidate)
+                break
+
+    @staticmethod
+    def collides_with_any_world_obj(obj):
+        '''Returns whether the provided object collides with any of the objects
+        that world is currently tracking.
+
+        Does very rudimentary (generous) collision detection, where it ignores
+        orientation. Also ignores z-dimension entirely as we assume everything
+        is sitting on the table plane.'''
+        p1 = obj.object.pose.position
+        d1 = obj.object.dimensions
+        for other_obj in World.objects:
+            p2 = other_obj.object.pose.position
+            d2 = other_obj.object.dimensions
+            center_dist = norm(array([p1.x - p2.x, p1.y - p2.y]))
+            corner_dist = norm(array([d1.x, d1.y])) / 2 + \
+                norm(array([d2.x, d2.y])) / 2
+            if center_dist < corner_dist:
+                return True
+        return False
+
+    @staticmethod
+    def get_planar_distance_from_arm(ref_object, arm_index):
+        '''Gets how far an objet is away from the robot's arm'''
+        if arm_index == 0:
+            arm_name = 'r_upper_arm_roll_link'
+        else:
+            arm_name = 'l_upper_arm_roll_link'
+        rel_obj_pose = World.transform(ref_object.object.pose, 'base_link',
+            arm_name)
+        #print rel_obj_pose
+        return norm(array([rel_obj_pose.position.x, rel_obj_pose.position.y]))
+
+    @staticmethod
+    def is_object_within_reach(ref_object):
+        '''Sees if the robot can reach the object.'''
+        for arm_index in range(2):
+            if not World.is_object_within_reach_of_arm(ref_object, arm_index):
+                return False
+        return True
+
+    @staticmethod
+    def is_object_within_reach_of_arm(ref_object, arm_index):
+        '''Sees whether a robot's particular arm can reach the object. The magic
+        number 0.881 is from the following code:
+
+        # finger_name = 'l_gripper_l_finger_tip_frame'
+        # arm_name = 'l_upper_arm_roll_link'
+        # rel_pose = World.get_pose_in_ref_frame(finger_name, arm_name)
+        # horizontal_ee_distance = norm(array([rel_pose.position.x,
+            rel_pose.position.y]))
+
+        So 0.881 is of course PR2-specific.
+        '''
+        allowed_distance = 0.881 + norm(array([ref_object.object.dimensions.x,
+            ref_object.object.dimensions.y, ref_object.object.dimensions.z])) / 2
+        planar_dist = World.get_planar_distance_from_arm(ref_object, arm_index)
+        # print 'allowed_distance', allowed_distance
+        # print 'planar_dist', planar_dist
+        return planar_dist < allowed_distance
+
+    @staticmethod
+    def get_pose_in_ref_frame(frame_name, ref_frame):
+        '''Used for computation of reachability constant (0.881). See comment in
+        is_object_within_reach_of_arm() for how this was used.'''
+        try:
+            time = World.tf_listener.getLatestCommonTime(ref_frame,
+                frame_name)
+            position, orientation = World.tf_listener.lookupTransform(
+                ref_frame, frame_name, time)
+            frame_pose = Pose()
+            frame_pose.position = Point(position[0], position[1], position[2])
+            frame_pose.orientation = Quaternion(orientation[0], orientation[1],
+               orientation[2], orientation[3])
+            return frame_pose
+        except (tf.LookupException, tf.ConnectivityException,
+                tf.ExtrapolationException):
+            rospy.logwarn('Something wrong with transform request.')
+            return None
+
+    def write_cur_objs_to_file(self, action_index):
+        data_filename = World.get_objfilename_for_action(action_index)
+        rospy.loginfo("Saving objects to " + data_filename)
+        fh = open(data_filename, 'w')
+        self._lock.acquire()
+        for obj in World.objects:
+            World.write_mocked_worldobj_to_file(obj, fh)
+        self._lock.release()
+        fh.close()
+
+    @staticmethod
+    def write_mocked_worldobj_to_file(worldObject, fileHandle):
+        '''Writes a WorldObject's pose (position and orentation) and dimensions
+        to the provided filehandle. Use with read_mockied_worldobjs_from_file()
+        to save and restore objects. Writes as csv, so should be readable from
+        text editors as well.
+
+        Note: Doesn't open or close fileHandle, so you must manage that
+        externally.'''
+        # Settings
+        sep = World._sep
+
+        # extract
+        p = worldObject.object.pose.position
+        o = worldObject.object.pose.orientation
+        d = worldObject.object.dimensions
+        data = [p.x, p.y, p.z, o.x, o.y, o.z, o.w, d.x, d.y, d.z]
+        data = [str(datum) for datum in data]
+        line = sep.join(data)
+
+        # write
+        fileHandle.write(line + '\n')
+
+    @staticmethod
+    def read_mocked_worldobjs_fom_file(fileName):
+        '''Read's the lines from the file specified by fileName and attempts to
+        turn them into WorldObjects. Only restores the pose (position and
+        orentation) and dimensions. Use with write_mocked_worldobj_to_file()
+        to save and restore objects.
+
+        Returns a list of WorldObjects.
+
+        Note that this assumes these are the only objects in the scene, so it
+        auto-numbers them this way (starting at 0).
+
+        Note: Creates file handle from the provided fileName, so this DOES
+        manage opening/closing of file for you.'''
+        # Settings
+        sep = World._sep
+
+        objects = []
+        lines = [line.strip() for line in open(fileName)]
+        for line in lines:
+            pieces = [float(piece) for piece in line.split(sep)]
+            position = Point(pieces[0], pieces[1], pieces[2])
+            orientation = Quaternion(pieces[3], pieces[4], pieces[5], pieces[6])
+            pose = Pose(position, orientation)
+            dimensions = Vector3(pieces[7], pieces[8], pieces[9])
+            objects.append(WorldObject(pose, len(objects), dimensions, False))
+        return objects
+
+    def _mock_table(self):
+        '''Testing for right now, but should add a fake object to the
+        interaction / rviz.'''
+        # This is mocked from the first data point collected
+        position = Point(0.681273249847, 0.0500235402375, 0.555035150217)
+        orientation = Quaternion(-0.000624796068025, -0.0230785640599,
+            1.44232405509e-05, 0.999733459129)
+        pose = Pose(position, orientation)
+        dimensions = Vector3(0.635490983725, 1.12122958899, 0.01)
+
+        # This is straight-up copy-pasted from receive_table_marker().
+        self.surface = World._get_surface_marker(pose, dimensions)
+        self._im_server.insert(self.surface, self.marker_feedback_cb)
+        self._im_server.applyChanges()
+
+        # NOTE(max): Testing to get a legend... who knows whether this will
+        # work...
+        legend = Legend()
 
     def _reset_objects(self):
         '''Function that removes all objects'''
         self._lock.acquire()
+        self._reset_objects_unlocked()
+        self._lock.release()
+
+    def _reset_objects_unlocked(self):
+        '''Call to remove all objects if you have the lock already.'''
         for i in range(len(World.objects)):
             self._im_server.erase(World.objects[i].int_marker.name)
             self._im_server.applyChanges()
@@ -115,7 +490,6 @@ class World:
         self._im_server.clear()
         self._im_server.applyChanges()
         World.objects = []
-        self._lock.release()
 
     def receive_table_marker(self, marker):
         '''Callback function for markers to determine table'''
@@ -155,9 +529,10 @@ class World:
                     if (object_pose != None):
                         rospy.logwarn('Adding the recognized object ' +
                                       'with most confident model.')
-                        self._add_new_object(object_pose,
-                            Vector3(0.2, 0.2, 0.2), True,
-                            object_list.meshes[i])
+                        self._add_new_object(object_pose, # pose
+                            Vector3(0.2, 0.2, 0.2), # dimensions
+                            True, # is_recognized
+                            object_list.meshes[i]) # mesh
                 else:
                     rospy.logwarn('... this is not a recognition result, ' +
                                   'it is probably just segmentation.')
@@ -165,11 +540,14 @@ class World:
                     bbox = self._bb_service(cluster)
                     cluster_pose = bbox.pose.pose
                     if (cluster_pose != None):
-                        rospy.loginfo('Adding unrecognized object with pose:' +
-                            World.pose_to_string(cluster_pose) + '\n' +
-                            'In ref frame' + str(bbox.pose.header.frame_id))
-                        self._add_new_object(cluster_pose, bbox.box_dims,
-                                             False)
+                        rospy.loginfo('Adding unrecognized object with\n' +
+                            '- pose:' + World.pose_to_string(cluster_pose) +
+                            '- dimensions: ' + World.vector_to_string(
+                                bbox.box_dims) + '\n' +
+                            '- in ref frame: ' + str(bbox.pose.header.frame_id))
+                        self._add_new_object(cluster_pose, # pose
+                            bbox.box_dims, # dimensions
+                            False) # is_recognized
         else:
             rospy.logwarn('... but the list was empty.')
         self._lock.release()
@@ -220,13 +598,15 @@ class World:
             rospy.logwarn('Did not find a similar object..')
             return None
         else:
-            print 'Object dissimilarity is --- ', best_dist
+            # Print?
+            # print 'Object dissimilarity is --- ', best_dist
             if best_dist > 0.075:
                 rospy.logwarn('Found some objects, but not similar enough.')
                 return None
             else:
-                rospy.loginfo('Most similar to new object '
-                                        + str(chosen_obj_index))
+                # Commenting out for spam.
+                #rospy.loginfo('Most similar to new object '
+                #                        + str(chosen_obj_index))
                 return ref_frame_list[chosen_obj_index]
 
     @staticmethod
@@ -274,37 +654,36 @@ class World:
 
             if (to_remove != None):
                 self._remove_object(to_remove)
-
             n_objects = len(World.objects)
-            World.objects.append(WorldObject(pose, n_objects,
-                                            dimensions, is_recognized))
-            int_marker = self._get_object_marker(len(World.objects) - 1, mesh)
-            World.objects[-1].int_marker = int_marker
-            self._im_server.insert(int_marker, self.marker_feedback_cb)
-            self._im_server.applyChanges()
-            World.objects[-1].menu_handler.apply(self._im_server,
-                                               int_marker.name)
-            self._im_server.applyChanges()
+            self._add_new_object_internal(WorldObject(pose, n_objects,
+                dimensions, is_recognized), mesh)
             return True
         else:
             for i in range(len(World.objects)):
                 if (World.pose_distance(World.objects[i].object.pose, pose)
                         < dist_threshold):
-                    rospy.loginfo('Previously detected object at the same' +
+                    rospy.loginfo('Previously detected object at the same ' +
                                   'location, will not add this object.')
                     return False
-
+            # NOTE(max): Not passing mesh along here because it's None if it
+            # wasn't recognized.
             n_objects = len(World.objects)
-            World.objects.append(WorldObject(pose, n_objects,
-                                            dimensions, is_recognized))
-            int_marker = self._get_object_marker(len(World.objects) - 1)
-            World.objects[-1].int_marker = int_marker
-            self._im_server.insert(int_marker, self.marker_feedback_cb)
-            self._im_server.applyChanges()
-            World.objects[-1].menu_handler.apply(self._im_server,
-                                               int_marker.name)
-            self._im_server.applyChanges()
+            self._add_new_object_internal(WorldObject(pose, n_objects,
+                dimensions, is_recognized))
             return True
+
+    def _add_new_object_internal(self, worldObject, mesh=None):
+        '''Refactoring as this code is used in three places. Just does the guts
+        of adding a new object internally after it's been created'''
+        World.objects.append(worldObject)
+        int_marker = self._get_object_marker(len(World.objects) - 1, mesh)
+        World.objects[-1].int_marker = int_marker
+        self._im_server.insert(int_marker, self.marker_feedback_cb)
+        self._im_server.applyChanges()
+        World.objects[-1].menu_handler.apply(self._im_server, int_marker.name)
+        # NOTE(max): Necessary to call applyChanges() twice?
+        self._im_server.applyChanges()
+
 
     def _remove_object(self, to_remove):
         '''Function to remove object by index'''
@@ -327,7 +706,8 @@ class World:
 
     def _remove_surface(self):
         '''Function to request removing surface'''
-        rospy.loginfo('Removing surface')
+        # Spam
+        #rospy.loginfo('Removing surface')
         self._im_server.erase('surface')
         self._im_server.applyChanges()
         self.surface = None
@@ -341,7 +721,7 @@ class World:
         int_marker.scale = 1
 
         button_control = InteractiveMarkerControl()
-        button_control.interaction_mode = InteractiveMarkerControl.BUTTON
+        button_control.interaction_mode = InteractiveMarkerControl.NONE
         button_control.always_visible = True
 
         object_marker = Marker(type=Marker.CUBE, id=index,
@@ -360,11 +740,12 @@ class World:
         text_pos.y = World.objects[index].object.pose.position.y
         text_pos.z = (World.objects[index].object.pose.position.z +
                      World.objects[index].object.dimensions.z / 2 + 0.06)
-        button_control.markers.append(Marker(type=Marker.TEXT_VIEW_FACING,
-                id=index, scale=Vector3(0, 0, 0.03),
-                text=int_marker.name, color=ColorRGBA(0.0, 0.0, 0.0, 0.5),
-                header=Header(frame_id='base_link'),
-                pose=Pose(text_pos, Quaternion(0, 0, 0, 1))))
+        # Remove object label
+        #button_control.markers.append(Marker(type=Marker.TEXT_VIEW_FACING,
+        #        id=index, scale=Vector3(0, 0, 0.05),
+        #        text=int_marker.name, color=ColorRGBA(0.0, 0.0, 0.0, 1.0),
+        #        header=Header(frame_id='base_link'),
+        #        pose=Pose(text_pos, Quaternion(0, 0, 0, 1))))
         int_marker.controls.append(button_control)
         return int_marker
 
@@ -374,16 +755,17 @@ class World:
         int_marker = InteractiveMarker()
         int_marker.name = 'surface'
         int_marker.header.frame_id = 'base_link'
+        pose.position.z = pose.position.z + 0.03
         int_marker.pose = pose
         int_marker.scale = 1
         button_control = InteractiveMarkerControl()
-        button_control.interaction_mode = InteractiveMarkerControl.BUTTON
+        button_control.interaction_mode = InteractiveMarkerControl.NONE
         button_control.always_visible = True
         object_marker = Marker(type=Marker.CUBE, id=2000,
                             lifetime=rospy.Duration(2),
                             scale=dimensions,
                             header=Header(frame_id='base_link'),
-                            color=ColorRGBA(0.8, 0.0, 0.4, 0.4),
+                            color=ColorRGBA(0.5, 0.5, 0.5, 0.4),
                             pose=pose)
         button_control.markers.append(object_marker)
         text_pos = Point()
@@ -393,21 +775,36 @@ class World:
         text_pos.y = position.y - dimensions.y / 2 + 0.06
         text_pos.z = position.z + dimensions.z / 2 + 0.06
         text_marker = Marker(type=Marker.TEXT_VIEW_FACING, id=2001,
-                scale=Vector3(0, 0, 0.03), text=int_marker.name,
-                color=ColorRGBA(0.0, 0.0, 0.0, 0.5),
+                scale=Vector3(0, 0, 0.05), text=int_marker.name,
+                color=ColorRGBA(0.0, 0.0, 0.0, 1.0),
                 header=Header(frame_id='base_link'),
                 pose=Pose(text_pos, Quaternion(0, 0, 0, 1)))
-        button_control.markers.append(text_marker)
+        #button_control.markers.append(text_marker)
         int_marker.controls.append(button_control)
         return int_marker
 
-    @staticmethod
-    def get_frame_list():
-        '''Function that returns the list of ref. frames'''
+    def get_frame_list(self, action_index):
+        '''Function that returns the list of ref. frames; actually used now as
+        a signal for which action index to load the mocked objects.'''
+        # NOTE(max): Implicitly, this is called with the action_index that we'll
+        # be in next / soon (unless it's called with an invalid number, which is
+        # possible). This means that here we don't want to just return the world
+        # object list, but we want to use it as a trigger for mocking in the new
+        # objects. This is because the world isn't notified when you switch
+        # actions, so this method call is the best of a notification we get!
+        if action_index > 0 and action_index <= self._max_mocked_action_idx:
+            # valid new action, so we mock the new objects
+            # Note: commenting out to reduce spam.
+            #rospy.loginfo("Mocking objects for action " + str(action_index))
+            self._mock_objects_for_action(action_index)
+        return self._get_underlying_objects()
+
+    def _get_underlying_objects(self):
+        '''Grabs the static object list and returns it.'''
         objects = []
         for i in range(len(World.objects)):
             objects.append(World.objects[i].object)
-        return objects
+        return objects        
 
     @staticmethod
     def has_objects():
@@ -498,24 +895,41 @@ class World:
                                                               pose_stamped)
                 return rel_ee_pose.pose
             except tf.Exception:
-                rospy.logerr('TF exception during transform.')
+                # This is so common during normal execution it shouldn't be an
+                # error or even logged (IMHO). Anyway, commenting out now to
+                # reduce spam.
+                #rospy.logerr('TF exception during transform.')
                 return pose
             except rospy.ServiceException:
                 rospy.logerr('Exception during transform.')
                 return pose
         else:
             rospy.logwarn('One of the frame objects might not exist: ' +
-                          from_frame + ' or ' + to_frame)
+                from_frame + ' or ' + to_frame)
             return pose
 
     @staticmethod
     def pose_to_string(pose):
         '''For printing a pose to stdout'''
-        return ('Position: ' + str(pose.position.x) + ", " +
-                str(pose.position.y) + ', ' + str(pose.position.z) + '\n' +
-                'Orientation: ' + str(pose.orientation.x) + ", " +
-                str(pose.orientation.y) + ', ' + str(pose.orientation.z) +
-                ', ' + str(pose.orientation.w) + '\n')
+        return '\t- position:   ' + World.vector_to_string(pose.position) + \
+            '\n\t- orientation: ' + World.vector_to_string(pose.orientation) + \
+            '\n'
+
+    @staticmethod
+    def vector_to_string(vector_like):
+        '''For printing something with x, y, z, and possibly w attributes to
+        stdout, when we don't want a bunch of newlines. This returns a string of
+        the form "[x, y, z[, w]]" (w optional). We might want this when printing
+        an object that is a:
+         - Point (e.g. pose.position)
+         - Quaternion (e.g. pose.orientation)
+         - Vector3 (e.g. boudning box dimensions)
+         - etc.
+         '''
+        # TODO(max): Actually write this.
+        w = '' if not hasattr(vector_like, 'w') else ', ' + str(vector_like.w)
+        return '[' + str(vector_like.x) + ', ' + str(vector_like.y) + ', ' + \
+            str(vector_like.z) + w + ']'
 
     def _publish_tf_pose(self, pose, name, parent):
         ''' Publishes a TF for object pose'''
@@ -527,7 +941,11 @@ class World:
                                         rospy.Time.now(), name, parent)
 
     def update_object_pose(self):
-        ''' Function to externally update an object pose'''
+        ''' Function to externally update an object pose. Returns bool of
+        success or failure'''
+        # NOTE(max): Mocking this for now
+        return True
+
         Response.perform_gaze_action(GazeGoal.LOOK_DOWN)
         while (Response.gaze_client.get_state() == GoalStatus.PENDING or
                Response.gaze_client.get_state() == GoalStatus.ACTIVE):
@@ -596,6 +1014,11 @@ class World:
 
     def clear_all_objects(self):
         '''Removes all objects from the world'''
+        # NOTE(max): Mocking this as well; for now we just clear the mocked
+        # objects until they (or different ones) are added.
+        self._reset_objects()
+        return
+
         goal = UserCommandGoal(UserCommandGoal.RESET, False)
         self._object_action_client.send_goal(goal)
         while (self._object_action_client.get_state() == GoalStatus.ACTIVE or
@@ -611,7 +1034,15 @@ class World:
 
     def get_nearest_object(self, arm_pose):
         '''Gives a pointed to the nearest object'''
+        # DEBUG(max): arm_pose is being passed here as None???
+        if arm_pose == None:
+            rospy.logwarn("arm_pose passed to World::get_nearest_object is None")
+            return None
         distances = []
+        toRet = None
+        # NOTE(max): Race conditions can happen on world objects when they're
+        # being swapped out during mocking.
+        self._lock.acquire()
         for i in range(len(World.objects)):
             dist = World.pose_distance(World.objects[i].object.pose,
                                                             arm_pose)
@@ -620,11 +1051,9 @@ class World:
         if (len(distances) > 0):
             if (min(distances) < dist_threshold):
                 chosen = distances.index(min(distances))
-                return World.objects[chosen].object
-            else:
-                return None
-        else:
-            return None
+                toRet = World.objects[chosen].object
+        self._lock.release()
+        return toRet
 
     @staticmethod
     def pose_distance(pose1, pose2, is_on_table=True):

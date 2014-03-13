@@ -198,7 +198,8 @@ class Arm:
         self.ik_request.ik_request.ik_seed_state.joint_state.position = seed
 
         try:
-            rospy.loginfo('Sending IK request.')
+            # Reduce spam
+            #rospy.loginfo('Sending IK request.')
             response = self.ik_srv(self.ik_request)
             if(response.error_code.val == response.error_code.SUCCESS):
                 return response.solution.joint_state.position
@@ -353,12 +354,15 @@ class Arm:
         joints = self._solve_ik(ee_pose, seed)
         ## If our seed did not work, try once again with the default seed
         if joints == None:
-            rospy.logwarn('Could not find IK solution with preferred seed,' +
-                          'will try default seed.')
+            # This is too normal to be logged with such frequency.
+            #rospy.logwarn('Could not find IK solution with preferred seed,' +
+            #              'will try default seed.')
             joints = self._solve_ik(ee_pose)
 
         if joints == None:
-            rospy.logwarn('IK out of bounds, will use the seed directly.')
+            # Also too normal; eliminating spam.
+            #rospy.logwarn('IK out of bounds, will use the seed directly.')
+            pass
         else:
             rollover = array((array(joints) - array(seed)) / pi, int)
             joints -= ((rollover + (sign(rollover) + 1) / 2) / 2) * 2 * pi

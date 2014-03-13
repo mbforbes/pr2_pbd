@@ -1,12 +1,36 @@
 <launch>
 
   <!-- This is the main state machine for interaction and PbD -->
-  <arg name="isReload" value="False" />
-  <arg name="dataRoot" value="$(env HOME)" />
-  <arg name="experimentNumber" value="3" />
+
+  <!-- Where to find data; right now we're saving in the repo itself. -->
+  <arg name="dataRoot" value="$(find pr2_pbd_interaction)" />
+
+  <!-- The 'mode' of the program. Options are:
+
+   - debug : for manually specifying the experiment number and (optinally)
+             reloading the data.
+
+   - study : for the user study; have input the experiment number and whether
+             to copy over seeds or reload.
+
+   - analysis : for analyzing the data after it's collected. Some other options
+                won't be relevant here as we'll be looking at data in aggregate.
+  -->
+  <arg name="mode" value="analysis" />
+
+  <!-- The following settings are relevant to 'debug' and 'study' modes:-->
+  <!-- The number of tasks. -->
+  <arg name="nTasks" value="3" />
+  <!-- The number of tests to generate per task. -->
+  <arg name="nTests" value="5" />
+
+  <!-- The following settings are relevant to 'debug' mode: -->
+  <!-- Manually set experiment number -->
+  <arg name="experimentNumber" value="10" />
+  <!-- Manually set whether to reload -->
+  <arg name="isReload" value="True" />
   
   <!-- This runs the interactive manipulation -->
-  
   <node pkg="pr2_arm_kinematics" type="pr2_arm_kinematics_node" name="pr2_left_arm_kinematics_simple" output="screen">
    <param name="tip_name" value="l_wrist_roll_link" />
    <param name="root_name" value="torso_lift_link" />
@@ -25,8 +49,12 @@
 
   <node name="pr2_pbd_interaction" pkg="pr2_pbd_interaction" type="interaction.py" output="screen">
     <param name="dataRoot" value="$(arg dataRoot)" />
-    <param name="isReload" value="$(arg isReload)" />
+    <param name="mode" value="$(arg mode)" />
+    <param name="nTasks" value="$(arg nTasks)" />
+    <param name="nTests" value="$(arg nTests)" />
     <param name="experimentNumber" value="$(arg experimentNumber)" />
+    <param name="isReload" value="$(arg isReload)" />
+
   </node>
   
   <!-- This makes the robot look around appropriately -->
