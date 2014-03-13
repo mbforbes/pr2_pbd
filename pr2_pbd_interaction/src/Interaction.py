@@ -70,6 +70,9 @@ class Interaction:
             rospy.set_param('data_directory', data_dir)
 
             # Copy over default first test so that things work.
+            default_dir = rospy.get_param('/pr2_pbd_interaction/dataRoot') + \
+                'data/objects/test/gentest_1'
+            rospy.set_param('da_obj_directory', default_dir)
             rospy.set_param('da_obj_filename', 'Action1.txt')
             objects = self.world.get_frame_list(1)
 
