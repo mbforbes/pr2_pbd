@@ -103,42 +103,6 @@ class Session:
         self.actions[self.current_action_index].select_step(step_id)
         self._selected_step = step_id
 
-<<<<<<< HEAD
-    def _get_participant_id(self):
-        '''Gets the experiment number from the command line'''
-        while (self._exp_number == None):
-            try:
-                self._exp_number = int(raw_input(
-                                    'Please enter participant ID:'))
-            except ValueError:
-                rospy.logerr("Participant ID needs to be a number")
-
-            self._data_dir = Session._get_data_dir(self._exp_number)
-            if (not os.path.exists(self._data_dir)):
-                os.makedirs(self._data_dir)
-            else:
-                rospy.logwarn('A directory for this participant ' +
-                              'ID already exists: ' + self._data_dir)
-                overwrite = raw_input('Do you want to overwrite? ' +
-                                      'Type r to reload the last state ' +
-                                      'of the experiment. [y/n/r]')
-                if (overwrite == 'y'):
-                    continue
-                elif (overwrite == 'n'):
-                    self._exp_number = None
-                elif (overwrite == 'r'):
-                    self._is_reload = True
-                else:
-                    rospy.logerr('Invalid response, try again.')
-
-    @staticmethod
-    def _get_data_dir(exp_number):
-        '''Returns the directory where action information is saved'''
-        return (rospy.get_param('/pr2_pbd_interaction/dataRoot') +
-                    '/data/experiment' + str(exp_number) + '/')
-
-=======
->>>>>>> 98dd8223b9f6bf1f0576c329d2ae51d13e30fc2c
     def save_session_state(self, is_save_actions=True):
         '''Saves the session state onto hard drive'''
         savemsg = 'Saving session state'
