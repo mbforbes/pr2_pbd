@@ -108,7 +108,7 @@ class World:
 
     # For generation
     gen_obj_dir = rospy.get_param('/pr2_pbd_interaction/dataRoot') + \
-        '/data/objects/'
+        '/data/objects/test/'
     gen_no = 1 # start looking here
 
     def __init__(self):
@@ -194,10 +194,10 @@ class World:
         directory of generated objects specified by the current World.gen_no has
         all required objects, and if not, increments it. Otherwise, it leaves it
         be.'''
-        while len(glob.glob(World.gen_obj_dir + 'generated_' + str(World.gen_no)
+        while len(glob.glob(World.gen_obj_dir + 'gentest_' + str(World.gen_no)
             + '/*')) == 15:
             World.gen_no += 1
-        rospy.loginfo('Generating objects in generated_' + str(World.gen_no) +
+        rospy.loginfo('Generating objects in gentest_' + str(World.gen_no) +
             '/')
 
     @staticmethod
@@ -210,7 +210,7 @@ class World:
         #objects_dir = rospy.get_param('data_directory') + 'objects/'
 
         # For generation
-        objects_dir = World.gen_obj_dir + 'generated_' + str(World.gen_no) + '/'
+        objects_dir = World.gen_obj_dir + 'gentest_' + str(World.gen_no) + '/'
 
         if (not os.path.exists(objects_dir)):
             os.makedirs(objects_dir)
@@ -419,8 +419,10 @@ class World:
 
     def write_cur_objs_to_file(self, action_index):
         gen_file = World.get_objfilename_for_action(action_index)
-        exp_file = World.get_expfilename(action_index)
-        filenames = [gen_file, exp_file]
+        # Not saving in experiment directory because now generating test
+        # objects.
+        #exp_file = World.get_expfilename(action_index)
+        filenames = [gen_file]#, exp_file]
         for data_filename in filenames:
             rospy.loginfo("Saving objects to " + data_filename)
             fh = open(data_filename, 'w')

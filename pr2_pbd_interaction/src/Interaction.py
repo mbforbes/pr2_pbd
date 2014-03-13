@@ -599,7 +599,7 @@ class Interaction:
             if (self.session.n_actions() > 0):
                 if (command.command == GuiCommand.SWITCH_TO_ACTION):
                     # Let's generate all the rest of the experiment data!
-                    for loop in range(20):
+                    for loop in range(2):
                         # Possibly increment gen. directory (if all objects
                         # generated)
                         World.maybe_inc_gen_no()
