@@ -5,7 +5,10 @@ roslib.load_manifest('pr2_pbd_interaction')
 
 # Generic libraries
 import rospy
+import os
+import shutil
 import time
+import yaml
 from visualization_msgs.msg import MarkerArray
 
 # Local stuff
@@ -32,17 +35,42 @@ class Interaction:
     _trajectory_start_time = None
 
     def __init__(self):
+        # We need the participant ID before we construct the Session as it's
+        # used in world.get_frame_list, so we're migrating part of it here.
+        is_reload = rospy.get_param('/pr2_pbd_interaction/isReload')
+        is_debug = False # Manually set this
+        if (is_debug):
+            exp_number = rospy.get_param(
+                '/pr2_pbd_interaction/experimentNumber')
+            rospy.set_param('experiment_number', exp_number)
+            data_dir = Interaction._get_data_dir(exp_number)
+            rospy.set_param('data_directory', data_dir)
+            if (not os.path.exists(data_dir)):
+                os.makedirs(data_dir)
+        else:
+            is_reload = True
+            self._get_participant_id()
+
+        # Old init starts here
         self.arms = Arms()
         self.world = World()
-        self.session = Session(object_list=self.world.get_frame_list(),
-                               is_debug=True)
+        # NOTE(max): Can't get the current action number from the session
+        # becauase we're creating it. More importantly, the world needs to
+        # access the fully-initialized session before it can mock objects (which
+        # happens in get_frame_list()) and it's can't yet, so just use action 0
+        # to return an empty object list back.
+        self.session = Session(object_list=self.world.get_frame_list(1),
+            is_reload=is_reload)
         self._viz_publisher = rospy.Publisher('visualization_marker_array',
-                                              MarkerArray)
+            MarkerArray)
 
         rospy.Subscriber('recognized_command', Command, self.speech_command_cb)
         rospy.Subscriber('gui_command', GuiCommand, self.gui_command_cb)
 
         self._undo_function = None
+        # NOTE(max): For counting frequency of pings... want to do not every 0.1
+        # seconds.
+        self._update_counter = 0
 
         self.responses = {
             Command.TEST_MICROPHONE: Response(Interaction.empty_response,
@@ -72,6 +100,103 @@ class Interaction:
             }
 
         rospy.loginfo('Interaction initialized.')
+
+    @staticmethod
+    def _get_participant_id():
+        '''Gets the experiment number from the command line'''
+        # NOTE(max): We always either reload data that's already been generated,
+        # ore we generate it ourselves and then 'reload' it.
+        exp_number = None
+        data_dir = None
+        while (exp_number == None):
+            try:
+                exp_number = int(raw_input(
+                                    'Please enter participant ID:'))
+            except ValueError:
+                rospy.logerr("Participant ID needs to be a number")
+                exp_number = None
+                continue
+
+            data_dir = Interaction._get_data_dir(exp_number)
+            generate_files = False
+            if (os.path.exists(data_dir)):
+                rospy.logwarn('A directory for this participant ' +
+                  'ID already exists: ' + data_dir)
+                overwrite = raw_input('Do you want to overwrite? ' +
+                  'Type r to reload the last state ' +
+                  'of the experiment. [y/n/r]')
+                if (overwrite == 'y'):
+                    # Generate the files and overwrite existing data
+                    generate_files = True
+                elif (overwrite == 'n'):
+                    # Ask for number again
+                    exp_number = None
+                    continue
+                elif (overwrite == 'r'):
+                    # Don't generate files; reload them
+                    pass
+                else:
+                    # Ask for number again
+                    rospy.logerr('Invalid response, try again.')
+                    exp_number = None
+                    continue
+            else:
+                # If the directory doesn't exist, make it and generate files.
+                os.makedirs(data_dir)
+                generate_files = True
+            if generate_files:
+                # Copy particular seed's actions n_tests times each
+                n_tests = rospy.get_param('/pr2_pbd_interaction/nTests')
+                seed_dir = Interaction._get_seed_dir(exp_number)
+                seed_actions = sorted(os.listdir(seed_dir))
+                n_tasks = int(rospy.get_param('/pr2_pbd_interaction/nTasks'))
+                if len(seed_actions) != n_tasks:                    
+                    rospy.logwarn("Have specified " + str(n_tasks) + " but " +
+                        "there are " + str(len(seed_actions)) + " seeds...")
+                cur_idx = 1
+                # Note that seed_actions should have the same length as the
+                # rospy param
+                for seed_action in seed_actions:
+                    for i in range(n_tests):
+                        shutil.copy(seed_dir + seed_action,
+                            data_dir + 'Action' + str(cur_idx) + '.bag')
+                        cur_idx += 1
+                # write experiment state
+                exp_state = dict()
+                exp_state['nProgrammedActions'] = cur_idx - 1
+                exp_state['currentProgrammedActionIndex'] = 1
+                state_file = open(data_dir + 'experimentState.yaml', 'w')
+                state_file.write(yaml.dump(exp_state))
+                state_file.close()
+        # Save the parameters for global access
+        rospy.set_param('data_directory', data_dir)
+        rospy.set_param('experiment_number', exp_number)
+    
+    @staticmethod
+    def _get_data_dir(exp_number):
+        '''Returns the directory where action information is saved'''
+        return (rospy.get_param('/pr2_pbd_interaction/dataRoot') +
+                    '/data/experiment' + str(exp_number) + '/')
+
+    @staticmethod
+    def _get_seed_number(exp_number):
+        ''' Maps experiment number to seed nubmer'''
+        options = os.listdir(Interaction._get_root_seed_dir())
+        n_seeds = len(options)
+        return (exp_number % n_seeds) + 1
+
+    @staticmethod
+    def _get_root_seed_dir():
+        '''Gets the directory that contains seed directories'''
+        return rospy.get_param('/pr2_pbd_interaction/dataRoot') + '/data/seed/'
+
+    @staticmethod
+    def _get_seed_dir(exp_number):
+        '''Gets the seed directory (containing the seed files) for the
+        given experiment number'''
+        return Interaction._get_root_seed_dir() + \
+            str(Interaction._get_seed_number(exp_number)) + '/'
+
 
     def open_hand(self, arm_index):
         '''Opens gripper on the indicated side'''
@@ -146,7 +271,8 @@ class Interaction:
     def next_action(self, dummy=None):
         '''Switches to next action'''
         if (self.session.n_actions() > 0):
-            if self.session.next_action(self.world.get_frame_list()):
+            if self.session.next_action(self.world.get_frame_list(
+                self.session.current_action_index + 1)):
                 return [RobotSpeech.SWITCH_SKILL + ' ' +
                         str(self.session.current_action_index), GazeGoal.NOD]
             else:
@@ -158,7 +284,8 @@ class Interaction:
     def previous_action(self, dummy=None):
         '''Switches to previous action'''
         if (self.session.n_actions() > 0):
-            if self.session.previous_action(self.world.get_frame_list()):
+            if self.session.previous_action(self.world.get_frame_list(
+                self.session.current_action_index - 1)):
                 return [RobotSpeech.SWITCH_SKILL + ' ' +
                         str(self.session.current_action_index), GazeGoal.NOD]
             else:
@@ -237,7 +364,8 @@ class Interaction:
                 actions[arm_index] = gripper_state
                 step.gripperAction = GripperAction(actions[0], actions[1])
                 self.session.add_step_to_action(step,
-                                                self.world.get_frame_list())
+                    self.world.get_frame_list(
+                        self.session.current_action_index))
 
     def start_recording(self, dummy=None):
         '''Starts recording continuous motion'''
@@ -283,7 +411,8 @@ class Interaction:
                                         self.arms.get_gripper_state(0),
                                         self.arms.get_gripper_state(1))
             self.session.add_step_to_action(traj_step,
-                                        self.world.get_frame_list())
+                self.world.get_frame_list(
+                    self.session.current_action_index))
             Interaction._arm_trajectory = None
             Interaction._trajectory_start_time = None
             return [RobotSpeech.STOPPED_RECORDING_MOTION + ' ' +
@@ -312,7 +441,7 @@ class Interaction:
     def _find_dominant_ref(self, arm_traj):
         '''Finds the most dominant reference frame
         in a continuous trajectory'''
-        ref_names = self.world.get_frame_list()
+        ref_names = self.world.get_frame_list(self.session.current_action_index)
         ref_counts = dict()
         for i in range(len(ref_names)):
             ref_counts[ref_names[i]] = 0
@@ -350,7 +479,8 @@ class Interaction:
                                             self.arms.get_gripper_state(0),
                                             self.arms.get_gripper_state(1))
                 self.session.add_step_to_action(step,
-                                            self.world.get_frame_list())
+                    self.world.get_frame_list(
+                        self.session.current_action_index))
                 return [RobotSpeech.STEP_RECORDED, GazeGoal.NOD]
             else:
                 return ['Action ' + str(self.session.current_action_index) +
@@ -374,6 +504,10 @@ class Interaction:
                 states[arm_index] = ArmState(ArmState.ROBOT_BASE,
                     abs_ee_poses[arm_index], joint_poses[arm_index], Object())
             else:
+                # print "\n\nDEBUG"
+                # print "arm index: " + str(arm_index)
+                # print "abs ee poses for it: " + str(abs_ee_poses[arm_index])
+                # print"\n\n"
                 nearest_obj = self.world.get_nearest_object(
                                                     abs_ee_poses[arm_index])
 
@@ -394,7 +528,7 @@ class Interaction:
 
     def execute_action(self, dummy=None):
         '''Starts the execution of the current action'''
-	execution_z_offset = -0.00
+        execution_z_offset = -0.00
         if (self.session.n_actions() > 0):
             if (self.session.n_frames() > 1):
                 self.session.save_current_action()
@@ -403,7 +537,8 @@ class Interaction:
                 if (action.is_object_required()):
                     if (self.world.update_object_pose()):
                         self.session.get_current_action().update_objects(
-                                                self.world.get_frame_list())
+                            self.world.get_frame_list(
+                                self.session.current_action_index))
                         self.arms.start_execution(action, execution_z_offset)
                     else:
                         return [RobotSpeech.OBJECT_NOT_DETECTED,
@@ -446,7 +581,7 @@ class Interaction:
                 action_no = int(action_no)
                 if (self.session.n_actions() > 0):
                     self.session.switch_to_action(action_no,
-                                                  self.world.get_frame_list())
+                        self.world.get_frame_list(action_no))
                     response = Response(Interaction.empty_response,
                         [RobotSpeech.SWITCH_SKILL + str(action_no),
                          GazeGoal.NOD])
@@ -460,13 +595,41 @@ class Interaction:
 
     def gui_command_cb(self, command):
         '''Callback for when a GUI command is received'''
-
         if (not self.arms.is_executing()):
             if (self.session.n_actions() > 0):
                 if (command.command == GuiCommand.SWITCH_TO_ACTION):
+                    # NOTE(max): I'm doing the fixing up here but not in the
+                    # speech_command_cb hook or any of the others... this is
+                    # what we got for having non-refactored code... I would
+                    # refactor now but don't have time.
                     action_no = command.param
-                    self.session.switch_to_action(action_no,
-                                                  self.world.get_frame_list())
+                    obj_filename = World.get_objfilename_for_action(
+                        action_no)
+                    if os.path.exists(obj_filename):
+                        # We've already mocked the objects, so we just load it
+                        # up and let the user keep working on them.
+                        self.session.switch_to_action(action_no,
+                            self.world.get_frame_list(action_no))
+                    else:
+                        # We need to mock the objects until we get the desired
+                        # number of fixable poses.
+                        desired_n_unreachable = World._get_desired_n_unreachable(
+                            action_no)                        
+                        rospy.loginfo("Sampling until " + str(
+                            desired_n_unreachable) + " unreachables.")
+                        while True:
+                            self.session.switch_to_action(action_no,
+                                self.world.get_frame_list(action_no))
+                            n_unreachable = self.session\
+                                .get_cur_n_unreachable_markers()
+                            if n_unreachable == desired_n_unreachable:
+                                break
+                            else:
+                                rospy.loginfo("Sampled with " + str(
+                                    n_unreachable) + " unreachable, but " +
+                                    "wanted " + str(desired_n_unreachable))
+                        # Save the objects so we don't have to sample again.
+                        self.world.write_cur_objs_to_file(action_no)
                     response = Response(Interaction.empty_response,
                         [RobotSpeech.SWITCH_SKILL + str(action_no),
                          GazeGoal.NOD])
@@ -517,8 +680,26 @@ class Interaction:
             if (is_world_changed):
                 rospy.loginfo('The world has changed.')
                 self.session.get_current_action().update_objects(
-                                        self.world.get_frame_list())
+                    self.world.get_frame_list(
+                        self.session.current_action_index))
 
+        # Only ping state every 1 second or so.
+        if self._update_counter % 10 == 0:
+            #rospy.loginfo('pinging...')
+            #self.session.ping_state()
+            #rospy.loginfo('...done pinging')
+            pass
+
+        # Save all actions every 10 seconds or so.
+        if self._update_counter == 0:
+            self.session.save_session_state(True) # Save all actions.
+
+        # Loop every 10 seconds
+        self._update_counter = 0 if self._update_counter >= 100 else \
+            self._update_counter + 1
+
+        # Note that timings above depend on this... should probably make
+        # a constant.
         time.sleep(0.1)
 
     def _end_execution(self):
@@ -540,7 +721,8 @@ class Interaction:
         if (self.world.update_object_pose()):
             if (self.session.n_actions() > 0):
                 self.session.get_current_action().update_objects(
-                                            self.world.get_frame_list())
+                    self.world.get_frame_list(
+                        self.session.current_action_index))
             return [RobotSpeech.START_STATE_RECORDED, GazeGoal.NOD]
         else:
             return [RobotSpeech.OBJECT_NOT_DETECTED, GazeGoal.SHAKE]

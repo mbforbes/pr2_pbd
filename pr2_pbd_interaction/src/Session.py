@@ -2,7 +2,7 @@
 
 from ProgrammedAction import ProgrammedAction
 import rospy
-import os
+import time
 import yaml
 from pr2_pbd_interaction.msg import ExperimentState
 from pr2_pbd_interaction.srv import GetExperimentState
@@ -12,22 +12,12 @@ from pr2_pbd_interaction.srv import GetExperimentStateResponse
 class Session:
     '''This class holds and maintains experimental data'''
 
-    def __init__(self, object_list, is_debug=False):
-        self._is_reload = rospy.get_param('/pr2_pbd_interaction/isReload')
-
-        self._exp_number = None
+    def __init__(self, object_list, is_reload=False):
+        self._is_reload = is_reload
+        self._data_dir = rospy.get_param('data_directory')
+        self._seed_number = None
         self._selected_step = 0
         self._object_list = object_list
-
-        if (is_debug):
-            self._exp_number = rospy.get_param(
-                                '/pr2_pbd_interaction/experimentNumber')
-            self._data_dir = self._get_data_dir(self._exp_number)
-            if (not os.path.exists(self._data_dir)):
-                os.makedirs(self._data_dir)
-        else:
-            self._get_participant_id()
-        rospy.set_param('data_directory', self._data_dir)
 
         self.actions = dict()
         self.current_action_index = 0
@@ -45,6 +35,17 @@ class Session:
         rospy.Service('get_experiment_state', GetExperimentState,
                       self.get_experiment_state_cb)
 
+        self._update_experiment_state()
+
+    def get_cur_n_unreachable_markers(self):
+        '''Function to allow external querying of number of unreachable
+        markers.'''
+        return (self.actions[self.current_action_index]
+            .get_n_unreachable_markers())
+
+    def ping_state(self):
+        '''Used to push experiment service state more often (but not absurdly
+            often) to gui.'''
         self._update_experiment_state()
 
     def _selected_step_cb(self, selected_step):
@@ -72,7 +73,9 @@ class Session:
                     self._get_gripper_states(1),
                     self._get_ref_frames(0),
                     self._get_ref_frames(1),
-                    self._object_list)
+                    self._object_list,
+                    self.actions[self.current_action_index].
+                        get_n_unreachable_markers())
 
     def _get_ref_frames(self, arm_index):
         ''' Returns the reference frames for the steps of the
@@ -100,6 +103,7 @@ class Session:
         self.actions[self.current_action_index].select_step(step_id)
         self._selected_step = step_id
 
+<<<<<<< HEAD
     def _get_participant_id(self):
         '''Gets the experiment number from the command line'''
         while (self._exp_number == None):
@@ -133,18 +137,32 @@ class Session:
         return (rospy.get_param('/pr2_pbd_interaction/dataRoot') +
                     '/data/experiment' + str(exp_number) + '/')
 
+=======
+>>>>>>> 98dd8223b9f6bf1f0576c329d2ae51d13e30fc2c
     def save_session_state(self, is_save_actions=True):
         '''Saves the session state onto hard drive'''
+        savemsg = 'Saving session state'
+        if is_save_actions:
+            savemsg += ' and all ' + str(len(self.actions)) + ' actions'
+        rospy.loginfo(savemsg)
         exp_state = dict()
         exp_state['nProgrammedActions'] = self.n_actions()
         exp_state['currentProgrammedActionIndex'] = self.current_action_index
+        # TODO(max): Need to save action completion (fix) state here?
         state_file = open(self._data_dir + 'experimentState.yaml', 'w')
         state_file.write(yaml.dump(exp_state))
         state_file.close()
 
         if (is_save_actions):
-            for i in range(self.n_actions()):
-                self.actions[i].save(self._data_dir)
+            for num, action in self.actions.iteritems():
+                action.save(self._data_dir)
+        rospy.loginfo('...done saving')
+
+    def _log_action_switch(self, new_action_idx):
+        '''Dumps user action switch in a log file.'''
+        action_log = open(self._data_dir + 'actionLog.txt', 'a')
+        action_log.write(time.asctime() + ',' + str(new_action_idx) + '\n')
+        action_log.close()
 
     def _load_session_state(self, object_list):
         '''Loads the experiment state from the hard drive'''
@@ -156,6 +174,8 @@ class Session:
                                             self._selected_step_cb)})
             self.actions[(i + 1)].load(self._data_dir)
         self.current_action_index = exp_state['currentProgrammedActionIndex']
+        # Log the initial action we started on as a 'switch'
+        self._log_action_switch(self.current_action_index)
         self.actions[self.current_action_index].initialize_viz(object_list)
         state_file.close()
 
@@ -236,6 +256,7 @@ class Session:
             if (action_number <= self.n_actions() and action_number > 0):
                 self.get_current_action().reset_viz()
                 self.current_action_index = action_number
+                self._log_action_switch(self.current_action_index)
                 self.get_current_action().initialize_viz(object_list)
                 success = True
             else:
@@ -251,10 +272,13 @@ class Session:
 
     def next_action(self, object_list):
         '''Switches to next action'''
+        # TODO(max): This should be refactored with switch_to_action(); don't
+        # want to duplicate logic.
         if (self.n_actions() > 0):
             if (self.current_action_index < self.n_actions()):
                 self.get_current_action().reset_viz()
                 self.current_action_index += 1
+                self._log_action_switch(self.current_action_index)
                 self.get_current_action().initialize_viz(object_list)
                 success = True
             else:
