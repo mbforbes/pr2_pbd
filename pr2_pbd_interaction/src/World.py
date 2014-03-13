@@ -189,8 +189,7 @@ class World:
         # For analysis mode, we go into the objects test directory and ignore
         # the provided action_index.
         if rospy.get_param('/pr2_pbd_interaction/mode') == 'analysis':
-            objects_dir = rospy.get_param('/pr2_pbd_interaction/dataRoot') + \
-                '/data/objects/test/' 
+            objects_dir = rospy.get_param('da_obj_directory')
             filename = rospy.get_param('da_obj_filename')
         else:
             # For debug and study modes, we go into the experiment directory

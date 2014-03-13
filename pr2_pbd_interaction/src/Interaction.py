@@ -157,10 +157,13 @@ class Interaction:
         [data root]/data/objects/test/'''
         # settings
         tasks = [1,2,3]
+        prefix = 'gentest_' # all test object directories start with this
         # Implict: only one seed (so there is just a single seed directory 1/)
         # Implict: test objects are numbered 1-15, 5 each for each task
         dirs_to_remove = [
             './experiment1/', # my 'experiment' for testing things out
+            './experiment2/', # first (2) experiment didn't use generated data
+            './experiment3/', # second (3) experiment didn't use generated data
             './experimentAnaylsis/' # where the analysis data is cached
         ]
         root_dir = rospy.get_param('/pr2_pbd_interaction/dataRoot') + '/'
@@ -174,69 +177,80 @@ class Interaction:
             rospy.loginfo('- Running task ' + str(task) + ' of ' +
                 str(max(tasks)))
             self.log.write("TASK " + str(task) + '\n')
-            # Maps 1 -> 1,2,3,4,5, 2 - > 6,7,8,9,10, etc.
-            filenames = ['Action' + str(i) + '.txt' for i in
-                range((task - 1) * 5 + 1, task * 5 + 1)]
-            # Loop test cases
-            for testfile in filenames:
-                # Get user data
-                globpath = root_dir + 'data/experiment*'
-                user_dirs = sorted([d + '/' for d in glob.glob(globpath)])
-                # Debug...
-                #self.log.write('Globbing ' + globpath + '; got: ' +
-                #    str(user_dirs) + '\n')
 
-                # Clean
-                for user_dir in user_dirs:
-                    for dir_to_remove in dirs_to_remove:
-                        # Using 'endswith' becuase glob can return different
-                        # things depending on how you specify the path.
-                        if user_dir.endswith(dir_to_remove):
-                            user_dirs.remove(user_dir)
+            # Loop through test dirs
+            test_root_dir = rospy.get_param('/pr2_pbd_interaction/dataRoot') + \
+                '/data/objects/test/'
+            # Still makes the '10 before 1' sorting bug, but mreh...
+            test_dirs = sorted([d + '/' for d in glob.glob(test_root_dir +
+                prefix + '*')])
+            for test_dir in test_dirs:
+                # Maps 1 -> 1,2,3,4,5, 2 - > 6,7,8,9,10, etc.
+                filenames = ['Action' + str(i) + '.txt' for i in
+                    range((task - 1) * 5 + 1, task * 5 + 1)]
+                # Loop test cases
+                for testfile in filenames:
+                    # Get user data
+                    globpath = root_dir + 'data/experiment*'
+                    user_dirs = sorted([d + '/' for d in glob.glob(globpath)])
+                    # Debug...
+                    #self.log.write('Globbing ' + globpath + '; got: ' +
+                    #    str(user_dirs) + '\n')
 
-                # Test the seed (currently assuming just one seed directory 1/)
-                seed_bag = Interaction._get_root_seed_dir() + '1/Action' + \
-                    str(task) + '.bag'
-                # Note: as a sanity check, for good test cases (e.g. those we
-                # auto-generate), THESE SHOULD NEVER RETURN 0 (for a seed).
-                self._do_feasability_test(testfile, seed_bag)
+                    # Clean
+                    for user_dir in user_dirs:
+                        for dir_to_remove in dirs_to_remove:
+                            # Using 'endswith' becuase glob can return different
+                            # things depending on how you specify the path.
+                            if user_dir.endswith(dir_to_remove):
+                                user_dirs.remove(user_dir)
 
-                # Loop users
-                for user_dir in user_dirs:
-                    bags = sorted(glob.glob(user_dir + '*.bag'))
-                    if len(bags) == 30:
-                        # Case for just user 2; map 1->1,2,...10, 2->11-20, ...
-                        multiplier = 10
-                    elif len(bags) == 15:
-                        # Case for rest of users; 5 bags / action (1->1-5, etc.)
-                        multiplier = 5
-                    else:
-                        # Sometimes not done yet or empty dir or something; skip
-                        continue
-                    valid_bag_endings = ['Action' + str(i) + '.bag' for i in \
-                        range((task - 1) * multiplier + 1,
-                            task * multiplier + 1)]
-                    valid_bags = []
-                    for b in bags:
-                        for vbe in valid_bag_endings:
-                            if b.endswith(vbe):
-                                valid_bags += [b]
-                                break
-                    # Loop user's fixes (scenarios)
-                    for bag in sorted(valid_bags):
-                        pass
-                        self._do_feasability_test(testfile, bag)
+                    # Test the seed (currently assuming just one seed directory 1/)
+                    seed_bag = Interaction._get_root_seed_dir() + '1/Action' + \
+                        str(task) + '.bag'
+                    # Note: as a sanity check, for good test cases (e.g. those we
+                    # auto-generate), THESE SHOULD NEVER RETURN 0 (for a seed).
+                    self._do_feasability_test(task, test_dir, testfile,
+                        seed_bag)
+
+                    # Loop users
+                    for user_dir in user_dirs:
+                        bags = sorted(glob.glob(user_dir + '*.bag'))
+                        if len(bags) == 30:
+                            # Case for just user 2; map 1->1,2,...10, 2->11-20, ...
+                            multiplier = 10
+                        elif len(bags) == 15:
+                            # Case for rest of users; 5 bags / action (1->1-5, etc.)
+                            multiplier = 5
+                        else:
+                            # Sometimes not done yet or empty dir or something; skip
+                            continue
+                        valid_bag_endings = ['Action' + str(i) + '.bag' for i in \
+                            range((task - 1) * multiplier + 1,
+                                task * multiplier + 1)]
+                        valid_bags = []
+                        for b in bags:
+                            for vbe in valid_bag_endings:
+                                if b.endswith(vbe):
+                                    valid_bags += [b]
+                                    break
+                        # Loop user's fixes (scenarios)
+                        for bag in sorted(valid_bags):
+                            pass
+                            self._do_feasability_test(task, test_dir,
+                                testfile, bag)
 
         # Cleanup
         self.log.close()
 
-    def _do_feasability_test(self, testfile, bagfile):
+    def _do_feasability_test(self, task, test_dir, testfile, bagfile):
         '''Copies bagfile (either fixed data from user or seed) into the data
         directory for this task, loads it, and then checks and logs how many
         unreachable markers there are.'''
         # Set the objects to be mocked as those in the testfile
         #raw_input('Testing:\n\ttest: ' + testfile + '\n\tbag: ' + bagfile +
         #    '\n\t' + 'press ENTER to continue...')
+        rospy.set_param('da_obj_directory', test_dir)
         rospy.set_param('da_obj_filename', testfile)
 
         # We always copy into Action1.bag
@@ -252,20 +266,62 @@ class Interaction:
         self.session.switch_to_action(1, self.world.get_frame_list(1))
         n_unreachable = self.session.get_cur_n_unreachable_markers()
 
-        # extract info for logging
+        # extract info for logging (one line each, comma-separated)
+        # format:
+        #  - task [yes]
+        #  - no. unreachable before fixing [yes]
+        #  - test dir no. [yes]
+        #  - test action no. (test_no) [yes]
+        #  - user no. [yes]
+        #  - user action no. (scenario no.) [yes]
+        #  - no. unreachable with this fix (n_unreachable) [yes]
+        #  - orig. no. unreachable (for user's action) [yes]
+
+        # '.../gentest_5/' -> '5'
+        test_dir_no = test_dir.split('/')[-2].split('_')[-1]
         # 'Action14.txt' -> '14'
-        test_no = testfile.split('.')[0].split('n')[1] 
+        test_no = testfile.split('.')[0].split('n')[1]
+        # Gets how many poses were unreachable for this test before fixing
+        n_unreachable_before_fix = \
+            Interaction._get_seed_unreachable_from_action_no(int(test_no))
         if bagfile.find('seed') > -1:
             # Seed
-            self.log.write(test_no + ',seed,' + str(n_unreachable) + '\n')            
+            # We aren't logging seeds, we're just doing assertions here to
+            # ensure everything's in order.
+            if n_unreachable_before_fix != n_unreachable:
+                self.log.write('ERROR: SEED FIXABILITY MISMATCH!')
+
+            # Originally we logged this...
+            #self.log.write(test_no + ',seed,' + str(n_unreachable) + '\n')
         else:
             # User / scenario
             # '.../experiment12/Action11.bag' -> '12'
             user_no = bagfile.split('/')[-2].split('t')[1]
             # '.../experiment12/Action11.bag' -> '11'
             scenario_no = bagfile.split('/')[-1].split('.')[0].split('n')[1]
-            self.log.write(test_no + ',' + user_no + ',' + scenario_no + ',' +
-                str(n_unreachable) + '\n')
+            # Gets how many poses the user's fix started with
+            n_unreachable_user_orig = \
+                Interaction._get_seed_unreachable_from_action_no(int(
+                    scenario_no))
+
+            self.log.write(str(task) + ',' + str(n_unreachable_before_fix) +
+                ',' + test_dir_no + ',' + test_no + ',' + user_no + ',' + 
+                scenario_no + ',' + n_unreachable + ',' +
+                str(n_unreachable_user_orig) + '\n')
+
+            # Original format
+            #self.log.write(test_no + ',' + user_no + ',' + scenario_no + ',' +
+            #    str(n_unreachable) + '\n')
+
+    @staticmethod
+    def _get_seed_unreachable_from_action_no(action_no):
+        '''Each action (1-15) is generated by sampling until a seed cannot reach
+        a pre-specified number of poses. This takes the resulting action number
+        (a number between 1 and 15) and maps it backwards to the number of
+        unreachable poses for the seed (a number between 1 and 5).'''
+        # NOTE: keep this in sync with World._get_desired_n_unreachable(...) !
+        return [0, 2, 1, 3, 1, 2, 4, 2, 3, 5, 1, 3, 1, 2, 5, 4][action_no]
+
 
     @staticmethod
     def _get_participant_id():
