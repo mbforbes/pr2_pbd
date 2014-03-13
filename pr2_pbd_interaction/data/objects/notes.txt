@@ -1,1 +1,0 @@
-test/ directory contains generated_10 (aka experiment13) objects.
