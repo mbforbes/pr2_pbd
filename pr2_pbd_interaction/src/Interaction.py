@@ -164,10 +164,10 @@ class Interaction:
         # Implict: only one seed (so there is just a single seed directory 1/)
         # Implict: test objects are numbered 1-15, 5 each for each task
         dirs_to_remove = [
-            './experiment1/', # my 'experiment' for testing things out
-            './experiment2/', # first (2) experiment didn't use generated data
-            './experiment3/', # second (3) experiment didn't use generated data
-            './experimentAnaylsis/' # where the analysis data is cached
+            'experiment1/', # my 'experiment' for testing things out
+            'experiment2/', # first (2) experiment didn't use generated data
+            'experiment3/', # second (3) experiment didn't use generated data
+            'experimentAnaylsis/' # where the analysis data is cached
         ]
         root_dir = rospy.get_param('/pr2_pbd_interaction/dataRoot') + '/'
 
@@ -202,8 +202,8 @@ class Interaction:
                     globpath = root_dir + 'data/experiment*'
                     user_dirs = sorted([d + '/' for d in glob.glob(globpath)])
                     # Debug...
-                    #self.log.write('Globbing ' + globpath + '; got: ' +
-                    #    str(user_dirs) + '\n')
+                    rospy.loginfo('Globbing ' + globpath + '; got: ' +
+                        str(user_dirs) + '\n')
 
                     # Clean
                     for user_dir in user_dirs:
@@ -224,18 +224,11 @@ class Interaction:
                     # Loop users
                     for user_dir in user_dirs:
                         bags = sorted(glob.glob(user_dir + '*.bag'))
-                        if len(bags) == 30:
-                            # Case for just user 2; map 1->1,2,...10, 2->11-20, ...
-                            multiplier = 10
-                        elif len(bags) == 15:
-                            # Case for rest of users; 5 bags / action (1->1-5, etc.)
-                            multiplier = 5
-                        else:
-                            # Sometimes not done yet or empty dir or something; skip
+                        if len(bags) != 15:
+                            # Some directories don't have user data in them yet.
                             continue
-                        valid_bag_endings = ['Action' + str(i) + '.bag' for i in \
-                            range((task - 1) * multiplier + 1,
-                                task * multiplier + 1)]
+                        valid_bag_endings = ['Action' + str(i) + '.bag' for i \
+                            in range((task - 1) * 5 + 1, task * 5 + 1)]
                         valid_bags = []
                         for b in bags:
                             for vbe in valid_bag_endings:
@@ -305,6 +298,10 @@ class Interaction:
             # User / scenario
             # '.../experiment12/Action11.bag' -> '12'
             user_no = bagfile.split('/')[-2].split('t')[1]
+            if int(user_no) < 4:
+                self.log.write('WARNING: REMOVE USERS BETTER! FOUND ' + user_no)
+                return
+
             # '.../experiment12/Action11.bag' -> '11'
             scenario_no = bagfile.split('/')[-1].split('.')[0].split('n')[1]
             # Gets how many poses the user's fix started with
