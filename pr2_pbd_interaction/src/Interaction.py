@@ -184,7 +184,6 @@ class Interaction:
         for task in tasks:
             rospy.loginfo('- Running task ' + str(task) + ' of ' +
                 str(max(tasks)))
-            self.log.write("TASK " + str(task) + '\n')
 
             # Loop through test dirs
             test_root_dir = rospy.get_param('/pr2_pbd_interaction/dataRoot') + \

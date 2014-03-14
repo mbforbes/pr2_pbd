@@ -1,5 +1,7 @@
 '''
-Analyze feasability log data.
+Feasability anaylsis
+
+1 - old data type. For newer data type, see fa_2
 '''
 
 __author__ = 'max'
