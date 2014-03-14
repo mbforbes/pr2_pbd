@@ -83,7 +83,10 @@ def main(logfile):
 				# test_acts will have multiple elements only for task 1, with 1
 				# and 2 start unreachable.
 				test_acts = np.unique(nun_data[:, col_testact])
-				for test_act in test_acts:
+
+				test_dir_res = np.zeros((len(test_acts), n_splits, 2),
+					dtype='int8')
+				for idx, test_act in enumerate(test_acts):
 					test_data = test_dir_data[np.where(
 						test_dir_data[:,col_testact] == test_act)]
 					# Now we have just data from
@@ -93,21 +96,29 @@ def main(logfile):
 					# - one test action
 					# and we can randomly pick user fixes
 					# Split the data in inreasing amounts of split_frac
-					test_act_res = np.zeros(shape=(n_splits, n_runs), dtype='int32')
+					test_act_res = np.zeros(shape=(n_splits, 2),
+						dtype='int8')
 					for split in range(1, n_splits + 1):
 						split_portion = split * split_frac
 						split_amt = int(split_portion * len(test_data))
 						# Do multiple runs for error bars.
-						run_res = np.zeros(n_runs, dtype='int32')
+						split_res = np.zeros(n_runs, dtype='int8')
 						for run in range(n_runs):
-							split_data = test_data[np.random.choice(len(test_data),
-								size=split_amt, replace=False)]
+							# Split the data for this run
+							run_data = test_data[np.random.choice(len(
+								test_data), size=split_amt, replace=False)]
 							# doing option (a); are there any fixes that get
 							# 0 unreachable poses as a result on this test?
-							split_res = sum(split_data[:,col_nun_res] == 0)
-							run_res[run] = split_res
-						test_act_res[split - 1,:] = run_res
-						code.interact(local=locals())
+							run_res = sum(run_data[:,col_nun_res] == 0)
+							split_res[run] = run_res
+						# Compute avg, std. dev
+						avg = np.avg(split_res)
+						std_dev = np.avg(split_res)
+						test_act_res[split - 1] = [avg, std_dev]
+					test_dir_res[idx] = test_act_res
+				# At this point, we've run over all test directories, and have
+				# a result array of the shape n_tests, n_splits, 2
+				code.interact(local=locals())
 
 if __name__ == '__main__':
 	if len(sys.argv) == 2:
