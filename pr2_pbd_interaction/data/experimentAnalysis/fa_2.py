@@ -38,7 +38,7 @@ def main(logfile):
 		skip_header=1)
 
 	# settings
-	n_runs = 1
+	n_runs = 2
 	n_splits = 10
 
 	# compute from settings...
@@ -74,7 +74,12 @@ def main(logfile):
 			test_dirs = np.unique(nun_data[:, col_testdir])
 			for test_dir in test_dirs:
 				test_dir_data = nun_data[np.where(
-					nun_data[:,col_testdir] == test_dir)
+					nun_data[:,col_testdir] == test_dir)]
+
+				# TODO (curspot): need to make array to hold the results for
+				# each test action; probably need to redo the naming scheme for
+				# the inner result arrays to be consistent...
+
 				# test_acts will have multiple elements only for task 1, with 1
 				# and 2 start unreachable.
 				test_acts = np.unique(nun_data[:, col_testact])
@@ -87,24 +92,22 @@ def main(logfile):
 					# - one test directory
 					# - one test action
 					# and we can randomly pick user fixes
-					# Split the data in inreasing amounts of split_frac							
+					# Split the data in inreasing amounts of split_frac
+					test_act_res = np.zeros(shape=(n_splits, n_runs), dtype='int32')
 					for split in range(1, n_splits + 1):
 						split_portion = split * split_frac
 						split_amt = int(split_portion * len(test_data))
 						# Do multiple runs for error bars.
+						run_res = np.zeros(n_runs, dtype='int32')
 						for run in range(n_runs):
-							split_data = test_data[np.random.choice(len(test_data))]
-
-
-
-					# old...
-					
-					split_data = np.random.choice(len(nun_data),
-						size=split_amt, replace=False)
-					code.interact(local=locals())
-
-
-	code.interact(local=locals())
+							split_data = test_data[np.random.choice(len(test_data),
+								size=split_amt, replace=False)]
+							# doing option (a); are there any fixes that get
+							# 0 unreachable poses as a result on this test?
+							split_res = sum(split_data[:,col_nun_res] == 0)
+							run_res[run] = split_res
+						test_act_res[split - 1,:] = run_res
+						code.interact(local=locals())
 
 if __name__ == '__main__':
 	if len(sys.argv) == 2:
