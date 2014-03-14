@@ -164,10 +164,10 @@ class Interaction:
         # Implict: only one seed (so there is just a single seed directory 1/)
         # Implict: test objects are numbered 1-15, 5 each for each task
         dirs_to_remove = [
-            'experiment1/', # my 'experiment' for testing things out
-            'experiment2/', # first (2) experiment didn't use generated data
-            'experiment3/', # second (3) experiment didn't use generated data
-            'experimentAnaylsis/' # where the analysis data is cached
+            'experiment1', # my 'experiment' for testing things out
+            'experiment2', # first (2) experiment didn't use generated data
+            'experiment3', # second (3) experiment didn't use generated data
+            'experimentAnaylsis' # where the analysis data is cached
         ]
         root_dir = rospy.get_param('/pr2_pbd_interaction/dataRoot') + '/'
 
@@ -208,18 +208,16 @@ class Interaction:
                     # Clean
                     # NOTE: CURSPOT: removing wrong (missing removing
                     # experiment3).
-                    for user_dir in user_dirs:
-                        for dir_to_remove in dirs_to_remove:
-                            # Using 'endswith' becuase glob can return different
-                            # things depending on how you specify the path.
-                            if user_dir.endswith(dir_to_remove):
-                                user_dirs.remove(user_dir)
+                    user_dirs[:] = [u for u in user_dirs if u.split('/')[-2] \
+                        not in dirs_to_remove]
 
-                    # Test the seed (currently assuming just one seed directory 1/)
+                    # Test the seed (currently assuming just one seed directory
+                    # 1/)
                     seed_bag = Interaction._get_root_seed_dir() + '1/Action' + \
                         str(task) + '.bag'
-                    # Note: as a sanity check, for good test cases (e.g. those we
-                    # auto-generate), THESE SHOULD NEVER RETURN 0 (for a seed).
+                    # Note: as a sanity check, for good test cases (e.g. those
+                    # we auto-generate), THESE SHOULD NEVER RETURN 0 (for a
+                    # seed).
                     self._do_feasability_test(task, test_dir, testfile,
                         seed_bag)
 
