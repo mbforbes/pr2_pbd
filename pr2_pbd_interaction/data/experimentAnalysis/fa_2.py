@@ -71,34 +71,34 @@ def main(logfile):
 		for nun_start in nun_starts:
 			nun_data = task_data[np.where(
 				task_data[:,col_nun_start] == nun_start)]
-			# Do multiple runs for error bars.
-			for run in range(n_runs):
-				# Split the data in inreasing amounts of split_frac
-				for split in range(1, n_splits + 1):
-					split_portion = split * split_frac
-					# This is wrong from here: need to split by crowd
-					# ... or split by test
-					# This will have multiple elements only for task 1, 1 and
-					# 2 start unreachable.
-					test_dirs = np.unique(nun_data[:, col_testdir])
-					for test_dir in test_dirs:
-						test_dir_data = nun_data[np.where(
-							nun_data[:,col_testdir] == test_dir)
-						test_acts = np.unique(nun_data[:, col_testact])
-						for test_act in test_acts:
-							test_data = test_dir_data[np.where(
-								test_dir_data[:,col_testact] == test_act)]
-							# Now we have just data from
-							# - one task
-							# - one n unreachable start
-							# - one test directory
-							# - one test action
-							# and we can randomly pick user fixes
+			test_dirs = np.unique(nun_data[:, col_testdir])
+			for test_dir in test_dirs:
+				test_dir_data = nun_data[np.where(
+					nun_data[:,col_testdir] == test_dir)
+				# test_acts will have multiple elements only for task 1, with 1
+				# and 2 start unreachable.
+				test_acts = np.unique(nun_data[:, col_testact])
+				for test_act in test_acts:
+					test_data = test_dir_data[np.where(
+						test_dir_data[:,col_testact] == test_act)]
+					# Now we have just data from
+					# - one task
+					# - one n unreachable start
+					# - one test directory
+					# - one test action
+					# and we can randomly pick user fixes
+					# Split the data in inreasing amounts of split_frac							
+					for split in range(1, n_splits + 1):
+						split_portion = split * split_frac
+						split_amt = int(split_portion * len(test_data))
+						# Do multiple runs for error bars.
+						for run in range(n_runs):
+							split_data = test_data[np.random.choice(len(test_data))]
 
 
 
 					# old...
-					split_amt = int(split_portion * len(nun_data))
+					
 					split_data = np.random.choice(len(nun_data),
 						size=split_amt, replace=False)
 					code.interact(local=locals())
