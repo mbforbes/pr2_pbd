@@ -206,6 +206,8 @@ class Interaction:
                         str(user_dirs) + '\n')
 
                     # Clean
+                    # NOTE: CURSPOT: removing wrong (missing removing
+                    # experiment3).
                     for user_dir in user_dirs:
                         for dir_to_remove in dirs_to_remove:
                             # Using 'endswith' becuase glob can return different
