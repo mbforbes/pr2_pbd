@@ -202,8 +202,8 @@ class Session:
             self.actions[self.current_action_index].clear()
         else:
             rospy.logwarn('No skills created yet.')
-        self._update_experiment_state()
         self._lock.release()
+        self._update_experiment_state()
 
     def undo_clear(self):
         '''Undo the effect of clear'''
@@ -212,8 +212,8 @@ class Session:
             self.actions[self.current_action_index].undoClear()
         else:
             rospy.logwarn('No skills created yet.')
-        self._update_experiment_state()
         self._lock.release()
+        self._update_experiment_state()
 
     def save_current_action(self):
         '''Save current action onto hard drive'''
@@ -234,8 +234,8 @@ class Session:
         else:
             rospy.logwarn('No skills created yet.')
         self._object_list = object_list
-        self._update_experiment_state()
         self._lock.release()
+        self._update_experiment_state()
 
     def delete_last_step(self):
         '''Removes the last step of the action'''
@@ -244,8 +244,8 @@ class Session:
             self.actions[self.current_action_index].delete_last_step()
         else:
             rospy.logwarn('No skills created yet.')
-        self._update_experiment_state()
         self._lock.release()
+        self._update_experiment_state()
 
     def resume_deleted_step(self):
         '''Resumes the deleted step'''
@@ -254,8 +254,8 @@ class Session:
             self.actions[self.current_action_index].resume_deleted_step()
         else:
             rospy.logwarn('No skills created yet.')
-        self._update_experiment_state()
         self._lock.release()
+        self._update_experiment_state()
 
     def switch_to_action(self, action_number, object_list):
         '''Switches to indicated action'''
