@@ -21,6 +21,7 @@ if __name__ == "__main__":
     global interaction
     rospy.init_node('pr2_pbd_interaction', anonymous=True)
     interaction = Interaction()
-    #rospy.spin()
-    while(not rospy.is_shutdown()):
-        interaction.update()
+    rospy.spin()
+    #while(not rospy.is_shutdown()):
+    # removing this here for now...
+    #interaction.update()

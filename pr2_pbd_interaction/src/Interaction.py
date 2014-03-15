@@ -263,6 +263,9 @@ class Interaction:
         # I think I need to actually call switch_to_action in order to get any
         # kind of results?
         self.session.switch_to_action(1, self.world.get_frame_list(1))
+        # Doing the main loop's update here (to avoid race conditions).
+        self.update()
+        # This computes the 'actual' test data.
         n_unreachable = self.session.get_cur_n_unreachable_markers()
 
         # extract info for logging (one line each, comma-separated)
@@ -315,6 +318,8 @@ class Interaction:
             # Original format
             #self.log.write(test_no + ',' + user_no + ',' + scenario_no + ',' +
             #    str(n_unreachable) + '\n')
+        # debug: doing this for faster feedback
+        self.log.flush()
 
     @staticmethod
     def _get_seed_unreachable_from_action_no(action_no):
