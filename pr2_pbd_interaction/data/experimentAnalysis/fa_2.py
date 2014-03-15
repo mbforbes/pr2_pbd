@@ -26,6 +26,7 @@ import code
 
 # 3rd party
 import numpy as np
+import matplotlib.pyplot as plt
 
 # settings
 N_TESTS = 15
@@ -64,14 +65,17 @@ def main(logfile):
 
 	# loop tasks (1-3)
 	tasks = np.unique(data[:,col_task])	
+	overall_res = []
 	for task in tasks:
 		task_data = data[np.where(data[:,col_task] == task)]
 		nun_starts = np.unique(task_data[:,col_nun_start])
+		task_res = []
 		# loop n unreachable (1-3 for task 1, 1-5 for tasks 2-3)
 		for nun_start in nun_starts:
 			nun_data = task_data[np.where(
 				task_data[:,col_nun_start] == nun_start)]
 			test_dirs = np.unique(nun_data[:, col_testdir])
+			nun_start_res = [] # Not np array. :-(
 			for test_dir in test_dirs:
 				test_dir_data = nun_data[np.where(
 					nun_data[:,col_testdir] == test_dir)]
@@ -84,8 +88,6 @@ def main(logfile):
 				# and 2 start unreachable.
 				test_acts = np.unique(nun_data[:, col_testact])
 
-				test_dir_res = np.zeros((len(test_acts), n_splits, 2),
-					dtype='int8')
 				for idx, test_act in enumerate(test_acts):
 					test_data = test_dir_data[np.where(
 						test_dir_data[:,col_testact] == test_act)]
@@ -96,7 +98,7 @@ def main(logfile):
 					# - one test action
 					# and we can randomly pick user fixes
 					# Split the data in inreasing amounts of split_frac
-					test_act_res = np.zeros(shape=(n_splits, 2),
+					test_act_res = np.zeros(shape=(n_splits, n_runs),
 						dtype='int8')
 					for split in range(1, n_splits + 1):
 						split_portion = split * split_frac
@@ -109,17 +111,41 @@ def main(logfile):
 								test_data), size=split_amt, replace=False)]
 							# doing option (a); are there any fixes that get
 							# 0 unreachable poses as a result on this test?
-							run_res = sum(run_data[:,col_nun_res] == 0)
+							run_res = 1 if \
+								sum(run_data[:,col_nun_res] == 0) >= 1 else 0
 							split_res[run] = run_res
-						# Compute avg, std. dev
-						avg = np.avg(split_res)
-						std_dev = np.avg(split_res)
-						test_act_res[split - 1] = [avg, std_dev]
-					test_dir_res[idx] = test_act_res
-				# At this point, we've run over all test directories, and have
-				# a result array of the shape n_tests, n_splits, 2
-				code.interact(local=locals())
+						test_act_res[split - 1] = split_res
+					nun_start_res.append(test_act_res)
+				# Not separating directories because this doesn't matter.
+			# At this point, we've run over all test directories, and have
+			# a result array of the shape
+			#
+			# n_test_dirs * n_test_actions, n_splits, n_runs.
+			#
+			# This is for one task, one no. unreachable start 
+			nun_start_res = np.array(nun_start_res)
+			# shape: n_splits, n_runs
+			nun_start_avg_across_tests = np.average(nun_start_res, axis=0)
+			# shape: n_splits
+			nun_start_avg_across_runs = np.average(nun_start_avg_across_tests,
+				axis=1)
+			# shape: n_splits
+			nun_start_std_across_runs = np.std(nun_start_avg_across_tests,
+				axis=1)
+			task_res.append({'avgs': nun_start_avg_across_runs,
+				'stds': nun_start_std_across_runs})
+		overall_res.append(task_res)
 
+	# plot (or print...)
+	for task in overall_res:
+		plt.figure()
+		for idx, nun_start in enumerate(task):
+			plt.errorbar(x=np.arange(n_splits),
+				y=nun_start['avgs'],
+				fmt='rgbky'[idx],
+				yerr=nun_start['stds'])
+			plt.axis([0, n_splits, 0, 1])
+	plt.show()
 if __name__ == '__main__':
 	if len(sys.argv) == 2:
 		main(sys.argv[1])
