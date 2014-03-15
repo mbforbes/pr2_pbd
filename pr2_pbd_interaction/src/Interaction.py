@@ -182,6 +182,7 @@ class Interaction:
 
         # Loop tasks
         for task in tasks:
+            # TODO change this once restructured (and other crap warnings gone).
             rospy.loginfo('- Running task ' + str(task) + ' of ' +
                 str(max(tasks)))
 
@@ -205,8 +206,6 @@ class Interaction:
                     #    str(user_dirs) + '\n')
 
                     # Clean
-                    # NOTE: CURSPOT: removing wrong (missing removing
-                    # experiment3).
                     user_dirs[:] = [u for u in user_dirs if u.split('/')[-2] \
                         not in dirs_to_remove]
 

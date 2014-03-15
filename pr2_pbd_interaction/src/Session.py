@@ -18,7 +18,6 @@ class Session:
         self._data_dir = rospy.get_param('data_directory')
         self._selected_step = 0
         self._object_list = object_list
-        self._lock = threading.Lock()
 
         self.actions = dict()
         self.current_action_index = 0
@@ -37,7 +36,6 @@ class Session:
 
     def reload_session_state(self, object_list):
         '''Forces a load from disk. Resets actions.'''
-        self._lock.acquire()
         # Clearing stuff (as in constructor)
         self._selected_step = 0
         self._object_list = object_list
@@ -46,16 +44,12 @@ class Session:
 
         # Loading and updating (as in constructor)
         self._load_session_state(object_list)
-        self._lock.release()
 
     def get_cur_n_unreachable_markers(self):
         '''Function to allow external querying of number of unreachable
         markers.'''
-        self._lock.acquire()
-        retobj = (self.actions[self.current_action_index]
+        return (self.actions[self.current_action_index]
             .get_n_unreachable_markers())
-        self._lock.release()
-        return retobj
 
     def ping_state(self):
         '''Used to push experiment service state more often (but not absurdly
@@ -98,37 +92,30 @@ class Session:
         ''' Returns the reference frames for the steps of the
         current action in array format'''
         ref_frames = []
-        self._lock.acquire()        
         for i in range(self.n_frames()):
             action = self.actions[self.current_action_index]
             ref_frame = action.get_step_ref_frame(arm_index, i)
             ref_frames.append(ref_frame)
-        self._lock.release()            
         return ref_frames
 
     def _get_gripper_states(self, arm_index):
         ''' Returns the gripper states for current action
         in array format'''
         gripper_states = []
-        self._lock.acquire()
         for i in range(self.n_frames()):
             action = self.actions[self.current_action_index]
             gripper_state = action.get_step_gripper_state(arm_index, i)
             gripper_states.append(gripper_state)
-        self._lock.release()
         return gripper_states
 
     def select_action_step(self, step_id):
         ''' Makes the interactive marker for the indicated action
         step selected, by showing the 6D controls'''
-        self._lock.acquire()
         self.actions[self.current_action_index].select_step(step_id)
         self._selected_step = step_id
-        self._lock.release()
 
     def save_session_state(self, is_save_actions=True):
         '''Saves the session state onto hard drive'''
-        self._lock.acquire()        
         savemsg = 'Saving session state'
         if is_save_actions:
             savemsg += ' and all ' + str(len(self.actions)) + ' actions'
@@ -147,7 +134,6 @@ class Session:
                 action.save(self._data_dir)
         # Eliminating spam messages...
         #rospy.loginfo('...done saving')
-        self._lock.release()
 
     def _log_action_switch(self, new_action_idx):
         '''Dumps user action switch in a log file.'''
@@ -187,74 +173,59 @@ class Session:
 
     def get_current_action(self):
         '''Returns the current action'''
-        self._lock.acquire()
-        retAct = self.actions[self.current_action_index]
-        self._lock.release()
-        return retAct
+        return self.actions[self.current_action_index]
 
 #     def get_current_action_name(self):
 #         return self.actions[self.current_action_index].get_name()
 
     def clear_current_action(self):
         '''Removes all steps in the current action'''
-        self._lock.acquire()
         if (self.n_actions() > 0):
             self.actions[self.current_action_index].clear()
         else:
             rospy.logwarn('No skills created yet.')
-        self._lock.release()
         self._update_experiment_state()
 
     def undo_clear(self):
         '''Undo the effect of clear'''
-        self._lock.acquire()        
         if (self.n_actions() > 0):
             self.actions[self.current_action_index].undoClear()
         else:
             rospy.logwarn('No skills created yet.')
-        self._lock.release()
         self._update_experiment_state()
 
     def save_current_action(self):
         '''Save current action onto hard drive'''
-        self._lock.acquire()
         if (self.n_actions() > 0):
             self.actions[self.current_action_index].save(self._data_dir)
             self.save_session_state(is_save_actions=False)
         else:
             rospy.logwarn('No skills created yet.')
-        self._lock.release()
 
     def add_step_to_action(self, step, object_list):
         '''Add a new step to the current action'''
-        self._lock.acquire()        
         if (self.n_actions() > 0):
             self.actions[self.current_action_index].add_action_step(step,
                                                                 object_list)
         else:
             rospy.logwarn('No skills created yet.')
         self._object_list = object_list
-        self._lock.release()
         self._update_experiment_state()
 
     def delete_last_step(self):
         '''Removes the last step of the action'''
-        self._lock.acquire()
         if (self.n_actions() > 0):
             self.actions[self.current_action_index].delete_last_step()
         else:
             rospy.logwarn('No skills created yet.')
-        self._lock.release()
         self._update_experiment_state()
 
     def resume_deleted_step(self):
         '''Resumes the deleted step'''
-        self._lock.acquire()
         if (self.n_actions() > 0):
             self.actions[self.current_action_index].resume_deleted_step()
         else:
             rospy.logwarn('No skills created yet.')
-        self._lock.release()
         self._update_experiment_state()
 
     def switch_to_action(self, action_number, object_list):
@@ -317,10 +288,7 @@ class Session:
     def n_frames(self):
         '''Returns the number of frames'''
         if (self.n_actions() > 0):
-            self._lock.acquire()
-            retobj = self.actions[self.current_action_index].n_frames()
-            self._lock.release()
-            return retobj
+            return self.actions[self.current_action_index].n_frames()
         else:
             rospy.logwarn('No skills created yet.')
             return 0
