@@ -201,8 +201,8 @@ class Interaction:
                     globpath = root_dir + 'data/experiment*'
                     user_dirs = sorted([d + '/' for d in glob.glob(globpath)])
                     # Debug...
-                    rospy.loginfo('Globbing ' + globpath + '; got: ' +
-                        str(user_dirs) + '\n')
+                    #rospy.loginfo('Globbing ' + globpath + '; got: ' +
+                    #    str(user_dirs) + '\n')
 
                     # Clean
                     # NOTE: CURSPOT: removing wrong (missing removing
@@ -915,20 +915,13 @@ class Interaction:
                     self.world.get_frame_list(
                         self.session.current_action_index))
 
-        # Only ping state every 1 second or so.
-        if self._update_counter % 10 == 0:
-            #rospy.loginfo('pinging...')
-            #self.session.ping_state()
-            #rospy.loginfo('...done pinging')
-            pass
+        # Save all actions every 10 seconds or so. OFF FOR TESTING
+        #if self._update_counter == 0:
+        #    self.session.save_session_state(True) # Save all actions.
 
-        # Save all actions every 10 seconds or so.
-        if self._update_counter == 0:
-            self.session.save_session_state(True) # Save all actions.
-
-        # Loop every 10 seconds
-        self._update_counter = 0 if self._update_counter >= 100 else \
-            self._update_counter + 1
+        # Loop every 10 seconds OFF DONT NEED
+        #self._update_counter = 0 if self._update_counter >= 100 else \
+        #    self._update_counter + 1
 
         # Note that timings above depend on this... should probably make
         # a constant.
