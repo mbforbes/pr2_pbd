@@ -1,5 +1,5 @@
 '''
-Feasability anaylsis
+Feasibility anaylsis
 
 2: newer data type. Here's what it looks like (skipping first line,
 which also describes this):
@@ -29,18 +29,15 @@ import code
 import numpy as np
 import matplotlib.pyplot as plt
 
-# settings
-N_TESTS = 15
-
 ### main
-def main(logfile):
+def compute(logfile):
 	'''Do analysis.'''
 	# load data
 	data = np.genfromtxt('log_2.txt', delimiter=',', dtype='int32',
 		skip_header=1)
 
 	# settings
-	n_runs = 2
+	n_runs = 100
 	n_splits = 10
 
 	# compute from settings...
@@ -64,6 +61,9 @@ def main(logfile):
 
 	# graph 1
 	# =======
+
+	# data to hang on to (saved in code)
+	data_amt = 0
 
 	# loop tasks (1-3)
 	tasks = np.unique(data[:,col_task])	
@@ -100,6 +100,7 @@ def main(logfile):
 					# - one test action
 					# and we can randomly pick user fixes
 					# Split the data in inreasing amounts of split_frac
+					data_amt = len(test_data)
 					test_act_res = np.zeros(shape=(n_splits, n_runs),
 						dtype='int8')
 					for split in range(1, n_splits + 1):
@@ -138,19 +139,91 @@ def main(logfile):
 				'stds': nun_start_std_across_runs})
 		overall_res.append(task_res)
 
-	# plot (or print...)
-	for task in overall_res:
-		plt.figure()
+	overall_res = np.array(overall_res)
+	# save
+	# np automatically appends .npt if it doesn't exist, but being explicit here
+	# for the sake of clarity
+	save_filename = logfile.split('.txt')[0] + '.npz'
+	np.savez(save_filename, overall_res=overall_res, data_amt=data_amt)
+	print 'Saved in ' + save_filename
+
+def plot(logfile):
+	'''Do plotting'''
+	# settings
+	colors = [
+		'#66c2a5',
+		'#fc8d62',
+		'#8da0cb',
+		'#e78ac3',
+		'#a6d854',
+	]
+
+	# another option
+	# (check this out for more)
+	# http://colorbrewer2.org/
+	#colors = [
+	#	'#ccebc5',
+	#	'#a8ddb5',
+	#	'#7bccc4',
+	#	'#43a2ca',
+	#	'#0868ac',
+	#]
+
+
+	# load data
+	filedata = np.load(logfile)
+	overall_res = filedata['overall_res']
+	data_amt = filedata['data_amt']
+	print 'Loaded from ' + logfile
+
+	n_splits = len(overall_res[0][0]['avgs'])
+	step = 1.0 / float(n_splits)
+	xs = np.arange(0.0, 1.0 + step, step) * data_amt
+
+	for i, task in enumerate(overall_res):
+		fig = plt.figure(figsize=(8,8))
+		ax = plt.subplot(111)
+		plt.title('Task ' + str(i + 1))
+		plt.xlabel('User fixes')
+		plt.ylabel('Portion feasible')
 		for idx, nun_start in enumerate(task):
-			plt.errorbar(x=np.arange(n_splits),
-				y=nun_start['avgs'],
-				fmt='rgbky'[idx],
-				yerr=nun_start['stds'])
-			plt.axis([0, n_splits, 0, 1])
+			ax.errorbar(x=xs,
+				y=np.insert(nun_start['avgs'], 0, 0),
+				color=colors[idx],
+				linewidth=2,
+				yerr=np.insert(nun_start['stds'], 0, 0),
+				label=str(idx + 1))
+			plt.axis([0, data_amt, 0, 1])
+
+		# Legend manip. from 
+		# http://stackoverflow.com/questions/4700614/how-to-put-the-legend-out-of-the-plot
+		
+		# Shink current axis's height by 10% on the bottom
+		box = ax.get_position()
+		ax.set_position([box.x0, box.y0 + box.height * 0.1,
+			box.width, box.height * 0.9])
+
+		# Put a legend below current axis
+		ax.legend(loc='upper center', bbox_to_anchor=(0.5, -0.10),
+			fancybox=True, shadow=True, ncol=5, title='Starting no. unreachable')
 	plt.show()
+
+def usage():
+	'''Tell 'em what to do.'''
+	print 'Usage: python pa_2.py <log_x.[txt,npz]>'
+	exit(1)
+
+# Program enters here
 if __name__ == '__main__':
 	if len(sys.argv) == 2:
-		main(sys.argv[1])
+		logfile = sys.argv[1]
+		if logfile.endswith('.txt'):
+			compute(logfile)
+		elif logfile.endswith('.npz'):
+			plot(logfile)
+		else:
+			usage()
 	else:
-		print 'Usage: python feasability_anaylsis.py <log_x.txt>'
-		exit(1)
+		usage()
+
+
