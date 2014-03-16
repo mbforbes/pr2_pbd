@@ -180,19 +180,17 @@ class Interaction:
         # Original format
         #self.log.write('test_no,user_no,scenario_no,n_unreachable\n')
 
-        # Loop tasks
-        for task in tasks:
-            # TODO change this once restructured (and other crap warnings gone).
-            rospy.loginfo('- Running task ' + str(task) + ' of ' +
-                str(max(tasks)))
-
-            # Loop through test dirs
-            test_root_dir = rospy.get_param('/pr2_pbd_interaction/dataRoot') + \
-                '/data/objects/test/'
-            # Still makes the '10 before 1' sorting bug, but mreh...
-            test_dirs = sorted([d + '/' for d in glob.glob(test_root_dir +
-                prefix + '*')])
-            for test_dir in test_dirs:
+        # Loop through test dirs overall; we want to use all users' data as a
+        # priority, so if tests are running last minute, we want to have no.
+        # tests be a smaller factor. (I think.)
+        test_root_dir = rospy.get_param('/pr2_pbd_interaction/dataRoot') + \
+            '/data/objects/test/'
+        # Still makes the '10 before 1' sorting bug, but mreh...
+        test_dirs = sorted([d + '/' for d in glob.glob(test_root_dir +
+            prefix + '*')])
+        for test_dir in test_dirs:
+            # Loop tasks
+            for task in tasks:
                 # Maps 1 -> 1,2,3,4,5, 2 - > 6,7,8,9,10, etc.
                 filenames = ['Action' + str(i) + '.txt' for i in
                     range((task - 1) * 5 + 1, task * 5 + 1)]
@@ -291,7 +289,7 @@ class Interaction:
             # We aren't logging seeds, we're just doing assertions here to
             # ensure everything's in order.
             if n_unreachable_before_fix != n_unreachable:
-                self.log.write('ERROR: SEED FIXABILITY MISMATCH!')
+                self.log.write('ERROR: SEED FIXABILITY MISMATCH!\n')
 
             # Originally we logged this...
             #self.log.write(test_no + ',seed,' + str(n_unreachable) + '\n')
@@ -300,7 +298,8 @@ class Interaction:
             # '.../experiment12/Action11.bag' -> '12'
             user_no = bagfile.split('/')[-2].split('t')[1]
             if int(user_no) < 4:
-                self.log.write('WARNING: REMOVE USERS BETTER! FOUND ' + user_no)
+                self.log.write('WARNING: REMOVE USERS BETTER! FOUND ' + user_no
+                    + '\n')
                 return
 
             # '.../experiment12/Action11.bag' -> '11'

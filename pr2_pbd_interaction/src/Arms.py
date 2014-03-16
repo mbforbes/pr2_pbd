@@ -149,7 +149,10 @@ class Arms:
             target_joints = Arms.arms[arm_index].get_ik_for_ee(target_pose,
                                                     arm_state.joint_pose)
             if (target_joints == None):
-                rospy.logerr('No IK for absolute end-effector pose.')
+                # It's quite worrysome/bad that this happens with our data...
+                # but we'll have to assume it's an occasional oddity of the
+                # simulation being different than real life.
+                #rospy.logerr('No IK for absolute end-effector pose.')
                 return arm_state, False
             else:
                 solution = ArmState()

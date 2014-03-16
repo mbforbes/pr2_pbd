@@ -234,7 +234,7 @@ class Session:
             if (action_number <= self.n_actions() and action_number > 0):
                 self.get_current_action().reset_viz()
                 self.current_action_index = action_number
-                self._log_action_switch(self.current_action_index)
+                #self._log_action_switch(self.current_action_index)
                 self.get_current_action().initialize_viz(object_list)
                 success = True
             else:
