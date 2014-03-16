@@ -12,6 +12,7 @@ which also describes this):
   - [5] user action no. (scenario no.)
   - [6] no. unreachable result (n_unreachable)
   - [7] user orig. no. unreachable (for user's action)
+  - [8] user's confidence in their fix for their action
 
 
 '''
@@ -54,6 +55,7 @@ def main(logfile):
 	col_useract   = 5 # user action (which they were fixing)
 	col_nun_res   = 6 # the resulting n. unreachable from user fix -> test
 	col_nun_user  = 7 # original n. unreachable that user's action started with
+	col_userconf  = 8 # user's confidence in their fix for their action
 
 	# NOTE(max): Test directory and n_unreachable almost fully-specifies a
 	# particular test instance... the only time the test action is necessary

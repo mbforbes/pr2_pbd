@@ -4,6 +4,7 @@ import roslib
 roslib.load_manifest('pr2_pbd_interaction')
 
 # Generic libraries
+import numpy as np
 import glob
 import rospy
 import os
@@ -34,12 +35,14 @@ class Interaction:
     _is_recording_motion = False
     _arm_trajectory = None
     _trajectory_start_time = None
+    _confidences = None
 
     def __init__(self):
         # Moving items from old init up here so we can use world in conditional
         # init code below.
         self.arms = Arms()
         self.world = World()
+        Interaction._load_confidences()
 
         # We need the participant ID before we construct the Session as it's
         # used in world.get_frame_list, so we're migrating part of it here.        
@@ -154,6 +157,22 @@ class Interaction:
         #    self._run_feasibility_analysis()
 
         rospy.loginfo('Interaction initialized.')
+
+    @staticmethod
+    def _load_confidences():
+        '''Must call before getting a user confidence measure.'''
+        if Interaction._confidences is not None:
+            # already loaded
+            return
+        fname = rospy.get_param('/pr2_pbd_interaction/dataRoot') + '/data/' + \
+            'user_confidences.txt'
+        Interaction._confidences = np.genfromtxt(fname, delimiter='\t',
+            dtype='int8')
+
+    @staticmethod
+    def _get_confidence(user_no, action_no):
+        '''Gets confidence measure a user rated.'''
+        return Interaction._confidences[user_no][action_no]
 
     def _run_feasibility_analysis(self):
         ''' Runs feasibility analysis on collected data to objects in 
@@ -276,6 +295,7 @@ class Interaction:
         #  - user action no. (scenario no.)
         #  - no. unreachable result (n_unreachable)
         #  - user orig. no. unreachable (for user's action)
+        #  - user confidence (for user's action)
 
         # '.../gentest_5/' -> '5'
         test_dir_no = test_dir.split('/')[-2].split('_')[-1]
@@ -309,10 +329,13 @@ class Interaction:
                 Interaction._get_seed_unreachable_from_action_no(int(
                     scenario_no))
 
+            confidence = Interaction._get_confidence(int(user_no),
+                int(scenario_no))
+
             self.log.write(str(task) + ',' + str(n_unreachable_before_fix) +
                 ',' + test_dir_no + ',' + test_no + ',' + user_no + ',' + 
                 scenario_no + ',' + str(n_unreachable) + ',' +
-                str(n_unreachable_user_orig) + '\n')
+                str(n_unreachable_user_orig) + ',' + str(confidence) + '\n')
 
             # Original format
             #self.log.write(test_no + ',' + user_no + ',' + scenario_no + ',' +
