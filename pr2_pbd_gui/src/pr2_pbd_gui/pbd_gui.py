@@ -117,64 +117,66 @@ class PbDGUI(Plugin):
         # Settings
         self.n_tasks = len(glob.glob(rospy.get_param(
             '/pr2_pbd_interaction/dataRoot') + '/data/experimentTesting/task*'))
-        task_names = ['Pick and Place', 'Constrained Pick and Place',
-            'Multi-Object Move']
-        if len(task_names) != self.n_tasks:
-            rospy.logwarn("Have specified " + str(len(task_names)) + " task " +
-                "names but only " + str(self.n_tasks) + " tasks in params...")
         self.n_tests = len(glob.glob(rospy.get_param(
             '/pr2_pbd_interaction/dataRoot') + '/data/experimentTesting/task' + 
             str(self.currentTask) + '/*.bag'))
 
+        # Creating components
+        # ======================================================================
         # Main box
         allWidgetsBox = QtGui.QVBoxLayout()
 
+        # Create task buttons to swtich between tasks & show active one
+        # TODO
+
         # Instructions area
-        instructionsGroupBox = QGroupBox('Instructions', self._widget)
+        instructionsGroupBox = QGroupBox('Information', self._widget)
         instructionsGroupBox.setObjectName('InstructionsGroup')
         instructionsBox = QtGui.QVBoxLayout()
-        i3 = QtGui.QLabel('Please make sure the robot can reach all saved ' +
-            'poses')
         self.i4 = QtGui.QLabel('\t- (waiting to load action)')
-        i1 = QtGui.QLabel('Please make sure the robot will correctly perform ' +
-            'the action')
-        i2 = QtGui.QLabel('\t- you must check this manually')
 
         self.palette = QtGui.QPalette()
         self.palette.setColor(QtGui.QPalette.Foreground,QtCore.Qt.red)
         self.i4.setPalette(self.palette)
-        instructionsBox.addWidget(i3)
         instructionsBox.addWidget(self.i4)
-        instructionsBox.addWidget(i1)
-        instructionsBox.addWidget(i2)
         instructionsGroupBox.setLayout(instructionsBox)
 
-        # Create one box per test (x tasks, y tests each; x * y = num actions)
-        task_boxes = []
+        # Create one action icon per test
+        unreachable_nums = self._get_n_tests_for_task(self.currentTask)
+        n_unreachable_boxes = []
         self.action_grids = []
         self.action_icon_sets = []
-        for i in range(self.n_tasks):
-            task_boxes.append(QGroupBox(task_names[i], self._widget))
+        for i in range(1, len(unreachable_nums) + 1):
+            n_unreachable_boxes += [QGroupBox(i + ' unreachable', self._widget)]
             grid = QtGui.QGridLayout()
-            self.action_grids.append(QtGui.QGridLayout())
+            self.action_grids += [QtGui.QGridLayout()]
             self.action_grids[i].setHorizontalSpacing(0)
-            for j in range(self.n_tests):
+            for j in range(1, unreachable_nums[i] + 1):
                 self.action_grids[i].addItem(QtGui.QSpacerItem(90, 90), 0, j, QtCore.Qt.AlignCenter)
                 self.action_grids[i].setColumnStretch(j, 0)
-            self.action_icon_sets.append(dict())
+            self.action_icon_sets += [dict()]
             actionBoxLayout = QtGui.QHBoxLayout()
             actionBoxLayout.addLayout(self.action_grids[i])
-            task_boxes[i].setLayout(actionBoxLayout)        
+            n_unreachable_boxes[i].setLayout(actionBoxLayout)        
 
+        # Create buttons to switch between score functions
+        # TODO
+
+        # Create selectable text area things to show top n from score function
+        # TODO
+
+        # Adding components
+        # ======================================================================
         # add instructions to main area
         allWidgetsBox.addWidget(instructionsGroupBox)
-        allWidgetsBox.addStretch(1)        
+        allWidgetsBox.addStretch(1)
         
         # add the three action sections
-        for i in range(self.n_tasks):
-            allWidgetsBox.addWidget(task_boxes[i])
+        for box in n_unreachable_boxes:
+            allWidgetsBox.addWidget(box)
 
         # Fix layout and add main widget to the user interface
+        # ======================================================================
         QtGui.QApplication.setStyle(QtGui.QStyleFactory.create('plastique'))
         vAllBox = QtGui.QVBoxLayout()
         vAllBox.addLayout(allWidgetsBox)
@@ -196,6 +198,22 @@ class PbDGUI(Plugin):
         response = exp_state_srv()
         self.update_state(response.state)
         
+    def _get_n_tests_for_task(task_no):
+        '''Returns an array of the number of tests for each no. unreachable
+        (start configs) based on the task.
+
+        For example, task 1 has
+        (5) 1 unreachable,
+        (3) 2 unreachable, and
+        (2) 3 unreachable,
+
+        so it would return the array [0, 5, 3, 2]
+        '''
+        if task_no == 1:
+            return [0, 5, 3, 2]
+        else:
+            return [0, 2, 2, 2, 2, 2]
+
     def _create_table_view(self, model, row_click_cb):
         proxy = QtGui.QSortFilterProxyModel(self)
         proxy.setSourceModel(model)
