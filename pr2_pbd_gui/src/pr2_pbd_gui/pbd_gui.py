@@ -142,7 +142,7 @@ class PbDGUI(Plugin):
         instructionsGroupBox.setLayout(instructionsBox)
 
         # Create one action icon per test
-        unreachable_nums = self._get_n_tests_for_task(self.currentTask)
+        unreachable_nums = PbDGUI._get_n_tests_for_task(self.currentTask)
         n_unreachable_boxes = []
         self.action_grids = []
         self.action_icon_sets = []
