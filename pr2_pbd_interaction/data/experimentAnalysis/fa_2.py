@@ -112,10 +112,24 @@ def compute(logfile):
 							# Split the data for this run
 							run_data = test_data[np.random.choice(len(
 								test_data), size=split_amt, replace=False)]
-							# doing option (a); are there any fixes that get
-							# 0 unreachable poses as a result on this test?
+
+							# Pick what kind of test we're doing!
+							# --------------------------------------------------
+
+							# (a); are there any fixes that get 0 unreachable
+							# poses as a result on this test?
 							run_res = 1 if \
 								sum(run_data[:,col_nun_res] == 0) >= 1 else 0
+
+							# (b) what's the average number of unreachable poses
+							# gotten as a result? sanity check: should be
+							# roughly constant vs amt. of data.
+							#run_res = np.average(run_data[:,col_nun_res])
+
+							# (c) how many users' fixes got the test to 0
+							# unreachable?
+							#run_res = sum(run_data[:,col_nun_res] == 0)
+
 							split_res[run] = run_res
 						test_act_res[split - 1] = split_res
 					nun_start_res.append(test_act_res)
@@ -141,9 +155,13 @@ def compute(logfile):
 
 	overall_res = np.array(overall_res)
 	# save
-	# np automatically appends .npt if it doesn't exist, but being explicit here
-	# for the sake of clarity
-	save_filename = logfile.split('.txt')[0] + '.npz'
+	if len(sys.argv) >= 3:
+		# allow for providing desired archive name
+		save_filename = sys.argv[2]
+	else:
+		# default. np automatically appends .npz if it doesn't exist, but being
+		# explicit here for the sake of clarity
+		save_filename = logfile.split('.txt')[0] + '.npz'
 	np.savez(save_filename, overall_res=overall_res, data_amt=data_amt)
 	print 'Saved in ' + save_filename
 
@@ -215,7 +233,7 @@ def usage():
 
 # Program enters here
 if __name__ == '__main__':
-	if len(sys.argv) == 2:
+	if len(sys.argv) >= 2:
 		logfile = sys.argv[1]
 		if logfile.endswith('.txt'):
 			compute(logfile)
