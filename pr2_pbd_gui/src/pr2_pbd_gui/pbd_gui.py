@@ -198,6 +198,10 @@ class PbDGUI(Plugin):
         response = exp_state_srv()
         self.update_state(response.state)
         
+    # STATIC METHODS
+    # ==========================================================================
+
+    @staticmethod
     def _get_n_tests_for_task(task_no):
         '''Returns an array of the number of tests for each no. unreachable
         (start configs) based on the task.
@@ -213,6 +217,23 @@ class PbDGUI(Plugin):
             return [0, 5, 3, 2]
         else:
             return [0, 2, 2, 2, 2, 2]
+
+    @staticmethod
+    def _get_row_col_idxes_for_action(action_no):
+        '''Returns row_idx, col_idx to get action action_no from the sets.'''
+        testarr = PbDGUI._get_n_tests_for_task(self.currentTask)
+        idx = 1
+        togo = action_no
+        while True:
+            n_in_cur = testarr[idx]
+            if togo - n_in_cur <= 0:
+                return idx - 1, togo - 1 # convert to 0-based indexing
+            else:
+                togo -= n_in_cur
+                idx += 1
+
+    # OBJECT METHODS
+    # ==========================================================================
 
     def _create_table_view(self, model, row_click_cb):
         proxy = QtGui.QSortFilterProxyModel(self)
@@ -242,18 +263,6 @@ class PbDGUI(Plugin):
     def l_row_clicked_cb(self, logicalIndex):
         self.step_pressed(self.get_uid(1, logicalIndex))
 
-    def _get_row_col_idxes_for_action(action_no):
-        '''Returns row_idx, col_idx to get action action_no from the sets.'''
-        testarr = self._get_n_tests_for_task(self.currentTask)
-        idx = 1
-        togo = action_no
-        while True:
-            n_in_cur = testarr[idx]
-            if togo - n_in_cur <= 0:
-                return idx - 1, togo - 1 # convert to 0-based indexing
-            else:
-                togo -= n_in_cur
-                idx += 1
 
     def update_state(self, state):
         # NOTE(max): Too spammy...
@@ -268,7 +277,7 @@ class PbDGUI(Plugin):
             self.action_pressed(state.i_current_action - 1, False)
 
         # Get icon
-        row, col = self._get_row_col_idxes_for_action(state.i_current_action)
+        row, col = PbDGUI._get_row_col_idxes_for_action(state.i_current_action)
         icon = self.action_icon_sets[row][col]
 
         # Extract no. unreachable markers
