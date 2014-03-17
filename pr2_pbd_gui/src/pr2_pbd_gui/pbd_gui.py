@@ -147,13 +147,14 @@ class PbDGUI(Plugin):
         self.action_grids = []
         self.action_icon_sets = []
         for i in range(1, len(unreachable_nums) + 1):
-            n_unreachable_boxes += [QGroupBox(i + ' unreachable', self._widget)]
+            n_unreachable_boxes += [QGroupBox(str(i) + ' unreachable',
+                self._widget)]
             grid = QtGui.QGridLayout()
             self.action_grids += [QtGui.QGridLayout()]
-            self.action_grids[i].setHorizontalSpacing(0)
+            self.action_grids[-1].setHorizontalSpacing(0)
             for j in range(1, unreachable_nums[i] + 1):
-                self.action_grids[i].addItem(QtGui.QSpacerItem(90, 90), 0, j, QtCore.Qt.AlignCenter)
-                self.action_grids[i].setColumnStretch(j, 0)
+                self.action_grids[-1].addItem(QtGui.QSpacerItem(90, 90), 0, j, QtCore.Qt.AlignCenter)
+                self.action_grids[-1].setColumnStretch(j, 0)
             self.action_icon_sets += [dict()]
             actionBoxLayout = QtGui.QHBoxLayout()
             actionBoxLayout.addLayout(self.action_grids[i])
