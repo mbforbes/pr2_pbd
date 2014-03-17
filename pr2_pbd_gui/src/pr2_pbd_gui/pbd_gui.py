@@ -146,7 +146,7 @@ class PbDGUI(Plugin):
         n_unreachable_boxes = []
         self.action_grids = []
         self.action_icon_sets = []
-        for i in range(1, len(unreachable_nums) + 1):
+        for i in range(1, len(unreachable_nums)):
             n_unreachable_boxes += [QGroupBox(str(i) + ' unreachable',
                 self._widget)]
             grid = QtGui.QGridLayout()
@@ -157,8 +157,8 @@ class PbDGUI(Plugin):
                 self.action_grids[-1].setColumnStretch(j, 0)
             self.action_icon_sets += [dict()]
             actionBoxLayout = QtGui.QHBoxLayout()
-            actionBoxLayout.addLayout(self.action_grids[i])
-            n_unreachable_boxes[i].setLayout(actionBoxLayout)        
+            actionBoxLayout.addLayout(self.action_grids[-1])
+            n_unreachable_boxes[-1].setLayout(actionBoxLayout)
 
         # Create buttons to switch between score functions
         # TODO
