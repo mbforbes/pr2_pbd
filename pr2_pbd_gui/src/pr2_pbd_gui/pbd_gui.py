@@ -133,7 +133,7 @@ class PbDGUI(Plugin):
         instructionsGroupBox = QGroupBox('Information', self._widget)
         instructionsGroupBox.setObjectName('InstructionsGroup')
         instructionsBox = QtGui.QVBoxLayout()
-        self.i4 = QtGui.QLabel('\t- (waiting to load action)')
+        self.i4 = QtGui.QLabel('(Waiting to load action.)')
 
         self.palette = QtGui.QPalette()
         self.palette.setColor(QtGui.QPalette.Foreground,QtCore.Qt.red)
@@ -153,8 +153,8 @@ class PbDGUI(Plugin):
             self.action_grids += [QtGui.QGridLayout()]
             self.action_grids[-1].setHorizontalSpacing(0)
             for j in range(1, unreachable_nums[i] + 1):
-                self.action_grids[-1].addItem(QtGui.QSpacerItem(90, 90), 0, j, QtCore.Qt.AlignCenter)
-                self.action_grids[-1].setColumnStretch(j, 0)
+                self.action_grids[-1].addItem(QtGui.QSpacerItem(90, 90), 0, j - 1, QtCore.Qt.AlignCenter)
+                self.action_grids[-1].setColumnStretch(j - 1, 0)
             self.action_icon_sets += [dict()]
             actionBoxLayout = QtGui.QHBoxLayout()
             actionBoxLayout.addLayout(self.action_grids[-1])
@@ -223,7 +223,8 @@ class PbDGUI(Plugin):
     # OBJECT METHODS
     # ==========================================================================
     def _get_row_col_idxes_for_action(self, action_no):
-        '''Returns row_idx, col_idx to get action action_no from the sets.'''
+        '''Returns row_idx, col_idx to get action action_no from the sets.
+        Assumes that passed param (action_no) is ONE-BASED INDEXING.'''
         testarr = PbDGUI._get_n_tests_for_task(self.currentTask)
         idx = 1
         togo = action_no
@@ -272,17 +273,24 @@ class PbDGUI(Plugin):
             for i in range(n_actions, state.n_actions):
                 self.new_action()
 
-        if (self.currentAction != (state.i_current_action - 1)):
+        # Go from 1-based to 0-based indexing
+        new_act_idx = state.i_current_action - 1
+        if self.currentAction != new_act_idx:
             self.delete_all_steps()
-            self.action_pressed(state.i_current_action - 1, False)
+            self.action_pressed(new_act_idx, False)
 
-        # Get icon
-        row, col = self._get_row_col_idxes_for_action(state.i_current_action)
-        icon = self.action_icon_sets[row][col]
+        # Get icon (_get_row_col_idxes_for_action uses 1-based)
+        row, col = self._get_row_col_idxes_for_action(new_act_idx + 1)
+        # NOTE: each action icon set maps from action index (0-based) to
+        # action, not starting at 0, but from the real action number.
+        # e.g. action icon set 2 might start at action 5 (6 in 1-baed)
+        # rather than 0.
+        icon = self.action_icon_sets[row][new_act_idx]
+        icon.updateView()
 
         # Extract no. unreachable markers
         nu = state.n_unreachable_markers
-        self.i4.setText('\t - number of unreachable markers: ' + str(nu))
+        self.i4.setText('Number of unreachable markers: ' + str(nu))
         if nu > 0:
             self.palette.setColor(QtGui.QPalette.Foreground,QtCore.Qt.red)
             icon.all_reachable = False
@@ -290,7 +298,6 @@ class PbDGUI(Plugin):
             self.palette.setColor(QtGui.QPalette.Foreground,QtCore.Qt.green)
             icon.all_reachable = True
         self.i4.setPalette(self.palette)
-        icon.updateView()
 
         # TODO: Deal with the following arrays:
         # state.r_gripper_states
@@ -307,27 +314,34 @@ class PbDGUI(Plugin):
         return sum([len(a.keys()) for a in self.action_icon_sets])
 
     def new_action(self):
-        rospy.logwarn('Not creating new actions in experiment testing..')
-        # nColumns = self.n_tests
-        # actionIndex = self.n_actions()
-        # taskIdx = actionIndex / nColumns # row idx
-        # for s in self.action_icon_sets:
-        #     for key, icon in s.iteritems():
-        #        icon.selected = False
-        #        icon.updateView()
-        # actIcon = ActionIcon(self._widget, actionIndex, self.action_pressed)
-        # actionGrid = self.action_grids[taskIdx]
-        # actionGrid.addLayout(actIcon,
-        #     actionIndex / nColumns, # row idx
-        #     actionIndex % nColumns) # col idx
-        # self.action_icon_sets[taskIdx][actionIndex] = actIcon
+        # Deselect the rest
+        for s in self.action_icon_sets:
+            for key, icon in s.iteritems():
+               icon.selected = False
+               icon.updateView()
+
+        # n_actions is 1-based, so good for insertion into 0-based indexing
+        actionIndex = self.n_actions()
+        # _get_row_col_idxes_for_action takes one-based indexing
+        row, col = self._get_row_col_idxes_for_action(actionIndex + 1)
+        actIcon = ActionIcon(self._widget, actionIndex, self.action_pressed)
+
+        #taskIdx = actionIndex / nColumns # row idx
+        #nColumns = self.n_tests
+        
+
+        actionGrid = self.action_grids[row]
+        actionGrid.addLayout(actIcon,
+            0, # row idx; was actionIndex / nColumns
+            col) # col idx; was actionIndex % nColumns
+        self.action_icon_sets[row][actionIndex] = actIcon
 
     def step_pressed(self, step_index):
         gui_cmd = GuiCommand(GuiCommand.SELECT_ACTION_STEP, step_index)
         self.gui_cmd_publisher.publish(gui_cmd)
 
     def action_pressed(self, actionIndex, isPublish=True):
-        for s in self.action_icon_sets:
+        for i, s in enumerate(self.action_icon_sets):
             for key, icon in s.iteritems():
                 icon.selected = (key == actionIndex)
                 icon.updateView()
