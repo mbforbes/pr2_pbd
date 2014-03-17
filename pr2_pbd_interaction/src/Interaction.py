@@ -1,15 +1,17 @@
 '''Main interaction loop'''
 
+# ROS
 import roslib
 roslib.load_manifest('pr2_pbd_interaction')
+import rospy
+from visualization_msgs.msg import MarkerArray
 
 # Generic libraries
-import rospy
+import glob
 import os
 import shutil
 import time
 import yaml
-from visualization_msgs.msg import MarkerArray
 
 # Local stuff
 from World import World
