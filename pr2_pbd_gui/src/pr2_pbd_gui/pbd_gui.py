@@ -6,6 +6,7 @@ roslib.load_manifest('pr2_pbd_gui')
 
 import os
 import time
+import glob
 from subprocess import call
 import rospy, yaml
 from std_msgs.msg import String
@@ -111,15 +112,19 @@ class PbDGUI(Plugin):
         
         self.currentAction = -1
         self.currentStep = -1
+        self.currentTask = 1
 
         # Settings
-        self.n_tasks = int(rospy.get_param('/pr2_pbd_interaction/nTasks'))
+        self.n_tasks = len(glob.glob(rospy.get_param(
+            '/pr2_pbd_interaction/dataRoot') + '/data/experimentTesting/task*'))
         task_names = ['Pick and Place', 'Constrained Pick and Place',
             'Multi-Object Move']
         if len(task_names) != self.n_tasks:
             rospy.logwarn("Have specified " + str(len(task_names)) + " task " +
                 "names but only " + str(self.n_tasks) + " tasks in params...")
-        self.n_tests = int(rospy.get_param('/pr2_pbd_interaction/nTests'))
+        self.n_tests = len(glob.glob(rospy.get_param(
+            '/pr2_pbd_interaction/dataRoot') + '/data/experimentTesting/task' + 
+            str(self.currentTask) + '/*.bag'))
 
         # Main box
         allWidgetsBox = QtGui.QVBoxLayout()

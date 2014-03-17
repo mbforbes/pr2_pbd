@@ -1,14 +1,7 @@
 <launch>
 
   <!-- This is the main state machine for interaction and PbD -->
-  <arg name="isReload" value="True" />
   <arg name="dataRoot" value="$(find pr2_pbd_interaction)" />
-  <!-- The number of tasks. -->
-  <arg name="nTasks" value="3" />
-  <!-- The number of tests to generate per task. -->
-  <arg name="nTests" value="5" />
-
-  <arg name="experimentNumber" value="10" />
   
   <!-- This runs the interactive manipulation -->
   
@@ -30,10 +23,6 @@
 
   <node name="pr2_pbd_interaction" pkg="pr2_pbd_interaction" type="interaction.py" output="screen">
     <param name="dataRoot" value="$(arg dataRoot)" />
-    <param name="isReload" value="$(arg isReload)" />
-    <param name="nTasks" value="$(arg nTasks)" />
-    <param name="nTests" value="$(arg nTests)" />
-    <param name="experimentNumber" value="$(arg experimentNumber)" />
   </node>
   
   <!-- This makes the robot look around appropriately -->

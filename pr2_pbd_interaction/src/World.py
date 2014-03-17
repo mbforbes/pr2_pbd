@@ -102,8 +102,6 @@ class World:
     objects = []
     # Separator for reading / writing mocked objects to / from files.
     _sep = ','
-    _n_tasks = None
-    _n_tests = None
 
     def __init__(self):
 
@@ -128,19 +126,13 @@ class World:
         # rospy.loginfo('Interactive object detection action ' +
         #               'server has responded.')
 
-        # NOTE(max): I made this method not do anything, but am keeping the call
-        # here as a reminder.
+        # TODO(max): Do we need this call here?
         self.clear_all_objects()
 
         # NOTE(max): We remove the table-getting subscription as well.
         # The following is to get the table information
         # rospy.Subscriber('tabletop_segmentation_markers',
         #                 Marker, self.receive_table_marker)
-
-        # How many actions we are mocking        
-        World._n_tasks = int(rospy.get_param('/pr2_pbd_interaction/nTasks'))
-        World._n_tests = int(rospy.get_param('/pr2_pbd_interaction/nTests'))
-        self._max_mocked_action_idx = World._n_tasks * World._n_tests
 
     @staticmethod
     def _get_task_n_from_action(action_index):
@@ -174,7 +166,9 @@ class World:
                 self._add_new_object_internal(mocked_obj)
         else:
             # Not sampled yet; we have to sapmle.
-            self._sample_objects(action_index)
+            # NOTE this should not happen in our branch
+            rospy.logwarn('Should not be sampling objects in successTesting')
+            #self._sample_objects(action_index)
 
         # Release
         self._lock.release()
@@ -777,8 +771,7 @@ class World:
         # object list, but we want to use it as a trigger for mocking in the new
         # objects. This is because the world isn't notified when you switch
         # actions, so this method call is the best of a notification we get!
-        if action_index > 0 and action_index <= self._max_mocked_action_idx:
-            # valid new action, so we mock the new objects
+        if action_index > 0:
             rospy.loginfo("Mocking objects for action " + str(action_index))
             self._mock_objects_for_action(action_index)
         return self._get_underlying_objects()

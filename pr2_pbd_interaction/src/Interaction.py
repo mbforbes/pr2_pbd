@@ -35,23 +35,34 @@ class Interaction:
     _trajectory_start_time = None
 
     def __init__(self):
-        # We need the participant ID before we construct the Session as it's
-        # used in world.get_frame_list, so we're migrating part of it here.
-        is_reload = rospy.get_param('/pr2_pbd_interaction/isReload')
-        is_debug = False # Manually set this
-        if (is_debug):
-            exp_number = rospy.get_param(
-                '/pr2_pbd_interaction/experimentNumber')
-            rospy.set_param('experiment_number', exp_number)
-            data_dir = Interaction._get_data_dir(exp_number)
-            rospy.set_param('data_directory', data_dir)
-            if (not os.path.exists(data_dir)):
-                os.makedirs(data_dir)
-        else:
-            is_reload = True
-            self._get_participant_id()
+        # Settings/code for success testing
+        # ======================================================================
+        is_reload = True
+        n_tasks = len(glob.glob(rospy.get_param(
+            '/pr2_pbd_interaction/dataRoot') + '/data/experimentTesting/task*'))
+        # Copy default bag files (seed)
+        Interaction._copy_seeds(n_tasks)
+        # Set up for current task
+        task_no = 1 # NOTE: This might have to become a field...
+        rospy.set_param('data_directory', Interaction._get_data_dir(task_no))
+
+
+        # Disabling this stuff for now because we're just going to focus on
+        # success testing here.
+        # ======================================================================
+        #is_debug = False # Manually set this
+        #if (is_debug):
+        #    data_dir = Interaction._get_data_dir(exp_number)
+        #    rospy.set_param('data_directory', data_dir)
+        #    if (not os.path.exists(data_dir)):
+        #        os.makedirs(data_dir)
+        #else:
+        #    is_reload = True
+        #    self._get_participant_id()
+
 
         # Old init starts here
+        # ======================================================================
         self.arms = Arms()
         self.world = World()
         # NOTE(max): Can't get the current action number from the session
@@ -102,6 +113,27 @@ class Interaction:
         rospy.loginfo('Interaction initialized.')
 
     @staticmethod
+    def _copy_seeds(n_tasks):
+        '''Copies seeds into the task directories as default bag files
+        (for experiment testing (success testing), as well as writes experiment
+        state yaml file.'''
+        seed_dir = Interaction._get_seed_dir()
+        for task_no in range(1, n_tasks + 1):
+            task_dir = Interaction._get_data_dir(task_no)
+            n_tests = len(glob.glob(task_dir + 'objects/Action*.txt'))
+            for test_no in range(1, n_tests + 1):
+                # copy seed for every test
+                shutil.copy(seed_dir + 'Action' + str(task_no) + '.bag',
+                    task_dir + 'Action' + str(test_no) + '.bag')
+            # write exp state
+            exp_state = dict()
+            exp_state['nProgrammedActions'] = n_tests
+            exp_state['currentProgrammedActionIndex'] = 1
+            state_file = open(task_dir + 'experimentState.yaml', 'w')
+            state_file.write(yaml.dump(exp_state))
+            state_file.close()
+
+    @staticmethod
     def _get_participant_id():
         '''Gets the experiment number from the command line'''
         # NOTE(max): We always either reload data that's already been generated,
@@ -146,9 +178,13 @@ class Interaction:
                 generate_files = True
             if generate_files:
                 # Copy particular seed's actions n_tests times each
+                # NOTE parameter missing; not supporting this method in this
+                # branch                
                 n_tests = rospy.get_param('/pr2_pbd_interaction/nTests')
-                seed_dir = Interaction._get_seed_dir(exp_number)
+                seed_dir = Interaction._get_seed_dir()
                 seed_actions = sorted(os.listdir(seed_dir))
+                # NOTE parameter missing; not supporting this method in this
+                # branch
                 n_tasks = int(rospy.get_param('/pr2_pbd_interaction/nTasks'))
                 if len(seed_actions) != n_tasks:                    
                     rospy.logwarn("Have specified " + str(n_tasks) + " but " +
@@ -170,33 +206,18 @@ class Interaction:
                 state_file.close()
         # Save the parameters for global access
         rospy.set_param('data_directory', data_dir)
-        rospy.set_param('experiment_number', exp_number)
     
     @staticmethod
-    def _get_data_dir(exp_number):
+    def _get_data_dir(task_no):
         '''Returns the directory where action information is saved'''
         return (rospy.get_param('/pr2_pbd_interaction/dataRoot') +
-                    '/data/experiment' + str(exp_number) + '/')
+                    '/data/experimentTesting/task' + str(task_no) + '/')
 
     @staticmethod
-    def _get_seed_number(exp_number):
-        ''' Maps experiment number to seed nubmer'''
-        options = os.listdir(Interaction._get_root_seed_dir())
-        n_seeds = len(options)
-        return (exp_number % n_seeds) + 1
-
-    @staticmethod
-    def _get_root_seed_dir():
-        '''Gets the directory that contains seed directories'''
-        return rospy.get_param('/pr2_pbd_interaction/dataRoot') + '/data/seed/'
-
-    @staticmethod
-    def _get_seed_dir(exp_number):
+    def _get_seed_dir():
         '''Gets the seed directory (containing the seed files) for the
         given experiment number'''
-        return Interaction._get_root_seed_dir() + \
-            str(Interaction._get_seed_number(exp_number)) + '/'
-
+        return rospy.get_param('/pr2_pbd_interaction/dataRoot') +'/data/seed/1/'
 
     def open_hand(self, arm_index):
         '''Opens gripper on the indicated side'''
@@ -629,7 +650,8 @@ class Interaction:
                                     n_unreachable) + " unreachable, but " +
                                     "wanted " + str(desired_n_unreachable))
                         # Save the objects so we don't have to sample again.
-                        self.world.write_cur_objs_to_file(action_no)
+                        # NOTE disabling in this branch as a safety measure.
+                        #self.world.write_cur_objs_to_file(action_no)
                     response = Response(Interaction.empty_response,
                         [RobotSpeech.SWITCH_SKILL + str(action_no),
                          GazeGoal.NOD])
