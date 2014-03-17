@@ -115,11 +115,11 @@ class PbDGUI(Plugin):
         self.currentTask = 1
 
         # Settings
-        self.n_tasks = len(glob.glob(rospy.get_param(
-            '/pr2_pbd_interaction/dataRoot') + '/data/experimentTesting/task*'))
-        self.n_tests = len(glob.glob(rospy.get_param(
-            '/pr2_pbd_interaction/dataRoot') + '/data/experimentTesting/task' + 
-            str(self.currentTask) + '/*.bag'))
+        #self.n_tasks = len(glob.glob(rospy.get_param(
+        #    '/pr2_pbd_interaction/dataRoot') + '/data/experimentTesting/task*'))
+        #self.n_tests = len(glob.glob(rospy.get_param(
+        #    '/pr2_pbd_interaction/dataRoot') + '/data/experimentTesting/task' + 
+        #    str(self.currentTask) + '/*.bag'))
 
         # Creating components
         # ======================================================================
@@ -242,6 +242,19 @@ class PbDGUI(Plugin):
     def l_row_clicked_cb(self, logicalIndex):
         self.step_pressed(self.get_uid(1, logicalIndex))
 
+    def _get_row_col_idxes_for_action(action_no):
+        '''Returns row_idx, col_idx to get action action_no from the sets.'''
+        testarr = self._get_n_tests_for_task(self.currentTask)
+        idx = 1
+        togo = action_no
+        while True:
+            n_in_cur = testarr[idx]
+            if togo - n_in_cur <= 0:
+                return idx - 1, togo - 1 # convert to 0-based indexing
+            else:
+                togo -= n_in_cur
+                idx += 1
+
     def update_state(self, state):
         # NOTE(max): Too spammy...
         # qWarning('Received new state')
@@ -255,14 +268,12 @@ class PbDGUI(Plugin):
             self.action_pressed(state.i_current_action - 1, False)
 
         # Get icon
-        curset = self.action_icon_sets[(state.i_current_action-1)/ self.n_tests]
-        # TODO(max): Indexing hack...
-        icon = curset[state.i_current_action - 1]
+        row, col = self._get_row_col_idxes_for_action(state.i_current_action)
+        icon = self.action_icon_sets[row][col]
 
-        # NOTE(max): Trying to extract number of unreachable markers.
+        # Extract no. unreachable markers
         nu = state.n_unreachable_markers
-        self.i4.setText('\t - number of unreachable markers: ' +
-            str(nu))
+        self.i4.setText('\t - number of unreachable markers: ' + str(nu))
         if nu > 0:
             self.palette.setColor(QtGui.QPalette.Foreground,QtCore.Qt.red)
             icon.all_reachable = False
@@ -287,21 +298,20 @@ class PbDGUI(Plugin):
         return sum([len(a.keys()) for a in self.action_icon_sets])
 
     def new_action(self):
-        nColumns = self.n_tests
-        actionIndex = self.n_actions()
-        taskIdx = actionIndex / self.n_tests
-        if taskIdx >= self.n_tasks:
-            rospy.logwarn('Cannot add more actions; this study is fixed!')
-            return
-        for s in self.action_icon_sets:
-            for key, icon in s.iteritems():
-               icon.selected = False
-               icon.updateView()
-        actIcon = ActionIcon(self._widget, actionIndex, self.action_pressed)
-        actionGrid = self.action_grids[taskIdx]
-        actionGrid.addLayout(actIcon, actionIndex / nColumns,
-            actionIndex % nColumns)
-        self.action_icon_sets[taskIdx][actionIndex] = actIcon
+        rospy.logwarn('Not creating new actions in experiment testing..')
+        # nColumns = self.n_tests
+        # actionIndex = self.n_actions()
+        # taskIdx = actionIndex / nColumns # row idx
+        # for s in self.action_icon_sets:
+        #     for key, icon in s.iteritems():
+        #        icon.selected = False
+        #        icon.updateView()
+        # actIcon = ActionIcon(self._widget, actionIndex, self.action_pressed)
+        # actionGrid = self.action_grids[taskIdx]
+        # actionGrid.addLayout(actIcon,
+        #     actionIndex / nColumns, # row idx
+        #     actionIndex % nColumns) # col idx
+        # self.action_icon_sets[taskIdx][actionIndex] = actIcon
 
     def step_pressed(self, step_index):
         gui_cmd = GuiCommand(GuiCommand.SELECT_ACTION_STEP, step_index)
