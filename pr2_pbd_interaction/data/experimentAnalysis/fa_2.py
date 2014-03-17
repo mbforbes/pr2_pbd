@@ -208,6 +208,7 @@ def computeExplore(logfile):
 			nun_user_data = task_data[np.where(task_data[:,col_nun_user] ==
 				nun_user)]
 			points = []
+			stds = []
 			start_nuns = np.unique(nun_user_data[:,col_nun_start])
 			# loop through start no. unreachable (tests cases)
 			for start_nun in start_nuns:
@@ -219,9 +220,12 @@ def computeExplore(logfile):
 				# - one task start no. unreachable
 				# and we want to compute the average result
 				avg = np.average(start_nun_data[:, col_nun_res])
+				std = np.std(start_nun_data[:, col_nun_res])
 				points += [avg]
-			plt.plot(start_nuns, points, label=str(nun_user),
-				color=colors[nun_user - 1], linewidth=2)
+				stds += [std]
+			plt.errorbar(start_nuns, points, label=str(nun_user),
+				color=colors[nun_user - 1], linewidth=2,
+				yerr=stds)
 		plt.title('Task ' + str(task))
 		plt.xlabel('test start no. unreachable')
 		plt.ylabel('test end no. unreachable')
