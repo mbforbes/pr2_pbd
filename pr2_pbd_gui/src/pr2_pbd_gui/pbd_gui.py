@@ -219,8 +219,10 @@ class PbDGUI(Plugin):
         else:
             return [0, 2, 2, 2, 2, 2]
 
-    @staticmethod
-    def _get_row_col_idxes_for_action(action_no):
+
+    # OBJECT METHODS
+    # ==========================================================================
+    def _get_row_col_idxes_for_action(self, action_no):
         '''Returns row_idx, col_idx to get action action_no from the sets.'''
         testarr = PbDGUI._get_n_tests_for_task(self.currentTask)
         idx = 1
@@ -232,9 +234,6 @@ class PbDGUI(Plugin):
             else:
                 togo -= n_in_cur
                 idx += 1
-
-    # OBJECT METHODS
-    # ==========================================================================
 
     def _create_table_view(self, model, row_click_cb):
         proxy = QtGui.QSortFilterProxyModel(self)
@@ -278,7 +277,7 @@ class PbDGUI(Plugin):
             self.action_pressed(state.i_current_action - 1, False)
 
         # Get icon
-        row, col = PbDGUI._get_row_col_idxes_for_action(state.i_current_action)
+        row, col = self._get_row_col_idxes_for_action(state.i_current_action)
         icon = self.action_icon_sets[row][col]
 
         # Extract no. unreachable markers
