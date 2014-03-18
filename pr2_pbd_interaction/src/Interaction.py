@@ -290,6 +290,8 @@ class Interaction:
             testdir_data[:, col_testact] == testact)]
 
         # Get only those that are feasible.
+        print "amt of testact data:", len(testact_data)
+        print "testact data:", testact_data
         feasibile_data = testact_data[np.where(
             testact_data[:, col_nun_res] == 0)]
 
