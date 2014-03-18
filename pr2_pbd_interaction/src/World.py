@@ -911,8 +911,9 @@ class World:
                 rospy.logerr('Exception during transform.')
                 return pose
         else:
-            rospy.logwarn('One of the frame objects might not exist: ' +
-                from_frame + ' or ' + to_frame)
+            # SPAM!
+            #rospy.logwarn('One of the frame objects might not exist: ' +
+            #    from_frame + ' or ' + to_frame)
             return pose
 
     @staticmethod
@@ -950,9 +951,6 @@ class World:
     def update_object_pose(self):
         ''' Function to externally update an object pose. Returns bool of
         success or failure'''
-        # NOTE(max): Mocking this for now
-        return True
-
         Response.perform_gaze_action(GazeGoal.LOOK_DOWN)
         while (Response.gaze_client.get_state() == GoalStatus.PENDING or
                Response.gaze_client.get_state() == GoalStatus.ACTIVE):
