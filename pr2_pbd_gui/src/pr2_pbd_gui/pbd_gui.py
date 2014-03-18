@@ -45,7 +45,7 @@ class ActionIcon(QtGui.QGridLayout):
         self.selectedDoneIconPath = path + '/icons/actions1_done.png'
         self.selected = True
         self.all_reachable = False
-        self.actionIconWidth = 50
+        self.actionIconWidth = 40
         self.index = index
         self.icon = ClickableLabel(parent, index, clickCallback)
         self.text = QtGui.QLabel(parent)
@@ -81,7 +81,7 @@ class ScoreIcon(QtGui.QGridLayout):
         self.notSelectedIconPath = path + '/icons/score_deselected.png'
         self.selectedIconPath = path + '/icons/score_selected.png'
         self.selected = True
-        self.actionIconWidth = 50
+        self.actionIconWidth = 40
         self.index = index
         self.icon = ClickableLabel(parent, index, clickCallback)
         self.text = QtGui.QLabel(parent)
@@ -191,16 +191,20 @@ class PbDGUI(Plugin):
             n_unreachable_boxes += [QGroupBox(str(i) + ' unreachable',
                 self._widget)]
             grid = QtGui.QGridLayout()
+            grid.setContentsMargins(0,0,0,0)
             self.action_grids += [QtGui.QGridLayout()]
             self.action_grids[-1].setHorizontalSpacing(0)
             for j in range(1, unreachable_nums[i] + 1):
                 self.action_grids[-1].addItem(
-                    QtGui.QSpacerItem(90, 90), 0, j - 1, QtCore.Qt.AlignCenter)
+                    QtGui.QSpacerItem(50, 0), 0, j - 1, QtCore.Qt.AlignCenter)
                 self.action_grids[-1].setColumnStretch(j - 1, 0)
             self.action_icon_sets += [dict()]
             actionBoxLayout = QtGui.QHBoxLayout()
+            actionBoxLayout.setContentsMargins(0,0,0,0)
             actionBoxLayout.addLayout(self.action_grids[-1])
             n_unreachable_boxes[-1].setLayout(actionBoxLayout)
+            n_unreachable_boxes[-1].setFlat(True)
+            n_unreachable_boxes[-1].setContentsMargins(0,0,0,0)
 
         # Create buttons to switch between score functions
         self.score_funcs = []
@@ -210,7 +214,7 @@ class PbDGUI(Plugin):
         for i in range(n_score_funcs):
             # Add placeholders (looks like)
             score_funcs_grid.addItem(
-                QtGui.QSpacerItem(90, 90), 0, i, QtCore.Qt.AlignCenter)
+                QtGui.QSpacerItem(90, 20), 0, i, QtCore.Qt.AlignCenter)
             score_funcs_grid.setColumnStretch(i, 0)
             # We're adding the real icons here because we don't need to create
             # them dynamically.
@@ -250,7 +254,6 @@ class PbDGUI(Plugin):
         misc_grid.addWidget(self.create_button(Command.FREEZE_RIGHT_ARM))
         misc_grid.addWidget(self.create_button(Command.RELAX_LEFT_ARM))
         misc_grid.addWidget(self.create_button(Command.RELAX_RIGHT_ARM))
-        misc_grid.addStretch(1)
 
         # Add all to overall score box...
         score_funcs_layout = QtGui.QVBoxLayout()
