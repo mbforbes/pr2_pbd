@@ -132,7 +132,8 @@ class Arms:
             target_joints = Arms.arms[arm_index].get_ik_for_ee(target_pose,
                                             arm_state.joint_pose)
             if (target_joints == None):
-                rospy.logerr('No IK for relative end-effector pose.')
+                # SPAM!
+                #rospy.logerr('No IK for relative end-effector pose.')
                 return solution, False
             else:
                 solution.refFrame = ArmState.ROBOT_BASE
@@ -148,7 +149,10 @@ class Arms:
             target_joints = Arms.arms[arm_index].get_ik_for_ee(target_pose,
                                                     arm_state.joint_pose)
             if (target_joints == None):
-                rospy.logerr('No IK for absolute end-effector pose.')
+                # SPAM!
+                # ... this is quite bad in our instance, but turning off here
+                # for the sake of noise reduction.
+                #rospy.logerr('No IK for absolute end-effector pose.')
                 return arm_state, False
             else:
                 solution = ArmState()

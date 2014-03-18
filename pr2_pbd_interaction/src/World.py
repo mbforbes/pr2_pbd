@@ -580,13 +580,15 @@ class World:
             rospy.logwarn('Did not find a similar object..')
             return None
         else:
-            print 'Object dissimilarity is --- ', best_dist
+            # PRINT????
+            #print 'Object dissimilarity is --- ', best_dist
             if best_dist > 0.075:
                 rospy.logwarn('Found some objects, but not similar enough.')
                 return None
             else:
-                rospy.loginfo('Most similar to new object '
-                                        + str(chosen_obj_index))
+                # SPAM!
+                #rospy.loginfo('Most similar to new object '
+                #                        + str(chosen_obj_index))
                 return ref_frame_list[chosen_obj_index]
 
     @staticmethod
