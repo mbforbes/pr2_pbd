@@ -24,7 +24,7 @@ from pr2_interactive_object_detection.msg import UserCommandAction
 from pr2_interactive_object_detection.msg import UserCommandGoal
 from geometry_msgs.msg import Quaternion, Vector3, Point, Pose, PoseStamped
 from std_msgs.msg import ColorRGBA, Header
-from visualization_msgs.msg import Marker, InteractiveMarker
+from visualization_msgs.msg import Marker, InteractiveMarker, MarkerArray
 from visualization_msgs.msg import InteractiveMarkerControl
 from visualization_msgs.msg import InteractiveMarkerFeedback
 from interactive_markers.interactive_marker_server import InteractiveMarkerServer
