@@ -239,6 +239,7 @@ class PbDGUI(Plugin):
 
         # Let us actually try it...
         runButtonGrid = QtGui.QHBoxLayout()
+        runButtonGrid.addWidget(self.create_button(Command.RECORD_OBJECT_POSE))
         runButtonGrid.addWidget(self.create_button(Command.EXECUTE_ACTION))
         runButtonGrid.addWidget(self.create_button(Command.STOP_EXECUTION))
 

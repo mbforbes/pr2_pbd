@@ -113,27 +113,34 @@ class World:
         self._tf_broadcaster = TransformBroadcaster()
         self._im_server = InteractiveMarkerServer('world_objects')
 
-        # NOTE(max): The following is for detecting "real" objects, so we're
-        # disabling it for now while we mock them.
-        # bb_service_name = 'find_cluster_bounding_box'
-        # rospy.wait_for_service(bb_service_name)
-        # self._bb_service = rospy.ServiceProxy(bb_service_name,
-        #                                     FindClusterBoundingBox)
-        # rospy.Subscriber('interactive_object_recognition_result',
-        #     GraspableObjectList, self.receive_object_info)
-        # self._object_action_client = actionlib.SimpleActionClient(
-        #     'object_detection_user_command', UserCommandAction)
-        # self._object_action_client.wait_for_server()
-        # rospy.loginfo('Interactive object detection action ' +
-        #               'server has responded.')
+        # NOTE(max): Enable decting real objects on the PR2.
+        bb_service_name = 'find_cluster_bounding_box'
+        rospy.wait_for_service(bb_service_name)
+        self._bb_service = rospy.ServiceProxy(bb_service_name,
+            FindClusterBoundingBox)
+        rospy.Subscriber('interactive_object_recognition_result',
+            GraspableObjectList, self.receive_object_info)
+        self._object_action_client = actionlib.SimpleActionClient(
+            'object_detection_user_command', UserCommandAction)
+        self._object_action_client.wait_for_server()
+        rospy.loginfo('Interactive obj detection action server has responded')
 
         # TODO(max): Do we need this call here?
         self.clear_all_objects()
 
-        # NOTE(max): We remove the table-getting subscription as well.
+        # NOTE(max): Putting this back for PR2.
         # The following is to get the table information
-        # rospy.Subscriber('tabletop_segmentation_markers',
-        #                 Marker, self.receive_table_marker)
+        rospy.Subscriber('tabletop_segmentation_markers', Marker,
+            self.receive_table_marker)
+
+        # Placeholder publisher publishes the locations of objects that were
+        # mocked and then fixed by the 'crowd' so that they can be visualized
+        # while the PR2 is running; we use these markers to place objects in the
+        # positions they show, so these markers aren't actually used in the
+        # interaction.
+        self._placeholder_pub = rospy.Publisher('visualization_marker_array',
+            MarkerArray)
+        self._placeholder_markers = MarkerArray()
 
     @staticmethod
     def _get_task_n_from_action(action_index):
@@ -149,6 +156,28 @@ class World:
     def _get_trial_idx_from_action(action_index):
         '''Maps an action index (like 12) to its index into its task (like 2)'''
         return ((action_index - 1) % 5) + 1
+
+    def _swap_placeholders(self, new_action_idx):
+        ''' Loads in the placeholder makers for the given action index'''
+        # Clear all of the markers
+        self._placeholder_markers.markers[:] = []
+
+        # Get the new ones and add them
+        data_filename = World.get_objfilename_for_action(action_index)
+        objs = World.read_mocked_worldobjs_fom_file(data_filename)
+        for obj in objs:
+            marker = Marker(type=Marker.CUBE,
+                id=100 + i, # avoid collisions with normal objects & markers
+                scale=obj.object.dimensions,
+                header=Header(frame_id='base_link'),
+                color=ColorRGBA(0.8, 0.8, 0.8, 0.5),
+                pose=obj.object.pose)
+            self._placeholder_markers.markers.append(marker)
+
+        # TODO(max): Need to continuously republish like this?
+        rospy.loginfo('Publishing ' +
+            str(len(self._placeholder_markers.markers)) + ' placeholder(s).')
+        self._placeholder_pub.publish(self._placeholder_markers)
 
     def _mock_objects_for_action(self, action_index):
         '''Add fake objects to the interaction / rviz'''
@@ -771,14 +800,13 @@ class World:
         a signal for which action index to load the mocked objects.'''
         # NOTE(max): Implicitly, this is called with the action_index that we'll
         # be in next / soon (unless it's called with an invalid number, which is
-        # possible). This means that here we don't want to just return the world
-        # object list, but we want to use it as a trigger for mocking in the new
-        # objects. This is because the world isn't notified when you switch
-        # actions, so this method call is the best of a notification we get!
+        # possible). This means that here (for the PR2) we want to put in the
+        # placeholders for this test, as well as return the world object list
         if action_index > 0:
-            # SPAM!
+            self._swap_placeholders(action_index)
+            # Not mocking the objects for the PR2.
             #rospy.loginfo("Mocking objects for action " + str(action_index))
-            self._mock_objects_for_action(action_index)
+            #self._mock_objects_for_action(action_index)
         return self._get_underlying_objects()
 
     def _get_underlying_objects(self):
