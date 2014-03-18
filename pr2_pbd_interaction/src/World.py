@@ -165,7 +165,7 @@ class World:
         # Get the new ones and add them
         data_filename = World.get_objfilename_for_action(new_action_idx)
         objs = World.read_mocked_worldobjs_fom_file(data_filename)
-        for obj in objs:
+        for i, obj in enumerate(objs):
             marker = Marker(type=Marker.CUBE,
                 id=100 + i, # avoid collisions with normal objects & markers
                 scale=obj.object.dimensions,
