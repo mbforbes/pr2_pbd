@@ -27,6 +27,7 @@ from pr2_pbd_interaction.msg import ArmState, GripperState
 from pr2_pbd_interaction.msg import ActionStep, ArmTarget, Object
 from pr2_pbd_interaction.msg import GripperAction, ArmTrajectory
 from pr2_pbd_interaction.msg import ExecutionStatus, GuiCommand
+from pr2_pbd_interaction.msg import ScoreResult, ScoreResultList
 from pr2_pbd_speech_recognition.msg import Command
 from pr2_social_gaze.msg import GazeGoal
 
@@ -302,8 +303,9 @@ class Interaction:
         scoreResultList = ScoreResultList(results)
 
         # Extract top for immediate switching-to.
-        userditr = topn[0][col_userdir]
-        useract = topn[0][col_useract]
+        userdir, useract = None, None
+        if len(topn) > 0:
+            userdir, useract, userscore = list(topn[0])
 
         return (userdir, useract), scoreResultList
 
@@ -716,7 +718,7 @@ class Interaction:
 
         that this came from (where the objects were copied from).'''
         curtask = self.task_no - 1 # 1-based -> 0-based
-        curact self.session.current_action_index # already 0-based
+        curact = self.session.current_action_index - 1 # 1-based -> 0-based
 
         dir_mapping = [
             [1, 1, 2, 2, 3, 1, 1, 2, 1, 2],
@@ -740,7 +742,8 @@ class Interaction:
         if (self.score_func == 0):
             top, scoreResultList = self.score_confidence(testdir, testact)
             userdir, useract = top
-            self.load_action(userdir, useract)
+            if userdir is not None and useract is not None:
+                self.load_action(userdir, useract)
         else:
             # Above are the only implemented.
             rospy.logwarn('Requested score function (' + str(self.score_func) +
@@ -751,6 +754,7 @@ class Interaction:
     def load_action(self, userdir, useract):
         '''Loads a userdir/useract action as the current action.'''
         # TODO(max): This.
+        print 'best is dir', userdir, 'act', useract
         pass
 
     def gui_command_cb(self, command):
