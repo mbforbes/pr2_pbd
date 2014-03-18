@@ -163,7 +163,7 @@ class World:
         self._placeholder_markers.markers[:] = []
 
         # Get the new ones and add them
-        data_filename = World.get_objfilename_for_action(action_index)
+        data_filename = World.get_objfilename_for_action(new_action_index)
         objs = World.read_mocked_worldobjs_fom_file(data_filename)
         for obj in objs:
             marker = Marker(type=Marker.CUBE,
