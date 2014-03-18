@@ -708,8 +708,15 @@ class Interaction:
                         [RobotSpeech.ERROR_NO_SKILLS, GazeGoal.SHAKE])
                 response.respond()
             else:
-                rospy.logwarn('\033[32m This command (' + command.command
-                              + ') is unknown. \033[0m')
+                # Just ignoring the fact that GUI commands get published here
+                # as speech commands... I refuse to implement here until I can
+                # refactor. And no time for that right now. (NOTE(max))
+                if command.command == GuiCommand.SELECT_RESULT or \
+                    command.command == GuiCommand.SELECT_SCORE_FUNC:
+                    pass
+                else:
+                    rospy.logwarn('\033[32m This command (' + command.command
+                        + ') is unknown. \033[0m')
 
 
     def get_cur_test_info(self):
@@ -764,7 +771,8 @@ class Interaction:
         # thread and if the update happens while we're swaping out the action,
         # it crashes (as it looks into the guts of the action).
         self._update_lock.acquire()
-        rospy.loginfo('Swapping in ' + str(userdir) + ', ' + str(useract))
+        # SPAM!
+        #rospy.loginfo('Swapping in ' + str(userdir) + ', ' + str(useract))
 
         # find src
         src_dir = rospy.get_param('/pr2_pbd_interaction/dataRoot') + '/data/' +\

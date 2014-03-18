@@ -93,7 +93,8 @@ class Legend:
         # NOTE(max): Publishing once doesn't work, but publishing infinitely
         # or sleeping before publishing does. Strange.
         # self.marker_pub.publish(marker)
-        rospy.loginfo("Published legend")
+        # SPAM!
+        #rospy.loginfo("Published legend")
 
 class World:
     '''Object recognition and localization related stuff'''
@@ -688,7 +689,8 @@ class World:
 
     def _remove_surface(self):
         '''Function to request removing surface'''
-        rospy.loginfo('Removing surface')
+        # SPAM!
+        #rospy.loginfo('Removing surface')
         self._im_server.erase('surface')
         self._im_server.applyChanges()
         self.surface = None
@@ -774,7 +776,8 @@ class World:
         # objects. This is because the world isn't notified when you switch
         # actions, so this method call is the best of a notification we get!
         if action_index > 0:
-            rospy.loginfo("Mocking objects for action " + str(action_index))
+            # SPAM!
+            #rospy.loginfo("Mocking objects for action " + str(action_index))
             self._mock_objects_for_action(action_index)
         return self._get_underlying_objects()
 

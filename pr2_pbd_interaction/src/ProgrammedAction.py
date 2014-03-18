@@ -267,8 +267,9 @@ class ProgrammedAction:
             demo_bag = rosbag.Bag(filename)
             for dummy, msg, bag_time in demo_bag.read_messages(
                                             topics=['sequence']):
-                rospy.loginfo('Reading demo bag file at time '
-                                + str(bag_time.to_sec()))
+                # SPAM!
+                #rospy.loginfo('Reading demo bag file at time '
+                #                + str(bag_time.to_sec()))
                 self.seq = msg
             demo_bag.close()
             self.lock.release()
