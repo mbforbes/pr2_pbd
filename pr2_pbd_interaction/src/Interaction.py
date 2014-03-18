@@ -902,6 +902,8 @@ class Interaction:
                 self.session.get_current_action().update_objects(
                     self.world.get_frame_list(
                         self.session.current_action_index))
+                # Publish update to GUI so it knows about new n_unreachable...
+                self.session.ping_state()
             return [RobotSpeech.START_STATE_RECORDED, GazeGoal.NOD]
         else:
             return [RobotSpeech.OBJECT_NOT_DETECTED, GazeGoal.SHAKE]
