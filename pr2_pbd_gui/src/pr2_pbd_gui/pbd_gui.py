@@ -16,9 +16,9 @@ from python_qt_binding.QtGui import QWidget, QFrame
 from python_qt_binding.QtGui import QGroupBox, QIcon, QTableView
 from python_qt_binding.QtCore import Slot, qDebug, QSignalMapper, QTimer, qWarning, Signal
 from pr2_pbd_speech_recognition.msg import Command
-from pr2_pbd_interaction.msg import GuiCommand
+from pr2_pbd_interaction.msg import GuiCommand, ExperimentState
+from pr2_pbd_interaction.msg import ScoreResult, ScoreResultList
 from sound_play.msg import SoundRequest
-from pr2_pbd_interaction.msg import ExperimentState
 from pr2_pbd_interaction.srv import GetExperimentState
 
 
@@ -71,6 +71,7 @@ class ActionIcon(QtGui.QGridLayout):
         self.icon.setPixmap(pixmap.scaledToWidth(self.actionIconWidth,
             QtCore.Qt.SmoothTransformation))
 
+
 class ScoreIcon(QtGui.QGridLayout):
     def __init__(self, parent, index, clickCallback):
         QtGui.QGridLayout.__init__(self)
@@ -100,9 +101,11 @@ class ScoreIcon(QtGui.QGridLayout):
         self.icon.setPixmap(pixmap.scaledToWidth(self.actionIconWidth,
             QtCore.Qt.SmoothTransformation))
 
+
 class PbDGUI(Plugin):
 
     exp_state_sig = Signal(ExperimentState)
+    score_result_list_sig = Signal(ScoreResultList)
 
     def __init__(self, context):
         super(PbDGUI, self).__init__(context)
@@ -113,9 +116,12 @@ class PbDGUI(Plugin):
         self.gui_cmd_publisher = rospy.Publisher('gui_command', GuiCommand)
         
         rospy.Subscriber('experiment_state', ExperimentState, self.exp_state_cb)
+        rospy.Subscriber('score_result_list', ScoreResultList,
+            self.score_result_list_cb)
         
         QtGui.QToolTip.setFont(QtGui.QFont('SansSerif', 10))
         self.exp_state_sig.connect(self.update_state)
+        self.score_result_list_sig.connect(self.update_score_result_list)
         
         self.commands = dict()
         self.commands[Command.CREATE_NEW_ACTION] = 'New action'
@@ -141,6 +147,9 @@ class PbDGUI(Plugin):
         self.currentAction = -1
         self.currentStep = -1
         self.currentTask = 1
+        self.currentScoreFunc = -1
+        self.results = [] # for score result list
+        self.selectedResult = -1 # start invalid
 
         # Settings (hardcoded for now; can just filter bad requests on node...)
         n_score_funcs = 3
@@ -209,12 +218,36 @@ class PbDGUI(Plugin):
             icon.updateView()
             self.score_funcs += [icon]
             score_funcs_grid.addLayout(icon, 0, i)
-        score_funcs_layout = QtGui.QHBoxLayout()
-        score_funcs_layout.addLayout(score_funcs_grid)
-        score_funcs_box.setLayout(score_funcs_layout)
 
         # Create selectable text area things to show top n from score function
-        # TODO
+        self.resultsGrid = QtGui.QGridLayout()
+        self.resultsModel = QtGui.QStandardItemModel(self)
+        self.resultsView = self._create_table_view(self.resultsModel,
+            self.result_clicked_cb)
+        self.resultsGrid.addItem(QtGui.QSpacerItem(560, 10), #item
+            0, # row
+            0, # col
+            2, # rowSpan
+            1) # colSpan
+        self.resultsGrid.addWidget(
+            QtGui.QLabel('Top results for selected score function'), # widget
+            0, # row
+            0) # col
+        self.resultsGrid.addWidget(self.resultsView, # widget
+            1, # row
+            0) # col
+
+        # Let us actually try it...
+        runButtonGrid = QtGui.QHBoxLayout()
+        runButtonGrid.addWidget(self.create_button(Command.EXECUTE_ACTION))
+        runButtonGrid.addWidget(self.create_button(Command.STOP_EXECUTION))
+
+        # Add all to overall score box...
+        score_funcs_layout = QtGui.QVBoxLayout()
+        score_funcs_layout.addLayout(score_funcs_grid)
+        score_funcs_layout.addLayout(self.resultsGrid)
+        score_funcs_layout.addLayout(runButtonGrid)
+        score_funcs_box.setLayout(score_funcs_layout)
 
         # Adding components
         # ======================================================================
@@ -275,6 +308,11 @@ class PbDGUI(Plugin):
 
     # OBJECT METHODS
     # ==========================================================================
+    def create_button(self, command):
+        btn = QtGui.QPushButton(self.commands[command], self._widget)
+        btn.clicked.connect(self.command_cb)
+        return btn
+
     def _get_row_col_idxes_for_action(self, action_no):
         '''Returns row_idx, col_idx to get action action_no from the sets.
         Assumes that passed param (action_no) is ONE-BASED INDEXING.'''
@@ -293,10 +331,18 @@ class PbDGUI(Plugin):
         proxy = QtGui.QSortFilterProxyModel(self)
         proxy.setSourceModel(model)
         view = QtGui.QTableView(self._widget)
+        horizontalHeader = view.horizontalHeader()
+        horizontalHeader.setStretchLastSection(True)
+        horizontalHeader.setClickable(False)
+        # TODO(max): These aren't doing anything...
+        model.setHeaderData(0, QtCore.Qt.Horizontal, QtGui.QLabel('user dir'))
+        model.setHeaderData(1, QtCore.Qt.Horizontal, QtGui.QLabel('user action'))
+        model.setHeaderData(2, QtCore.Qt.Horizontal, QtGui.QLabel('score'))
         verticalHeader = view.verticalHeader()
         verticalHeader.sectionClicked.connect(row_click_cb)
         view.setModel(proxy)
-        view.setMaximumWidth(250)
+        view.setMaximumWidth(560)
+        view.setMinimumHeight(200)
         view.setSortingEnabled(False)
         view.setCornerButtonEnabled(False)
         return view
@@ -311,12 +357,53 @@ class PbDGUI(Plugin):
         index = (uid - arm_index) / 2
         return (arm_index, (index - 1))
 
+    def result_clicked_cb(self, idx):
+        '''Fired when one of the topn score results clicked.'''
+        # debug
+        #print 'RESULT CLICKED:', idx, self.results[idx]
+        # first update the visuals
+        self.selectedResult = idx
+        self.resultsView.selectRow(idx)
+
+        # then trigger a gui command creation / broadcast
+        res = self.results[idx]
+        userdir, useract = res[0], res[1]
+        uid = userdir * 100 + useract
+        self.result_pressed(uid)
+
     def r_row_clicked_cb(self, logicalIndex):
         self.step_pressed(self.get_uid(0, logicalIndex))
 
     def l_row_clicked_cb(self, logicalIndex):
         self.step_pressed(self.get_uid(1, logicalIndex))
 
+    def update_score_result_list(self, scoreResultList):
+        # clear
+        self.resultsModel.invisibleRootItem().removeRows(0, len(self.results))
+        self.results = []
+
+        # get new results
+        for res in scoreResultList.results:
+            row = [QtGui.QStandardItem(str(res.userdir)),
+                QtGui.QStandardItem(str(res.useract)), 
+                QtGui.QStandardItem(str(res.score))]
+            self.resultsModel.invisibleRootItem().appendRow(row)
+            self.results += [[res.userdir, res.useract, res.score]]
+        self.update_results_view()
+        if len(scoreResultList.results) > 0:
+            self.selectedResult = 0
+            self.resultsView.selectRow(self.selectedResult)
+        else:
+            # invalid
+            self.selectedResult = -1
+
+        # debug
+        print 'new results:', self.results
+
+    def update_results_view(self):
+        col_widths = [150, 150, 150]
+        for idx, width in enumerate(col_widths):
+            self.resultsView.setColumnWidth(idx, width)
 
     def update_state(self, state):
         # NOTE(max): Too spammy...
@@ -393,7 +480,15 @@ class PbDGUI(Plugin):
         gui_cmd = GuiCommand(GuiCommand.SELECT_ACTION_STEP, step_index)
         self.gui_cmd_publisher.publish(gui_cmd)
 
+    def result_pressed(self, uid):
+        gui_cmd = GuiCommand(GuiCommand.SELECT_RESULT, uid)
+        self.gui_cmd_publisher.publish(gui_cmd)
+
     def score_pressed(self, score_index):
+        # debug
+        if self.currentScoreFunc == score_index:
+            return
+        self.currentScoreFunc = score_index
         for idx, icon in enumerate(self.score_funcs):
             icon.selected = (idx == score_index)
             icon.updateView()
@@ -420,6 +515,10 @@ class PbDGUI(Plugin):
                 command.command = key
                 self.speech_cmd_publisher.publish(command)
         
+    def score_result_list_cb(self, scoreResultList):
+        # happens twice ...
+        self.score_result_list_sig.emit(scoreResultList)
+
     def exp_state_cb(self, state):
         # NOTE(max): Too spammy...
         #qWarning('Received new experiment state.')

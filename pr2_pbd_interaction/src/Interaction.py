@@ -10,6 +10,7 @@ from visualization_msgs.msg import MarkerArray
 import glob
 import os
 import shutil
+import threading
 import time
 import yaml
 
@@ -65,6 +66,9 @@ class Interaction:
 
         self._score_publisher = rospy.Publisher('score_result_list',
             ScoreResultList)
+
+        # For reloading actions, need a lock
+        self._update_lock = threading.Lock()
 
         # Disabling this stuff for now because we're just going to focus on
         # success testing here.
@@ -292,7 +296,10 @@ class Interaction:
         # Sort by user confidence.
         # Thanks to http://stackoverflow.com/questions/2828059/sorting-arrays-
         #     in-numpy-by-column
-        sorted_data = feasibile_data[feasibile_data[:,col_userconf].argsort()]
+        # http://stackoverflow.com/questions/6771428/most-efficient-way-to-
+        #     reverse-a-numpy-array
+        sorted_data = feasibile_data[feasibile_data[:,col_userconf]\
+            .argsort()][::-1] # get reverse view with [::-1] to 'reverse sort'
         topn = sorted_data[:self.top_n,[col_userdir, col_useract, col_userconf]]
 
         # Create response.
@@ -738,8 +745,8 @@ class Interaction:
 
     def score(self):
         '''Call relevant score function, switch to top, and publish result.'''
-        testdir, testact = self.get_cur_test_info()
         if (self.score_func == 0):
+            testdir, testact = self.get_cur_test_info()
             top, scoreResultList = self.score_confidence(testdir, testact)
             userdir, useract = top
             if userdir is not None and useract is not None:
@@ -753,54 +760,53 @@ class Interaction:
 
     def load_action(self, userdir, useract):
         '''Loads a userdir/useract action as the current action.'''
-        # TODO(max): This.
-        print 'best is dir', userdir, 'act', useract
-        pass
+        # Need to lock against the update loop because this runs in another
+        # thread and if the update happens while we're swaping out the action,
+        # it crashes (as it looks into the guts of the action).
+        self._update_lock.acquire()
+        rospy.loginfo('Swapping in ' + str(userdir) + ', ' + str(useract))
+
+        # find src
+        src_dir = rospy.get_param('/pr2_pbd_interaction/dataRoot') + '/data/' +\
+            'experiment' + str(userdir) + '/'
+        srcfilename = 'Action' + str(useract) + '.bag'
+        src = src_dir + srcfilename
+
+        # find dst
+        task_dir = Interaction._get_data_dir(self.task_no)
+        dstfilename = 'Action' + str(self.session.current_action_index) + '.bag'
+        dst = task_dir + dstfilename
+
+        # copy
+        shutil.copy(src, dst)
+
+        # update
+        self.session.switch_to_action(self.session.current_action_index,
+            self.world.get_frame_list(self.session.current_action_index))
+
+        # release
+        self._update_lock.release()
 
     def gui_command_cb(self, command):
         '''Callback for when a GUI command is received'''
         if (not self.arms.is_executing()):
             if (self.session.n_actions() > 0):
                 if (command.command == GuiCommand.SELECT_SCORE_FUNC):
-                    score_func = command.param
-                    # NOTE: currently NOT re-computing if switching to current.
-                    if self.score_func != score_func:
-                        self.score_func = score_func
-                        self.score()
+                    self.score_func = command.param
+                    self.score()
                 if (command.command == GuiCommand.SWITCH_TO_ACTION):
                     # NOTE(max): I'm doing the fixing up here but not in the
                     # speech_command_cb hook or any of the others... this is
                     # what we got for having non-refactored code... I would
                     # refactor now but don't have time.
                     action_no = command.param
-                    obj_filename = World.get_objfilename_for_action(
-                        action_no)
+                    obj_filename = World.get_objfilename_for_action(action_no)
                     if os.path.exists(obj_filename):
-                        # We've already mocked the objects, so we just load it
-                        # up and let the user keep working on them.
                         self.session.switch_to_action(action_no,
                             self.world.get_frame_list(action_no))
+                        self.score()
                     else:
-                        # We need to mock the objects until we get the desired
-                        # number of fixable poses.
-                        desired_n_unreachable = World._get_desired_n_unreachable(
-                            action_no)                        
-                        rospy.loginfo("Sampling until " + str(
-                            desired_n_unreachable) + " unreachables.")
-                        while True:
-                            self.session.switch_to_action(action_no,
-                                self.world.get_frame_list(action_no))
-                            n_unreachable = self.session\
-                                .get_cur_n_unreachable_markers()
-                            if n_unreachable == desired_n_unreachable:
-                                break
-                            else:
-                                rospy.loginfo("Sampled with " + str(
-                                    n_unreachable) + " unreachable, but " +
-                                    "wanted " + str(desired_n_unreachable))
-                        # Save the objects so we don't have to sample again.
-                        # NOTE disabling in this branch as a safety measure.
-                        #self.world.write_cur_objs_to_file(action_no)
+                        rospy.logwarn('Test file did not exist...')
                     response = Response(Interaction.empty_response,
                         [RobotSpeech.SWITCH_SKILL + str(action_no),
                          GazeGoal.NOD])
@@ -822,6 +828,9 @@ class Interaction:
 
     def update(self):
         '''General update for the main loop'''
+        # Doing this as it's async and want to avoid conflicts with action
+        # swapping happening in the interaction thread.
+        self._update_lock.acquire()
         self.arms.update()
 
         if (self.arms.status != ExecutionStatus.NOT_EXECUTING):
@@ -853,7 +862,7 @@ class Interaction:
                 self.session.get_current_action().update_objects(
                     self.world.get_frame_list(
                         self.session.current_action_index))
-
+        self._update_lock.release()                
         time.sleep(0.1)
 
     def _end_execution(self):

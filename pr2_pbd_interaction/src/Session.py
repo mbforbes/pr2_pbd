@@ -143,6 +143,16 @@ class Session:
         self.actions[self.current_action_index].initialize_viz(object_list)
         state_file.close()
 
+    def swap_action(self, object_list):
+        '''Swaps the current action by reloading (it should already have been
+        copied to the active self._data_dir)'''
+        self.actions.update({self.current_action_index:
+            ProgrammedAction(self.current_action_index,
+                self._selected_step_cb)})
+        self.actions[self.current_action_index].load(self._data_dir)
+        # TODO(max): Next call may not be necessary...
+        self.actions[self.current_action_index].initialize_viz(object_list)
+
     def new_action(self):
         '''Creates new action'''
         if (self.n_actions() > 0):
