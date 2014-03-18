@@ -378,6 +378,9 @@ class PbDGUI(Plugin):
         self.step_pressed(self.get_uid(1, logicalIndex))
 
     def update_score_result_list(self, scoreResultList):
+        # NOTE(max): This is getting called twice... is it because we have two
+        # instances of PbD GUI?
+        
         # clear
         self.resultsModel.invisibleRootItem().removeRows(0, len(self.results))
         self.results = []
@@ -396,9 +399,6 @@ class PbDGUI(Plugin):
         else:
             # invalid
             self.selectedResult = -1
-
-        # debug
-        print 'new results:', self.results
 
     def update_results_view(self):
         col_widths = [150, 150, 150]

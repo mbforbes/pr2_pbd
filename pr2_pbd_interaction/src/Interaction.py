@@ -781,8 +781,8 @@ class Interaction:
         shutil.copy(src, dst)
 
         # update
-        self.session.switch_to_action(self.session.current_action_index,
-            self.world.get_frame_list(self.session.current_action_index))
+        self.session.swap_action(self.world.get_frame_list(
+            self.session.current_action_index))
 
         # release
         self._update_lock.release()
