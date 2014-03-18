@@ -13,6 +13,9 @@ import shutil
 import time
 import yaml
 
+# 3rd party
+import numpy as np
+
 # Local stuff
 from World import World
 from RobotSpeech import RobotSpeech
@@ -39,15 +42,28 @@ class Interaction:
     def __init__(self):
         # Settings/code for success testing
         # ======================================================================
+        # Basic settings
         is_reload = True
         n_tasks = len(glob.glob(rospy.get_param(
             '/pr2_pbd_interaction/dataRoot') + '/data/experimentTesting/task*'))
+        self.top_n = 5 # How many results to return from the score function.
+
         # Copy default bag files (seed)
         Interaction._copy_seeds(n_tasks)
-        # Set up for current task
-        task_no = 1 # NOTE: This might have to become a field...
-        rospy.set_param('data_directory', Interaction._get_data_dir(task_no))
 
+        # Set up for current task
+        self.task_no = 1
+        self.score_func = -1 # start invalid; should click to load first
+        rospy.set_param('data_directory', Interaction._get_data_dir(
+            self.task_no))
+
+        # Load feasability results
+        logfile = rospy.get_param('/pr2_pbd_interaction/dataRoot') + '/data/' +\
+            'experimentAnalysis/log3_archives/log_3.txt'
+        self.fdata = self.load_feasibility_data(logfile)
+
+        self._score_publisher = rospy.Publisher('score_result_list',
+            ScoreResultList)
 
         # Disabling this stuff for now because we're just going to focus on
         # success testing here.
@@ -81,9 +97,6 @@ class Interaction:
         rospy.Subscriber('gui_command', GuiCommand, self.gui_command_cb)
 
         self._undo_function = None
-        # NOTE(max): For counting frequency of pings... want to do not every 0.1
-        # seconds.
-        self._update_counter = 0
 
         self.responses = {
             Command.TEST_MICROPHONE: Response(Interaction.empty_response,
@@ -113,6 +126,9 @@ class Interaction:
             }
 
         rospy.loginfo('Interaction initialized.')
+
+    # STATIC METHDOS
+    # ==========================================================================
 
     @staticmethod
     def _copy_seeds(n_tasks):
@@ -220,6 +236,76 @@ class Interaction:
         '''Gets the seed directory (containing the seed files) for the
         given experiment number'''
         return rospy.get_param('/pr2_pbd_interaction/dataRoot') +'/data/seed/1/'
+
+    @staticmethod
+    def empty_response(responses):
+        '''Default response to speech commands'''
+        return responses
+
+    # MEMBER METHDOS
+    # ==========================================================================
+
+    def load_feasibility_data(self, logfile):
+        '''Returns the feasibility data as a numpy array. Format:
+        - [0] task
+        - [1] no. unreachable before fixing
+        - [2] test dir no.
+        - [3] test action no. (test_no)
+        - [4] user no.
+        - [5] user action no. (scenario no.)
+        - [6] no. unreachable result (n_unreachable)
+        - [7] user orig. no. unreachable (for user's action)
+        - [8] user's confidence in their fix for their action
+        '''
+        return np.genfromtxt(logfile, delimiter=',', dtype='int8',
+            skip_header=1)
+
+    def score_confidence(self, testdir, testact):
+        '''Score function that selects from feasibile results and sorts by
+        users' assigned confidence rating.
+
+        Returns (userdir, useract), ScoreResultList
+        '''
+        col_task      = 0 # task number
+        col_nun_start = 1 # number unreachable before fixing (this test action)
+        col_testdir   = 2 # test directory
+        col_testact   = 3 # test action (i.e. the "test")
+        col_userdir   = 4 # user directory / user number
+        col_useract   = 5 # user action (which they were fixing)
+        col_nun_res   = 6 # the resulting n. unreachable from user fix -> test
+        col_nun_user  = 7 # original n. unreachable that user's act. started w/
+        col_userconf  = 8 # user's confidence in their fix for their action   
+
+        # Narrow down to what we want.
+        task_data = self.fdata[np.where(
+            self.fdata[:, col_task] == self.task_no)]
+        testdir_data = task_data[np.where(
+            task_data[:, col_testdir] == testdir)]
+        testact_data = testdir_data[np.where(
+            testdir_data[:, col_testact] == testact)]
+
+        # Get only those that are feasible.
+        feasibile_data = testact_data[np.where(
+            testact_data[:, col_nun_res] == 0)]
+
+        # Sort by user confidence.
+        # Thanks to http://stackoverflow.com/questions/2828059/sorting-arrays-
+        #     in-numpy-by-column
+        sorted_data = feasibile_data[feasibile_data[:,col_userconf].argsort()]
+        topn = sorted_data[:self.top_n,[col_userdir, col_useract, col_userconf]]
+
+        # Create response.
+        results = []
+        for res in list(topn):
+            userdir, useract, userconf = list(res)
+            results += [ScoreResult(userdir, useract, userconf)]
+        scoreResultList = ScoreResultList(results)
+
+        # Extract top for immediate switching-to.
+        userditr = topn[0][col_userdir]
+        useract = topn[0][col_useract]
+
+        return (userdir, useract), scoreResultList
 
     def open_hand(self, arm_index):
         '''Opens gripper on the indicated side'''
@@ -616,10 +702,67 @@ class Interaction:
                 rospy.logwarn('\033[32m This command (' + command.command
                               + ') is unknown. \033[0m')
 
+
+    def get_cur_test_info(self):
+        '''This is where all the hardcoded values go. Given that it knows
+
+        - current task (self.task_no)
+        - current action (self.session.current_action_index)
+
+        returns tuple of the source
+
+        - test directory
+        - test action
+
+        that this came from (where the objects were copied from).'''
+        curtask = self.task_no - 1 # 1-based -> 0-based
+        curact self.session.current_action_index # already 0-based
+
+        dir_mapping = [
+            [1, 1, 2, 2, 3, 1, 1, 2, 1, 2],
+            [1, 2, 1, 2, 1, 2, 1, 2, 1, 2],
+            [1, 2, 1, 2, 1, 2, 1, 2, 1, 2],
+        ]
+
+        action_mapping = [
+            [2, 4, 2, 4, 2, 1, 5, 1, 3, 3],
+            [5, 5, 2, 2, 3, 3, 1, 1, 4, 4],
+            [2, 2, 3, 3, 1, 1, 5, 5, 4, 4]
+        ]
+
+        testdir = dir_mapping[curtask][curact]
+        testact = action_mapping[curtask][curact]
+        return testdir, testact
+
+    def score(self):
+        '''Call relevant score function, switch to top, and publish result.'''
+        testdir, testact = self.get_cur_test_info()
+        if (self.score_func == 0):
+            top, scoreResultList = self.score_confidence(testdir, testact)
+            userdir, useract = top
+            self.load_action(userdir, useract)
+        else:
+            # Above are the only implemented.
+            rospy.logwarn('Requested score function (' + str(self.score_func) +
+                ') not implemented.')
+            return
+        self._score_publisher.publish(scoreResultList)
+
+    def load_action(self, userdir, useract):
+        '''Loads a userdir/useract action as the current action.'''
+        # TODO(max): This.
+        pass
+
     def gui_command_cb(self, command):
         '''Callback for when a GUI command is received'''
         if (not self.arms.is_executing()):
             if (self.session.n_actions() > 0):
+                if (command.command == GuiCommand.SELECT_SCORE_FUNC):
+                    score_func = command.param
+                    # NOTE: currently NOT re-computing if switching to current.
+                    if self.score_func != score_func:
+                        self.score_func = score_func
+                        self.score()
                 if (command.command == GuiCommand.SWITCH_TO_ACTION):
                     # NOTE(max): I'm doing the fixing up here but not in the
                     # speech_command_cb hook or any of the others... this is
@@ -707,23 +850,6 @@ class Interaction:
                     self.world.get_frame_list(
                         self.session.current_action_index))
 
-        # Only ping state every 1 second or so.
-        if self._update_counter % 10 == 0:
-            #rospy.loginfo('pinging...')
-            #self.session.ping_state()
-            #rospy.loginfo('...done pinging')
-            pass
-
-        # Save all actions every 10 seconds or so.
-        if self._update_counter == 0:
-            self.session.save_session_state(True) # Save all actions.
-
-        # Loop every 10 seconds
-        self._update_counter = 0 if self._update_counter >= 100 else \
-            self._update_counter + 1
-
-        # Note that timings above depend on this... should probably make
-        # a constant.
         time.sleep(0.1)
 
     def _end_execution(self):
@@ -755,7 +881,3 @@ class Interaction:
         '''Saves session state'''
         self.session.save_current_action()
 
-    @staticmethod
-    def empty_response(responses):
-        '''Default response to speech commands'''
-        return responses

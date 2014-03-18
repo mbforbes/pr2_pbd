@@ -71,6 +71,34 @@ class ActionIcon(QtGui.QGridLayout):
         self.icon.setPixmap(pixmap.scaledToWidth(self.actionIconWidth,
             QtCore.Qt.SmoothTransformation))
 
+class ScoreIcon(QtGui.QGridLayout):
+    def __init__(self, parent, index, clickCallback):
+        QtGui.QGridLayout.__init__(self)
+        self.setSpacing(0)
+        path = os.popen('rospack find pr2_pbd_gui').read()
+        path = path[0:len(path)-1]
+        self.notSelectedIconPath = path + '/icons/score_deselected.png'
+        self.selectedIconPath = path + '/icons/score_selected.png'
+        self.selected = True
+        self.actionIconWidth = 50
+        self.index = index
+        self.icon = ClickableLabel(parent, index, clickCallback)
+        self.text = QtGui.QLabel(parent)
+        self.text.setText(self.getName())
+        self.updateView()
+        self.addWidget(self.icon, 0, 0, QtCore.Qt.AlignCenter)
+        self.addWidget(self.text, 1, 0, QtCore.Qt.AlignCenter)
+    
+    def getName(self):
+        return 'Score func. ' + str(self.index + 1)
+    
+    def updateView(self):
+        if self.selected:
+            pixmap = QtGui.QPixmap(self.selectedIconPath)
+        else:
+            pixmap = QtGui.QPixmap(self.notSelectedIconPath)
+        self.icon.setPixmap(pixmap.scaledToWidth(self.actionIconWidth,
+            QtCore.Qt.SmoothTransformation))
 
 class PbDGUI(Plugin):
 
@@ -114,6 +142,9 @@ class PbDGUI(Plugin):
         self.currentStep = -1
         self.currentTask = 1
 
+        # Settings (hardcoded for now; can just filter bad requests on node...)
+        n_score_funcs = 3
+
         # Settings
         #self.n_tasks = len(glob.glob(rospy.get_param(
         #    '/pr2_pbd_interaction/dataRoot') + '/data/experimentTesting/task*'))
@@ -153,7 +184,8 @@ class PbDGUI(Plugin):
             self.action_grids += [QtGui.QGridLayout()]
             self.action_grids[-1].setHorizontalSpacing(0)
             for j in range(1, unreachable_nums[i] + 1):
-                self.action_grids[-1].addItem(QtGui.QSpacerItem(90, 90), 0, j - 1, QtCore.Qt.AlignCenter)
+                self.action_grids[-1].addItem(
+                    QtGui.QSpacerItem(90, 90), 0, j - 1, QtCore.Qt.AlignCenter)
                 self.action_grids[-1].setColumnStretch(j - 1, 0)
             self.action_icon_sets += [dict()]
             actionBoxLayout = QtGui.QHBoxLayout()
@@ -161,7 +193,25 @@ class PbDGUI(Plugin):
             n_unreachable_boxes[-1].setLayout(actionBoxLayout)
 
         # Create buttons to switch between score functions
-        # TODO
+        self.score_funcs = []
+        score_funcs_box = QGroupBox('Score functions', self._widget)
+        score_funcs_grid = QtGui.QGridLayout()
+        score_funcs_grid.setHorizontalSpacing(0)
+        for i in range(n_score_funcs):
+            # Add placeholders (looks like)
+            score_funcs_grid.addItem(
+                QtGui.QSpacerItem(90, 90), 0, i, QtCore.Qt.AlignCenter)
+            score_funcs_grid.setColumnStretch(i, 0)
+            # We're adding the real icons here because we don't need to create
+            # them dynamically.
+            icon = ScoreIcon(self._widget, i, self.score_pressed)
+            icon.selected = False
+            icon.updateView()
+            self.score_funcs += [icon]
+            score_funcs_grid.addLayout(icon, 0, i)
+        score_funcs_layout = QtGui.QHBoxLayout()
+        score_funcs_layout.addLayout(score_funcs_grid)
+        score_funcs_box.setLayout(score_funcs_layout)
 
         # Create selectable text area things to show top n from score function
         # TODO
@@ -175,6 +225,9 @@ class PbDGUI(Plugin):
         # add the three action sections
         for box in n_unreachable_boxes:
             allWidgetsBox.addWidget(box)
+
+        # add the score function scetion
+        allWidgetsBox.addWidget(score_funcs_box)
 
         # Fix layout and add main widget to the user interface
         # ======================================================================
@@ -314,7 +367,7 @@ class PbDGUI(Plugin):
         return sum([len(a.keys()) for a in self.action_icon_sets])
 
     def new_action(self):
-        # Deselect the rest
+        # Deselect the rest (automatically selects the new one)
         for s in self.action_icon_sets:
             for key, icon in s.iteritems():
                icon.selected = False
@@ -324,11 +377,11 @@ class PbDGUI(Plugin):
         actionIndex = self.n_actions()
         # _get_row_col_idxes_for_action takes one-based indexing
         row, col = self._get_row_col_idxes_for_action(actionIndex + 1)
+        # The new action icon is automatically selected upon construction.
         actIcon = ActionIcon(self._widget, actionIndex, self.action_pressed)
 
         #taskIdx = actionIndex / nColumns # row idx
         #nColumns = self.n_tests
-        
 
         actionGrid = self.action_grids[row]
         actionGrid.addLayout(actIcon,
@@ -339,6 +392,14 @@ class PbDGUI(Plugin):
     def step_pressed(self, step_index):
         gui_cmd = GuiCommand(GuiCommand.SELECT_ACTION_STEP, step_index)
         self.gui_cmd_publisher.publish(gui_cmd)
+
+    def score_pressed(self, score_index):
+        for idx, icon in enumerate(self.score_funcs):
+            icon.selected = (idx == score_index)
+            icon.updateView()
+        # NOTE: keeping 0-based indexing here as sending to code...
+        self.gui_cmd_publisher.publish(
+            GuiCommand(GuiCommand.SELECT_SCORE_FUNC, score_index))
 
     def action_pressed(self, actionIndex, isPublish=True):
         for i, s in enumerate(self.action_icon_sets):
