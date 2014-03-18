@@ -243,11 +243,20 @@ class PbDGUI(Plugin):
         runButtonGrid.addWidget(self.create_button(Command.EXECUTE_ACTION))
         runButtonGrid.addWidget(self.create_button(Command.STOP_EXECUTION))
 
+        # helpful commands to have when manipulating the real robot
+        misc_grid = QtGui.QHBoxLayout()
+        misc_grid.addWidget(self.create_button(Command.FREEZE_LEFT_ARM))        
+        misc_grid.addWidget(self.create_button(Command.FREEZE_RIGHT_ARM))
+        misc_grid.addWidget(self.create_button(Command.RELAX_LEFT_ARM))
+        misc_grid.addWidget(self.create_button(Command.RELAX_RIGHT_ARM))
+        misc_grid.addStretch(1)
+
         # Add all to overall score box...
         score_funcs_layout = QtGui.QVBoxLayout()
         score_funcs_layout.addLayout(score_funcs_grid)
         score_funcs_layout.addLayout(self.resultsGrid)
         score_funcs_layout.addLayout(runButtonGrid)
+        score_funcs_layout.addLayout(misc_grid)
         score_funcs_box.setLayout(score_funcs_layout)
 
         # Adding components
