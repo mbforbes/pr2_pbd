@@ -54,7 +54,7 @@ class Interaction:
         Interaction._copy_seeds(n_tasks)
 
         # Set up for current task
-        self.task_no = 1
+        self.task_no = 2
         self.score_func = -1 # start invalid; should click to load first
         rospy.set_param('data_directory', Interaction._get_data_dir(
             self.task_no))
