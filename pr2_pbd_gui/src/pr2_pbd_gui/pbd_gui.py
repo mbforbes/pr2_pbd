@@ -368,6 +368,12 @@ class PbDGUI(Plugin):
         # then trigger a gui command creation / broadcast
         res = self.results[idx]
         userdir, useract = res[0], res[1]
+        # NOTE(max): With uint16 (2^16 = 65536), this only works through
+        # - max user no. 655
+        # and
+        # - max action 36 for that user
+        # or
+        # - action 99 for all other users
         uid = userdir * 100 + useract
         self.result_pressed(uid)
 
@@ -380,7 +386,7 @@ class PbDGUI(Plugin):
     def update_score_result_list(self, scoreResultList):
         # NOTE(max): This is getting called twice... is it because we have two
         # instances of PbD GUI?
-        
+
         # clear
         self.resultsModel.invisibleRootItem().removeRows(0, len(self.results))
         self.results = []

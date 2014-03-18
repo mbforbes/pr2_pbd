@@ -784,6 +784,9 @@ class Interaction:
         self.session.swap_action(self.world.get_frame_list(
             self.session.current_action_index))
 
+        # make the GUI's unreachability counter reflect the changes
+        self.session.ping_state()  
+
         # release
         self._update_lock.release()
 
@@ -791,6 +794,11 @@ class Interaction:
         '''Callback for when a GUI command is received'''
         if (not self.arms.is_executing()):
             if (self.session.n_actions() > 0):
+                if (command.command == GuiCommand.SELECT_RESULT):
+                    result = command.param
+                    userdir = result / 100
+                    useract = result % 100
+                    self.load_action(userdir, useract)
                 if (command.command == GuiCommand.SELECT_SCORE_FUNC):
                     self.score_func = command.param
                     self.score()
