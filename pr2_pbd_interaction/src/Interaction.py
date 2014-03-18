@@ -290,11 +290,12 @@ class Interaction:
             testdir_data[:, col_testact] == testact)]
 
         # Get only those that are feasible.
-        print "finding with testdir:", testdir, "testact:", testact
-        print "amt of testact data:", len(testact_data)
-        print "testact data:", testact_data
         feasibile_data = testact_data[np.where(
             testact_data[:, col_nun_res] == 0)]
+
+        # We might not have any feasible; if so, return empty result.
+        if len(feasibile_data) == 0:
+            return (None, None), ScoreResultList([])
 
         # Sort by user confidence.
         # Thanks to http://stackoverflow.com/questions/2828059/sorting-arrays-
@@ -313,9 +314,7 @@ class Interaction:
         scoreResultList = ScoreResultList(results)
 
         # Extract top for immediate switching-to.
-        userdir, useract = None, None
-        if len(topn) > 0:
-            userdir, useract, userscore = list(topn[0])
+        userdir, useract, userscore = list(topn[0])
 
         return (userdir, useract), scoreResultList
 
@@ -745,8 +744,8 @@ class Interaction:
 
         action_mapping = [
             [2, 4, 2, 4, 2, 1, 5, 1, 3, 3],
-            [5, 5, 2, 2, 3, 3, 1, 1, 4, 4],
-            [2, 2, 3, 3, 1, 1, 5, 5, 4, 4]
+            [10, 10, 7, 7, 8, 8, 6, 6, 9, 9],
+            [12, 12, 13, 13, 11, 11, 15, 15, 14, 14]
         ]
 
         testdir = dir_mapping[curtask][curact]
