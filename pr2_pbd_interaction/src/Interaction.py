@@ -338,7 +338,21 @@ class Interaction:
         relative orientation differences of poses to seed.
 
         Returns (userdir, useract), ScoreResultList
+
+        NOTE(max): This is currently mostly copy-pasted from score_distance
+        (below)... should refactor if they both end up working with this
+        structure...
         '''
+        col_task      = 0 # task number
+        col_nun_start = 1 # number unreachable before fixing (this test action)
+        col_testdir   = 2 # test directory
+        col_testact   = 3 # test action (i.e. the "test")
+        col_userdir   = 4 # user directory / user number
+        col_useract   = 5 # user action (which they were fixing)
+        col_nun_res   = 6 # the resulting n. unreachable from user fix -> test
+        col_nun_user  = 7 # original n. unreachable that user's act. started w/
+        col_score     = 8 # originally user's confidence; replaced with dist.
+
         # NOTE(max): At this point, the 'current action' loaded into memory
         # could be anything, so we have to load the seed explicitly.
         # load seed
@@ -394,7 +408,7 @@ class Interaction:
         Returns (userdir, useract), ScoreResultList
         '''
         # Sort by user confidence.        
-        return self.top_n_last_col(feasible_data)
+        return self.top_n_last_col(feasible_data, reverse=True)
 
     def open_hand(self, arm_index):
         '''Opens gripper on the indicated side'''
@@ -835,7 +849,7 @@ class Interaction:
         testdir, testact = self.get_cur_test_info()
         feasible_data = self._get_feasible_results(testdir, testact)
         # We might not have any feasible; if so, publish and return.
-        if len(feasibile_data) == 0:
+        if len(feasible_data) == 0:
             self._score_publisher.publish(ScoreResultList([]))
             return
         # Make sure score function exists
