@@ -38,6 +38,18 @@ class ProgrammedAction:
             ProgrammedAction._marker_publisher = rospy.Publisher(
                     'visualization_marker_array', MarkerArray)
 
+    def euclidean_dist_to(self, other):
+        '''Computes Euclidean distance to another ProgrammedAction via distance
+        between steps.'''
+        # TODO(max): This.
+        return 1
+
+    def orientation_dist_to(self, other):
+        '''Computes orientation distance to another ProgrammedAction via
+        all step orientation distances.'''
+        # TODO(max): This.
+        return 1
+
     def get_n_unreachable_markers(self):
         '''Returns the current number of markers for which the IK solver cannot
         find a solution.'''
