@@ -68,6 +68,21 @@ class ActionStepMarker:
         #return self._cached_is_reachable
         return is_reachable
 
+    def get_norm(self):
+        '''Gets the Euclidean distnace from its relative object.'''
+        # TODO(max): Check whether get_pose() or get_absolute_pose() correct...
+        p = self.get_pose().position
+        return numpy.linalg.norm(numpy.array([p.x, p.y, p.z]))
+
+
+    def get_distance_to(self, other):
+        '''Returns Euclidean distance to another ActionStepMarker'''
+        # trying pose (not absolute...)
+        p1 = self.get_pose().position
+        p2 = other.get_pose().position
+        return numpy.linalg.norm(numpy.array([p1.x, p1.y, p1.z]),
+            numpy.array([p2.x, p2.y, p2.z]))
+
     def get_uid(self):
         '''Returns a unique id of the marker'''
         return (2 * self.step_number + self.arm_index)

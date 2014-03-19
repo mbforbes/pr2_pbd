@@ -24,6 +24,7 @@ from Session import Session
 from Response import Response
 from Arms import Arms
 from Arm import ArmMode
+from ProgrammedAction import ProgrammedAction
 from pr2_pbd_interaction.msg import ArmState, GripperState
 from pr2_pbd_interaction.msg import ActionStep, ArmTarget, Object
 from pr2_pbd_interaction.msg import GripperAction, ArmTrajectory
@@ -54,8 +55,10 @@ class Interaction:
         Interaction._copy_seeds(n_tasks)
 
         # Set up for current task
-        self.task_no = 3
-        self.score_func = -1 # start invalid; should click to load first
+        self.task_no = 1
+        self.cur_score_func = -1 # start invalid; should click to load first
+        self.score_funcs = [self.score_confidence, self.score_distance, \
+            self.score_compactness]
         rospy.set_param('data_directory', Interaction._get_data_dir(
             self.task_no))
 
@@ -265,9 +268,35 @@ class Interaction:
         return np.genfromtxt(logfile, delimiter=',', dtype='int8',
             skip_header=1)
 
-    def score_confidence(self, testdir, testact):
-        '''Score function that selects from feasibile results and sorts by
-        users' assigned confidence rating.
+    def _get_feasible_results(self, testdir, testact):
+        '''Searches the feasibility test log to find feasible results.
+        Returns a 2D numpy array, where each entry is a result from the test
+        file with the format as shown in load_feasibility_data. '''
+        col_task      = 0 # task number
+        col_nun_start = 1 # number unreachable before fixing (this test action)
+        col_testdir   = 2 # test directory
+        col_testact   = 3 # test action (i.e. the "test")
+        col_userdir   = 4 # user directory / user number
+        col_useract   = 5 # user action (which they were fixing)
+        col_nun_res   = 6 # the resulting n. unreachable from user fix -> test
+        col_nun_user  = 7 # original n. unreachable that user's act. started w/
+        col_userconf  = 8 # user's confidence in their fix for their action   
+        # Narrow down to what we want.
+        task_data = self.fdata[np.where(
+            self.fdata[:, col_task] == self.task_no)]
+        testdir_data = task_data[np.where(
+            task_data[:, col_testdir] == testdir)]
+        testact_data = testdir_data[np.where(
+            testdir_data[:, col_testact] == testact)]
+        # Get only those that are feasible.
+        feasibile_data = testact_data[np.where(
+            testact_data[:, col_nun_res] == 0)]
+        return feasibile_data
+
+    def top_n_last_col(self, scored_data, reverse=False):
+        '''Sorts by the last column in scored_data and returns the top n.
+        Defaults to sorting low-high, but can be reversed with reverse param.
+        Also extracts top score for immediate switching-to (first tuple).
 
         Returns (userdir, useract), ScoreResultList
         '''
@@ -279,44 +308,115 @@ class Interaction:
         col_useract   = 5 # user action (which they were fixing)
         col_nun_res   = 6 # the resulting n. unreachable from user fix -> test
         col_nun_user  = 7 # original n. unreachable that user's act. started w/
-        col_userconf  = 8 # user's confidence in their fix for their action   
+        col_score     = 8 # originally user's confidence; replaced with dist.
 
-        # Narrow down to what we want.
-        task_data = self.fdata[np.where(
-            self.fdata[:, col_task] == self.task_no)]
-        testdir_data = task_data[np.where(
-            task_data[:, col_testdir] == testdir)]
-        testact_data = testdir_data[np.where(
-            testdir_data[:, col_testact] == testact)]
-
-        # Get only those that are feasible.
-        feasibile_data = testact_data[np.where(
-            testact_data[:, col_nun_res] == 0)]
-
-        # We might not have any feasible; if so, return empty result.
-        if len(feasibile_data) == 0:
-            return (None, None), ScoreResultList([])
-
-        # Sort by user confidence.
         # Thanks to http://stackoverflow.com/questions/2828059/sorting-arrays-
         #     in-numpy-by-column
         # http://stackoverflow.com/questions/6771428/most-efficient-way-to-
         #     reverse-a-numpy-array
-        sorted_data = feasibile_data[feasibile_data[:,col_userconf]\
-            .argsort()][::-1] # get reverse view with [::-1] to 'reverse sort'
-        topn = sorted_data[:self.top_n,[col_userdir, col_useract, col_userconf]]
+        sorted_data = scored_data[scored_data[:,col_score].argsort()]
+        if reverse:
+            # get reverse view with [::-1] to 'reverse sort'
+            sorted_data = sorted_data[::-1]
+        topn = sorted_data[:self.top_n,[col_userdir, col_useract, col_score]]
 
         # Create response.
         results = []
         for res in list(topn):
-            userdir, useract, userconf = list(res)
-            results += [ScoreResult(userdir, useract, userconf)]
+            userdir, useract, score = list(res)
+            results += [ScoreResult(userdir, useract, score)]
         scoreResultList = ScoreResultList(results)
 
         # Extract top for immediate switching-to.
         userdir, useract, userscore = list(topn[0])
 
         return (userdir, useract), scoreResultList
+
+
+    def score_compactness(self, feasible_data):
+        '''Score function that selects from feasible results and sorts by
+        how compact the poses are.
+
+        Returns (userdir, useract), ScoreResultList
+
+        NOTE(max): This is currently mostly copy-pasted from score_distance
+        (below)... should refactor if they both end up working with this
+        structure...
+        '''
+        col_task      = 0 # task number
+        col_nun_start = 1 # number unreachable before fixing (this test action)
+        col_testdir   = 2 # test directory
+        col_testact   = 3 # test action (i.e. the "test")
+        col_userdir   = 4 # user directory / user number
+        col_useract   = 5 # user action (which they were fixing)
+        col_nun_res   = 6 # the resulting n. unreachable from user fix -> test
+        col_nun_user  = 7 # original n. unreachable that user's act. started w/
+        col_score     = 8 # originally user's confidence; replaced with dist.
+
+        # Need this for initializing actions
+        object_list = self.world.get_frame_list(
+            self.session.current_action_index)        
+
+        exp_root = rospy.get_param('/pr2_pbd_interaction/dataRoot') + '/data/'
+        # loop through feasible and find best
+        for fix_data in feasible_data:
+            fix = ProgrammedAction(int(fix_data[col_useract]), None)
+            fix.load(exp_root + 'experiment' + str(int(fix_data[col_userdir])) +
+                '/')
+            fix.initialize_viz(object_list)
+            dist = fix.compactness()
+            # assuming it's OK to modify feasible data directly as only one
+            # score function is used before another copy is made
+            fix_data[col_score] = dist
+        return self.top_n_last_col(feasible_data)
+
+    def score_distance(self, feasible_data):
+        '''Score function that selects from feasible results and sorts by
+        total distance of poses to seed.
+
+        Returns (userdir, useract), ScoreResultList
+        '''
+        col_task      = 0 # task number
+        col_nun_start = 1 # number unreachable before fixing (this test action)
+        col_testdir   = 2 # test directory
+        col_testact   = 3 # test action (i.e. the "test")
+        col_userdir   = 4 # user directory / user number
+        col_useract   = 5 # user action (which they were fixing)
+        col_nun_res   = 6 # the resulting n. unreachable from user fix -> test
+        col_nun_user  = 7 # original n. unreachable that user's act. started w/
+        col_score     = 8 # originally user's confidence; replaced with dist.
+
+        # Need this for initializing actions
+        object_list = self.world.get_frame_list(
+            self.session.current_action_index)
+
+        # NOTE(max): At this point, the 'current action' loaded into memory
+        # could be anything, so we have to load the seed explicitly.
+        # load seed
+        seed = ProgrammedAction(self.task_no, None)
+        seed.load(Interaction._get_seed_dir())
+        seed.initialize_viz(object_list)
+        exp_root = rospy.get_param('/pr2_pbd_interaction/dataRoot') + '/data/'
+        # loop through feasible and find best
+        for fix_data in feasible_data:
+            fix = ProgrammedAction(int(fix_data[col_useract]), None)
+            fix.load(exp_root + 'experiment' + str(int(fix_data[col_userdir])) +
+                '/')
+            fix.initialize_viz(object_list)
+            dist = seed.euclidean_dist_to_weighted(fix)
+            # assuming it's OK to modify feasible data directly as only one
+            # score function is used before another copy is made
+            fix_data[col_score] = dist
+        return self.top_n_last_col(feasible_data)
+
+    def score_confidence(self, feasible_data):
+        '''Score function that selects from feasibile results and sorts by
+        users' assigned confidence rating.
+
+        Returns (userdir, useract), ScoreResultList
+        '''
+        # Sort by user confidence.        
+        return self.top_n_last_col(feasible_data, reverse=True)
 
     def open_hand(self, arm_index):
         '''Opens gripper on the indicated side'''
@@ -754,17 +854,26 @@ class Interaction:
 
     def score(self):
         '''Call relevant score function, switch to top, and publish result.'''
-        if (self.score_func == 0):
-            testdir, testact = self.get_cur_test_info()
-            top, scoreResultList = self.score_confidence(testdir, testact)
-            userdir, useract = top
-            if userdir is not None and useract is not None:
-                self.load_action(userdir, useract)
-        else:
-            # Above are the only implemented.
-            rospy.logwarn('Requested score function (' + str(self.score_func) +
-                ') not implemented.')
+        testdir, testact = self.get_cur_test_info()
+        feasible_data = self._get_feasible_results(testdir, testact)\
+            .astype('float64') # for adding scores, which aren't ints...
+        # We might not have any feasible; if so, publish and return.
+        if len(feasible_data) == 0:
+            self._score_publisher.publish(ScoreResultList([]))
             return
+        # Make sure score function exists
+        if self.cur_score_func <= -1 or self.cur_score_func >= \
+            len(self.score_funcs):
+            rospy.logwarn('Requested score function (' +
+                str(self.cur_score_func) + ') not implemented.')
+            return
+        # Otherwise, let's actually score them
+        top, scoreResultList = \
+            self.score_funcs[self.cur_score_func](feasible_data)
+        userdir, useract = top
+        # Might have gotten no results; only load if we did get a top.
+        if userdir is not None and useract is not None:
+            self.load_action(int(userdir), int(useract))
         self._score_publisher.publish(scoreResultList)
 
     def load_action(self, userdir, useract):
@@ -810,7 +919,7 @@ class Interaction:
                     useract = result % 100
                     self.load_action(userdir, useract)
                 if (command.command == GuiCommand.SELECT_SCORE_FUNC):
-                    self.score_func = command.param
+                    self.cur_score_func = command.param
                     self.score()
                 if (command.command == GuiCommand.SWITCH_TO_ACTION):
                     # NOTE(max): I'm doing the fixing up here but not in the
