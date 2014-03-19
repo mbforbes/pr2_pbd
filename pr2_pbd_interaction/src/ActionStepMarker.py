@@ -80,7 +80,7 @@ class ActionStepMarker:
         # trying pose (not absolute...)
         p1 = self.get_pose().position
         p2 = other.get_pose().position
-        return numpy.linalg.norm(numpy.array([p1.x, p1.y, p1.z]),
+        return numpy.linalg.norm(numpy.array([p1.x, p1.y, p1.z]) -
             numpy.array([p2.x, p2.y, p2.z]))
 
     def get_uid(self):
