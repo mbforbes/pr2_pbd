@@ -40,15 +40,35 @@ class ProgrammedAction:
 
     def euclidean_dist_to(self, other):
         '''Computes Euclidean distance to another ProgrammedAction via distance
-        between steps.'''
-        # TODO(max): This.
-        return 1
+        between steps, weighting by distance to objects.'''
+        # First, just see if we can get no. relative poses of each. Should be
+        # same. Return other.
+        total_dist = 0.0
+        for l_marker in other.l_markers:
+            # Just count the number relative right now (as debug).
+            if l_marker.action_step.armTarget.lArm.refFrame == ArmState.OBJECT:
+                total_dist += 1.0
+            if l_marker.action_step.armTarget.rArm.refFrame == ArmState.OBJECT:
+                total_dist += 1.0
 
-    def orientation_dist_to(self, other):
-        '''Computes orientation distance to another ProgrammedAction via
-        all step orientation distances.'''
-        # TODO(max): This.
-        return 1
+            # Maybe actual total dist
+            #total_dist += marker.get_distance_to(their_markers[i])
+        return total_dist
+
+    def compactness(self):
+        '''Computes how 'compact' an action is by summing the norms of the
+        distances from the poses to the objects that they are relative to.'''
+        # TODO(max): Check whether correct...
+        total_dist = 0.0
+        for i in len(self.l_markers):
+            # Just do lens of those relative to objects
+            if self.l_markers[i].action_step.armTarget.lArm.refFrame == \
+                ArmState.OBJECT:
+                total_dist += self.l_markers[i].get_norm()
+            if self.r_markers[i].action_step.armTarget.rArm.refFrame == \
+                ArmState.OBJECT:
+                total_dist += self.r_markers[i].get_norm()
+        return total_dist        
 
     def get_n_unreachable_markers(self):
         '''Returns the current number of markers for which the IK solver cannot

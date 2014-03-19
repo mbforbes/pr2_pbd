@@ -58,7 +58,7 @@ class Interaction:
         self.task_no = 1
         self.cur_score_func = -1 # start invalid; should click to load first
         self.score_funcs = [self.score_confidence, self.score_distance, \
-            self.score_orientation]
+            self.score_compactness]
         rospy.set_param('data_directory', Interaction._get_data_dir(
             self.task_no))
 
@@ -333,9 +333,9 @@ class Interaction:
         return (userdir, useract), scoreResultList
 
 
-    def score_orientation(self, feasible_data):
+    def score_compactness(self, feasible_data):
         '''Score function that selects from feasible results and sorts by
-        relative orientation differences of poses to seed.
+        how compact the poses are.
 
         Returns (userdir, useract), ScoreResultList
 
@@ -343,31 +343,8 @@ class Interaction:
         (below)... should refactor if they both end up working with this
         structure...
         '''
-        col_task      = 0 # task number
-        col_nun_start = 1 # number unreachable before fixing (this test action)
-        col_testdir   = 2 # test directory
-        col_testact   = 3 # test action (i.e. the "test")
-        col_userdir   = 4 # user directory / user number
-        col_useract   = 5 # user action (which they were fixing)
-        col_nun_res   = 6 # the resulting n. unreachable from user fix -> test
-        col_nun_user  = 7 # original n. unreachable that user's act. started w/
-        col_score     = 8 # originally user's confidence; replaced with dist.
-
-        # NOTE(max): At this point, the 'current action' loaded into memory
-        # could be anything, so we have to load the seed explicitly.
-        # load seed
-        seed = ProgrammedAction(self.task_no, None) # TODO: None OK? Or called?
-        seed.load(Interaction._get_seed_dir())
-        exp_root = rospy.get_param('/pr2_pbd_interaction/dataRoot') + '/data/'
-        # loop through feasible and find best
-        for fix_data in feasible_data:
-            fix = ProgrammedAction(fix_data[col_useract], None) # TODO: None OK?
-            fix.load(exp_root + 'experiment' + str(fix_data[col_userdir]) + '/')
-            dist = seed.orientation_dist_to(fix)
-            # assuming it's OK to modify feasible data directly as only one
-            # score function is used before another copy is made
-            fix_data[col_score] = dist
-        return self.top_n_last_col(feasible_data)
+        # TODO(max): Write this once score_distance is complete
+        return (None, None), ScoreResultList([])
 
     def score_distance(self, feasible_data):
         '''Score function that selects from feasible results and sorts by
@@ -385,16 +362,22 @@ class Interaction:
         col_nun_user  = 7 # original n. unreachable that user's act. started w/
         col_score     = 8 # originally user's confidence; replaced with dist.
 
+        # Need this for initializing actions
+        object_list = self.world.get_frame_list(
+            self.session.current_action_index)
+
         # NOTE(max): At this point, the 'current action' loaded into memory
         # could be anything, so we have to load the seed explicitly.
         # load seed
         seed = ProgrammedAction(self.task_no, None) # TODO: None OK? Or called?
         seed.load(Interaction._get_seed_dir())
+        seed.initialize_viz(object_list)
         exp_root = rospy.get_param('/pr2_pbd_interaction/dataRoot') + '/data/'
         # loop through feasible and find best
         for fix_data in feasible_data:
             fix = ProgrammedAction(fix_data[col_useract], None) # TODO: None OK?
             fix.load(exp_root + 'experiment' + str(fix_data[col_userdir]) + '/')
+            fix.initialize_viz(object_list)
             dist = seed.euclidean_dist_to(fix)
             # assuming it's OK to modify feasible data directly as only one
             # score function is used before another copy is made
