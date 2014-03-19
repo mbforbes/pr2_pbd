@@ -343,8 +343,32 @@ class Interaction:
         (below)... should refactor if they both end up working with this
         structure...
         '''
-        # TODO(max): Write this once score_distance is complete
-        return (None, None), ScoreResultList([])
+        col_task      = 0 # task number
+        col_nun_start = 1 # number unreachable before fixing (this test action)
+        col_testdir   = 2 # test directory
+        col_testact   = 3 # test action (i.e. the "test")
+        col_userdir   = 4 # user directory / user number
+        col_useract   = 5 # user action (which they were fixing)
+        col_nun_res   = 6 # the resulting n. unreachable from user fix -> test
+        col_nun_user  = 7 # original n. unreachable that user's act. started w/
+        col_score     = 8 # originally user's confidence; replaced with dist.
+
+        # Need this for initializing actions
+        object_list = self.world.get_frame_list(
+            self.session.current_action_index)        
+
+        exp_root = rospy.get_param('/pr2_pbd_interaction/dataRoot') + '/data/'
+        # loop through feasible and find best
+        for fix_data in feasible_data:
+            fix = ProgrammedAction(int(fix_data[col_useract]), None)
+            fix.load(exp_root + 'experiment' + str(int(fix_data[col_userdir])) +
+                '/')
+            fix.initialize_viz(object_list)
+            dist = fix.compactness()
+            # assuming it's OK to modify feasible data directly as only one
+            # score function is used before another copy is made
+            fix_data[col_score] = dist
+        return self.top_n_last_col(feasible_data)
 
     def score_distance(self, feasible_data):
         '''Score function that selects from feasible results and sorts by
@@ -369,16 +393,17 @@ class Interaction:
         # NOTE(max): At this point, the 'current action' loaded into memory
         # could be anything, so we have to load the seed explicitly.
         # load seed
-        seed = ProgrammedAction(self.task_no, None) # TODO: None OK? Or called?
+        seed = ProgrammedAction(self.task_no, None)
         seed.load(Interaction._get_seed_dir())
         seed.initialize_viz(object_list)
         exp_root = rospy.get_param('/pr2_pbd_interaction/dataRoot') + '/data/'
         # loop through feasible and find best
         for fix_data in feasible_data:
-            fix = ProgrammedAction(fix_data[col_useract], None) # TODO: None OK?
-            fix.load(exp_root + 'experiment' + str(fix_data[col_userdir]) + '/')
+            fix = ProgrammedAction(int(fix_data[col_useract]), None)
+            fix.load(exp_root + 'experiment' + str(int(fix_data[col_userdir])) +
+                '/')
             fix.initialize_viz(object_list)
-            dist = seed.euclidean_dist_to(fix)
+            dist = seed.euclidean_dist_to_weighted(fix)
             # assuming it's OK to modify feasible data directly as only one
             # score function is used before another copy is made
             fix_data[col_score] = dist
@@ -830,7 +855,8 @@ class Interaction:
     def score(self):
         '''Call relevant score function, switch to top, and publish result.'''
         testdir, testact = self.get_cur_test_info()
-        feasible_data = self._get_feasible_results(testdir, testact)
+        feasible_data = self._get_feasible_results(testdir, testact)\
+            .astype('float64') # for adding scores, which aren't ints...
         # We might not have any feasible; if so, publish and return.
         if len(feasible_data) == 0:
             self._score_publisher.publish(ScoreResultList([]))
@@ -847,7 +873,7 @@ class Interaction:
         userdir, useract = top
         # Might have gotten no results; only load if we did get a top.
         if userdir is not None and useract is not None:
-            self.load_action(userdir, useract)
+            self.load_action(int(userdir), int(useract))
         self._score_publisher.publish(scoreResultList)
 
     def load_action(self, userdir, useract):

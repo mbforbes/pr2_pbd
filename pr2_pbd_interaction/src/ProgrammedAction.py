@@ -38,21 +38,33 @@ class ProgrammedAction:
             ProgrammedAction._marker_publisher = rospy.Publisher(
                     'visualization_marker_array', MarkerArray)
 
-    def euclidean_dist_to(self, other):
+    def euclidean_dist_to_weighted(self, other):
         '''Computes Euclidean distance to another ProgrammedAction via distance
-        between steps, weighting by distance to objects.'''
-        # First, just see if we can get no. relative poses of each. Should be
-        # same. Return other.
+        between steps, weighting by (self's) distance to objects.'''
+        # This is how we weight absolute poses that are different; this is a
+        # medium weight (norm measures are usually between 0.13 and 0.2, whose
+        # weights (1/norm) would yield between 7.7 and 5).
+        abs_weight = 6.0
         total_dist = 0.0
-        for l_marker in other.l_markers:
-            # Just count the number relative right now (as debug).
-            if l_marker.action_step.armTarget.lArm.refFrame == ArmState.OBJECT:
-                total_dist += 1.0
-            if l_marker.action_step.armTarget.rArm.refFrame == ArmState.OBJECT:
-                total_dist += 1.0
+        for i in range(len(self.l_markers)):
+            l_dist = self.l_markers[i].get_distance_to(other.l_markers[i])
+            r_dist = self.r_markers[i].get_distance_to(other.r_markers[i])
 
-            # Maybe actual total dist
-            #total_dist += marker.get_distance_to(their_markers[i])
+            if self.l_markers[i].action_step.armTarget.lArm.refFrame == \
+                ArmState.OBJECT:
+                l_weight = 1.0 / self.l_markers[i].get_norm()
+            else:
+                l_weight = abs_weight
+            l_weighted_dist = l_dist * l_weight
+
+            if self.r_markers[i].action_step.armTarget.rArm.refFrame == \
+                ArmState.OBJECT:
+                r_weight = 1.0 / self.r_markers[i].get_norm()
+            else:
+                r_weight = abs_weight
+            r_weighted_dist = r_dist * r_weight
+
+            total_dist += l_weighted_dist + r_weighted_dist
         return total_dist
 
     def compactness(self):
@@ -60,7 +72,7 @@ class ProgrammedAction:
         distances from the poses to the objects that they are relative to.'''
         # TODO(max): Check whether correct...
         total_dist = 0.0
-        for i in len(self.l_markers):
+        for i in range(len(self.l_markers)):
             # Just do lens of those relative to objects
             if self.l_markers[i].action_step.armTarget.lArm.refFrame == \
                 ArmState.OBJECT:
