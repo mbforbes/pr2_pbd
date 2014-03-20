@@ -147,7 +147,7 @@ class PbDGUI(Plugin):
         self.currentAction = -1
         self.currentStep = -1
         # TODO(max): Make GUI area to select this / report back to Interaction
-        self.currentTask = 3
+        self.currentTask = 1
         self.currentScoreFunc = -1
         self.results = [] # for score result list
         self.selectedResult = -1 # start invalid
