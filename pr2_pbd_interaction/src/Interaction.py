@@ -49,7 +49,7 @@ class Interaction:
         is_reload = True
         n_tasks = len(glob.glob(rospy.get_param(
             '/pr2_pbd_interaction/dataRoot') + '/data/experimentTesting/task*'))
-        self.top_n = 5 # How many results to return from the score function.
+        self.top_n = 10 # How many results to return from the score function.
 
         # Copy default bag files (seed)
         Interaction._copy_seeds(n_tasks)
