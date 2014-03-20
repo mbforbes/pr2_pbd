@@ -837,7 +837,7 @@ class Interaction:
         curact = self.session.current_action_index - 1 # 1-based -> 0-based
 
         dir_mapping = [
-            [1, 1, 2, 2, 3, 1, 1, 2, 1, 2],
+            [1, 1, 2, 2, 3, 1, 1, 2, 1, 3],
             [1, 2, 1, 2, 1, 2, 1, 2, 1, 2],
             [1, 2, 1, 2, 1, 2, 1, 2, 1, 2],
         ]
