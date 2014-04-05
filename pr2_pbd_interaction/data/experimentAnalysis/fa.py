@@ -361,7 +361,7 @@ def plot1(logfile, plot_let, save_filename=None):
                 plt.ylabel('Portion of tests made feasible')
             elif plot_let == 'd':
                 # d
-                plt.ylabel('Portion of fixes feasible')
+                plt.ylabel('Portion of fixes feasible on test set')
             else:
                 # bad
                 print 'Unsupported plot letter:', plot_let
@@ -392,9 +392,6 @@ def plot1(logfile, plot_let, save_filename=None):
         box = ax.get_position()
         ax.set_position([box.x0, box.y0 + box.height * 0.1, box.width,
             box.height * 0.9])
-
-    # Legend manip. from 
-    # http://stackoverflow.com/questions/4700614/how-to-put-the-legend-out-of-the-plot
 
     # Put a legend below current axis
     legend = fig.legend(lines,
@@ -445,7 +442,7 @@ def plot2(logfile, plot_let, save_filename=None):
                 plt.ylabel('Portion of tests made feasibile')
             elif plot_let == 'd':
                 # d
-                plt.ylabel('Portion of fixes feasibile')
+                plt.ylabel('Portion of fixes feasibile on test set')
             else:
                 # bad
                 print 'Unsupported plot letter:', plot_let

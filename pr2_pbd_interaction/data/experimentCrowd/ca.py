@@ -10,6 +10,8 @@ __author__ = "max"
 #
 # builtins
 import code
+import os
+import sys
 
 # 3rd party
 import numpy as np
@@ -24,6 +26,7 @@ from prettyplotlib import brewer2mpl
 # CONSTANTS
 #
 
+ALMOST_BLACK = '#262626'
 
 #
 # CLASSES
@@ -39,9 +42,11 @@ from prettyplotlib import brewer2mpl
 # MAIN
 #
 
-def heat():
+def heat(save_filename=None):
     '''Do some crowd confidence analysis!'''
     nuns = [2, 1, 3, 1, 2, 4, 2, 3, 5, 1, 3, 1, 2, 5, 4]
+    # So we can load the file
+    os.chdir(os.path.dirname(os.path.realpath(__file__)))
     data = np.genfromtxt('confidences.txt', delimiter=',', dtype='int8')
 
     fnuns = np.repeat(nuns, len(data))
@@ -58,7 +63,16 @@ def heat():
     # http://wiki.scipy.org/Cookbook/Matplotlib/Show_colormaps
     plt.figure()
     plt.hist2d(fnuns, fdata, bins=[xedges,yedges], cmap='OrRd')
-    plt.colorbar()
+
+    # Make and configure colorbar
+    cbar = plt.colorbar(orientation='horizontal')
+    cbar.ax.tick_params(axis='x', which='major', color=ALMOST_BLACK, length=4)
+    #cbar.set_ticks([])
+    for label in cbar.ax.get_xticklabels():
+        label.set_color(ALMOST_BLACK)
+    cbar.outline.set_color(ALMOST_BLACK)
+    cbar.outline.set_linewidth(1)
+
     ax = plt.gca()
     ax.set_xticks([1.5,2.5,3.5,4.5,5.5])
     ax.set_xticklabels([str(i) for i in [1,2,3,4,5]])
@@ -68,7 +82,81 @@ def heat():
     plt.xlabel('Start no. unreachable poses', size=15)
     plt.ylabel('Confidence from 0 - 100', size=15)
 
-    plt.show()
+    # Prettify
+    beautify_heat_plot(ax)
+
+    if save_filename is not None:
+        uid = 'ca_startheat'
+        save_fig(save_filename, uid)
+    else:
+        plt.show()
+
+def save_fig(save_filename, uid):
+    '''Save figure to all formats in formats (in function) and close.
+    save_filename should be root directory from which format subdirectories
+    are used to house figures.'''
+    formats = ['png', 'pdf']    
+    if save_filename[-1] != '/':
+        save_filename += '/'
+    for fmt in formats:
+        savedir = save_filename + fmt + '/'
+        if not os.path.exists(savedir):
+            os.makedirs(savedir)
+        savepath = savedir + uid + '.' + fmt
+        print 'Saving to', savepath
+        plt.savefig(savepath, bbox_inches='tight')
+    plt.close()
+
+def beautify_heat_plot(ax):
+    '''Modified beautify :-/
+    '''
+    # Settings
+    more_grey = '#929292'
+    text_font = 'serif'
+    number_font = 'serif'
+
+    # Get the figure and axes.
+    if ax is None:
+        fig = plt.figure(1)
+        ax = plt.axes()
+
+    # To remove the ticks all-together (like in prettyplotlib), do the following
+    # instead of tick_left() and tick_bottom()
+    ax.xaxis.set_ticks_position('none')
+    ax.yaxis.set_ticks_position('none')
+
+    # Now make them go 'out' rather than 'in'
+    # for axis in ['x', 'y']:
+    #     ax.tick_params(axis=axis, which='both', direction='out', pad=7)
+    #     ax.tick_params(axis=axis, which='major', color=ALMOST_BLACK, length=6)
+    #     ax.tick_params(axis=axis, which='minor', color=more_grey, length=4)
+
+    # Make thinner and off-black
+    spines_to_keep = ['bottom', 'left', 'top', 'right']
+    for spine in spines_to_keep:
+        ax.spines[spine].set_linewidth(0.5)
+        ax.spines[spine].set_color(ALMOST_BLACK)
+
+    # Change the labels & title to the off-black and change their font
+    for label in [ax.yaxis.label, ax.xaxis.label, ax.title]:
+        label.set_color(ALMOST_BLACK)
+        label.set_family(text_font)
+        label.set_fontsize(20)
+
+    # Change the tick labels' color and font and padding
+    for axis in [ax.yaxis, ax.xaxis]:
+        # padding
+        #axis.labelpad = 20
+        # major ticks
+        for major_tick in axis.get_major_ticks():
+            label = major_tick.label
+            label.set_color(ALMOST_BLACK)
+            label.set_family(number_font)
+        # minor ticks
+        for minor_tick in axis.get_minor_ticks():
+            label = minor_tick.label
+            label.set_color(more_grey)
+            label.set_family(number_font)
 
 def line():
     lw = 2
@@ -128,5 +216,8 @@ def line():
     plt.show()
 
 if __name__ == '__main__':
-    heat()
-    line()
+    save_filename = None
+    if len(sys.argv) > 1:
+        save_filename = sys.argv[1]
+    heat(save_filename)
+    #line()
