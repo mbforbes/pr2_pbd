@@ -61,7 +61,7 @@ def heat(save_filename=None):
             fdata[i] = 99
     # Pick colors here:
     # http://wiki.scipy.org/Cookbook/Matplotlib/Show_colormaps
-    plt.figure()
+    plt.figure(figsize=(8,6))
     plt.hist2d(fnuns, fdata, bins=[xedges,yedges], cmap='OrRd')
 
     # Make and configure colorbar

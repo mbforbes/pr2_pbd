@@ -35,6 +35,9 @@ import brewer2mpl as b2
 ### CONSTANTS
 COLORS = b2.get_map('YlOrRd', 'Sequential', 9).mpl_colors
 ALMOST_BLACK = '#262626'
+STYLES = ['-', '--', '-.', ':', '--']
+MARKERS = ['*', '^', 'D', 's', '8']
+
 
 ### FUNCTIONS
 def computeLines(logfile):
@@ -205,10 +208,15 @@ def computeConfheat(logfile, save_filename):
     confs = data[:,col_userconf]
     nun_res = data[:,col_nun_res]
 
+    # TODO(max): Important! Check out of this valid at all... couldn't number of
+    # unreachable poses go above 5? Don't we need a 5+ bin? Are these bins
+    # really capturing the correct data?
+
     # create plot stuff
     xedges = np.arange(0, 110, 10)
-    yedges = np.arange(1, 7, 1)
-    plt.figure()
+    yedges = np.arange(0, 7, 1)
+    # TODO(max): Make this (4,8) when doing two heatmaps side-by-side.
+    plt.figure(figsize=(8,8))
     # Pick colors here:
     # color http://wiki.scipy.org/Cookbook/Matplotlib/Show_colormaps
     plt.hist2d(confs, nun_res, bins=[xedges,yedges], cmap='OrRd')
@@ -224,11 +232,11 @@ def computeConfheat(logfile, save_filename):
 
     # Configure normal ticks
     ax = plt.gca()
-    ax.set_yticks([1.5,2.5,3.5,4.5,5.5])
-    ax.set_yticklabels([str(i) for i in [1,2,3,4,5]])
+    ax.set_yticks([0.5,1.5,2.5,3.5,4.5,5.5])
+    ax.set_yticklabels([str(i) for i in [0, 1,2,3,4,5]])
 
     # labels
-    plt.title('Crowd confidence vs feasibility of fixes', size=20)
+    plt.title('Crowd confidence vs\nfeasibility of fixes', size=20)
     plt.ylabel('Result no. unreachable poses', size=15)
     plt.xlabel('Confidence from 0 - 100', size=15)
     beautify_heat_plot(ax)
@@ -329,9 +337,6 @@ def plot1(logfile, plot_let, save_filename=None):
     # debug
     print os.getcwd()
 
-    # settings
-    styles = ['-', '--', '-.', ':', '--']
-    markers = ['*', '^', 'D', 's', '8']
 
     # load data
     filedata = np.load(logfile)
@@ -343,7 +348,10 @@ def plot1(logfile, plot_let, save_filename=None):
     step = 1.0 / float(n_splits)
     xs = np.arange(0.0, 1.0 + step, step) * data_amt
 
-    fig = plt.figure(figsize=(12,8))
+    fig = plt.figure(figsize=(12,5))
+    # Adjustments for viewability
+    plt.subplots_adjust(wspace=0.05)
+
     bigax = plt.gca()
     for i, task in enumerate(overall_res):
         ax = plt.subplot(1, # nrows
@@ -352,16 +360,16 @@ def plot1(logfile, plot_let, save_filename=None):
         plt.title('Task ' + str(i + 1))
         # Plot x axis only in middle
         if i == 1:
-            plt.xlabel('User fixes')
+            plt.xlabel('Amount of user fixes')
 
         # Because graphs a bit more cramped, only plt y axis once (left)
         if i == 0:
             if plot_let == 'a':
                 # a
-                plt.ylabel('Portion of tests made feasible')
+                plt.ylabel('Portion of test scenarios\nmade reachable')
             elif plot_let == 'd':
                 # d
-                plt.ylabel('Portion of fixes feasible on test set')
+                plt.ylabel('Portion of fixes reachable on test set')
             else:
                 # bad
                 print 'Unsupported plot letter:', plot_let
@@ -374,13 +382,14 @@ def plot1(logfile, plot_let, save_filename=None):
                 y=np.insert(nun_start['avgs'], 0, 0),
                 color=COLORS[idx + 4],
                 lw=2,
-                ls=styles[idx],
-                marker=markers[idx],
+                ls=STYLES[idx],
+                marker=MARKERS[idx],
                 elinewidth=1,
                 yerr=np.insert(nun_start['stds'], 0, 0),
                 label=str(idx + 1))
             lines += [l]
         plt.axis([0, data_amt + 10, 0, 1.05])
+
         # shrink x axis ticks
         majorLocator = FixedLocator(range(0, 200, 40))
         ax.xaxis.set_major_locator(majorLocator)
@@ -388,22 +397,23 @@ def plot1(logfile, plot_let, save_filename=None):
         # Do beautification
         beautify_line_plots(ax, i, 1)
 
-        # Shink current axis's height by 10% on the bottom
+        # Shink current axis's height by 15% on the bottom
         box = ax.get_position()
-        ax.set_position([box.x0, box.y0 + box.height * 0.1, box.width,
-            box.height * 0.9])
+        ax.set_position([box.x0, box.y0 + box.height * 0.15, box.width,
+            box.height * 0.85])
 
     # Put a legend below current axis
     legend = fig.legend(lines,
         [str(n) for n in range(1,6)],
         loc='lower center',
         frameon=False,
-        #bbox_to_anchor=(0.5, -0.10),
+        bbox_to_anchor=(0.47, -0.03),
         fancybox=True,
         shadow=True,
         ncol=5,
         title='Starting no. unreachable poses',
         prop={'size':15, 'family':'serif'})
+
     # And no font color property, so now we extract...
     for text in (legend.get_texts() + [legend.get_title()]):
         plt.setp(text, color=ALMOST_BLACK, family='serif')
@@ -439,10 +449,10 @@ def plot2(logfile, plot_let, save_filename=None):
         if i == 0:
             if plot_let == 'a':            
                 # a
-                plt.ylabel('Portion of tests made feasibile')
+                plt.ylabel('Portion of test scenarios\nmade reachable')
             elif plot_let == 'd':
                 # d
-                plt.ylabel('Portion of fixes feasibile on test set')
+                plt.ylabel('Portion of fixes reachable on test set')
             else:
                 # bad
                 print 'Unsupported plot letter:', plot_let
@@ -458,6 +468,7 @@ def plot2(logfile, plot_let, save_filename=None):
             linewidth=2,
             marker='o',
             markeredgecolor=ALMOST_BLACK)
+
         if plot_let == 'd':
             plt.axis([0.5, nun_opts + 0.5, 0, 0.5])
         elif plot_let == 'a':
@@ -469,6 +480,86 @@ def plot2(logfile, plot_let, save_filename=None):
         beautify_line_plots(ax, i, 2)
     if save_filename is not None:
         uid = 'fa_2' + plot_let
+        save_fig(save_filename, uid)
+    else:
+        plt.show()
+
+def plot2ad(logdir, save_filename=None):
+    '''Plot line graph 2, which is is, per task,
+    - x-axis: n_unreachable
+    - y-axis: portion of tests|fixes feasible.
+    - one color (single line)
+    '''
+    styles = ['-', '--', ':']
+    # load data ... change ending from <log_dir>/2ad to <log_dir>/
+    logdir = logdir[:-3]
+    files = ['a', 'd']
+    datas = [np.load(logfile) for logfile in \
+        [logdir + '2' + f + '.npz' for f in files]]
+    results = [d['overall_res'] for d in datas]
+    amounts = [d['data_amt'] for d in datas]
+    print 'Loaded from ' + logdir + '2[a,d].npz'
+    ylabels = ['Portion of test scenarios made reachable', \
+        'Portion of fixes reachable on test set']
+    fig = plt.figure(figsize=(8,8))
+    plt.subplots_adjust(wspace=0.45)
+    #plt.title('Task ' + str(i + 1))
+    yranges = [[0.3, 1.02], [0.0, 0.41]]
+    for r_idx, r in enumerate(results):
+        ax = plt.subplot(1, # nrows
+            2, # ncols
+            r_idx + 1) # plot_number
+        lines = []
+        for t_idx, task in enumerate(r):
+            nun_opts = len(task)
+            xs = range(1, nun_opts + 1)
+            ys, stds = [], []
+            for nun_start in task:
+                ys += [nun_start['avgs'][0]]
+                stds += [nun_start['stds'][0]]
+            l = ax.errorbar(x=xs,
+                y=ys,
+                color=COLORS[t_idx*2 + 4],
+                lw=4,
+                ls=styles[t_idx], # local styles for readability
+                marker=MARKERS[t_idx + 1],
+                elinewidth=1,
+                yerr=stds)
+            lines += [l]
+        # labels
+        plt.xlabel('Start no. unreachable')
+        # only ylabel for left (first)
+        plt.ylabel(ylabels[r_idx])
+        plt.axis([0.5, 5.5] + yranges[r_idx])
+        majorLocator = FixedLocator(range(1,6))
+        ax.xaxis.set_major_locator(majorLocator)
+        beautify_line_plots(ax, 0, 3)
+
+        # shrink for legend (15%)
+        box = ax.get_position()
+        ax.set_position([box.x0, box.y0 + box.height * 0.10, box.width,
+            box.height * 0.90])
+
+        # Make tick font larger
+        for label in ax.get_xticklabels() + ax.get_yticklabels():
+            label.set_fontsize(15)
+
+    # Make legend
+    # Put a legend below current axis
+    legend = fig.legend(lines,
+        ['Task ' + str(n) for n in range(1,6)],
+        loc='lower center',
+        frameon=False,
+        bbox_to_anchor=(0.46, -0.02),
+        fancybox=True,
+        shadow=True,
+        ncol=5)
+        #prop={'size':20, 'family':'serif'}) # setting after w/ title
+    for text in (legend.get_texts() + [legend.get_title()]):
+        plt.setp(text, color=ALMOST_BLACK, family='serif', size=18)
+
+    if save_filename is not None:
+        uid = 'fa_2a+d'
         save_fig(save_filename, uid)
     else:
         plt.show()
@@ -491,11 +582,26 @@ def save_fig(save_filename, uid):
 
 def beautify_line_plots(ax, pnum, gnum):
     '''Modified beautify :-/
+
+    params
+    ------
+
+    ax
+     - the axis
+
+    pnum
+     - which plot nubmer you are (i.e. which column subplot)
+
+    gnum 
+    - 1 : plot1
+    - 2 : plot2
+    - 3 : plot2ad
     '''
     # Settings
     more_grey = '#929292'
     text_font = 'serif'
     number_font = 'serif'
+    font_sizes = [15,15,20] # index by graph num
 
     # Get the figure and axes.
     if ax is None:
@@ -532,7 +638,7 @@ def beautify_line_plots(ax, pnum, gnum):
         ax.tick_params(axis=axis, which='major', color=ALMOST_BLACK, length=6)
         ax.tick_params(axis=axis, which='minor', color=more_grey, length=4)
 
-    # Make thinner and off-black
+    # Make spines thinner and off-black
     spines_to_keep = ['bottom', 'left']
     for spine in spines_to_keep:
         ax.spines[spine].set_linewidth(0.5)
@@ -542,7 +648,7 @@ def beautify_line_plots(ax, pnum, gnum):
     for label in [ax.yaxis.label, ax.xaxis.label, ax.title]:
         label.set_color(ALMOST_BLACK)
         label.set_family(text_font)
-        label.set_fontsize(20)
+        label.set_fontsize(font_sizes[gnum - 1])
 
     # Change the tick labels' color and font and padding
     for axis in [ax.yaxis, ax.xaxis]:
@@ -622,10 +728,13 @@ def usage():
     print 'comp_opt: lines|explore|confheat'
     print 'plot_opt: 1[a|d]|2[a|d]'
     print 'save_path: for plots, will save in pdf/ and png/ subdirs under arg'
+    print
+    print 'for 2a+d, run:'
+    print '    python fa.py <path_to_log3_archives>/2ad 2ad [save_filename]'
     exit(1)
 
 # Program enters here
-if __name__ == '__main__':
+def main():
     if len(sys.argv) >= 2:
         logfile = sys.argv[1]
         if logfile.endswith('.txt'):
@@ -645,12 +754,16 @@ if __name__ == '__main__':
                     usage()
             else:
                 usage()
-        elif logfile.endswith('.npz'):
+        elif logfile.endswith('.npz') or logfile.endswith('2ad'):
             save_filename = None
             if len(sys.argv) >= 4:
                 save_filename = sys.argv[3]
             # Plot lines
             if len(sys.argv) >= 3:
+                # Hack... multiple log files...
+                if logfile.endswith('2ad'):
+                    plot2ad(logfile, save_filename)
+                    return
                 plot_num, plot_let = sys.argv[2]
                 if plot_num == '1':
                     plot1(logfile, plot_let, save_filename)
@@ -666,3 +779,5 @@ if __name__ == '__main__':
         usage()
 
 
+if __name__ == '__main__':
+    main()

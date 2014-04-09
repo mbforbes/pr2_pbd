@@ -63,6 +63,7 @@ def main(save_filename):
     # make top-1 data
     fig = plt.figure(figsize=(8,8))
     more_grey = '#929292'    
+    dotted_line = None
 
     for task_no, task in enumerate(tasks):
         ax = plt.subplot(1, #nrows
@@ -91,8 +92,8 @@ def main(save_filename):
         plt.grid(axis='y', color=more_grey)                
         # do plotting all at once (old: do for top 5 now)
         if len(t5xs) > 0:
-            plt.bar(t5xs, t5ys, color='white', edgecolor=ALMOST_BLACK,
-                ls='dotted', label='Top 5')
+            dotted_line = plt.bar(t5xs, t5ys, color='white',
+                edgecolor=ALMOST_BLACK, ls='dotted', label='Top 5')
         # plot each score function in different color
         # Collect lines from last
         lines = []
@@ -109,8 +110,12 @@ def main(save_filename):
         plt.axis([0.25, N_SCORES + 0.5, 0, 10])
         ax = plt.gca()
         ax.set_xticks(np.arange(1, N_SCORES + 1) - 0.125)
-        ax.set_xticklabels(['s1', 's2', 's3'])
+        ax.set_xticklabels([r'$s_o$', r'$s_d$', r'$s_c$'])
         #ax.set_xticklabels(['s' + str(i) for i in range(1, N_SCORES + 1)])
+
+        # Make tick font larger
+        for label in ax.get_xticklabels() + ax.get_yticklabels():
+            label.set_fontsize(20)
 
         beautify_bar_plot(ax, task_no)
 
@@ -131,14 +136,14 @@ def main(save_filename):
         #     bbox_to_anchor=(0.5, -0.10), fancybox=True, shadow=True, ncol=5)
 
     # Put a legend below current axis
-    legend = fig.legend(lines,
-        ['Confidence', 'Seed distance', 'Compactness'],
+    legend = fig.legend(lines + [dotted_line],
+        ['Confidence', 'Seed distance', 'Compactness', 'Top 5'],
         loc='lower center',
         frameon=False,
         #bbox_to_anchor=(0.5, -0.10),
         fancybox=True,
         shadow=True,
-        ncol=3,
+        ncol=4,
         #title='Score functions',
         prop={'size':15, 'family':'serif'})
     # And no font color property, so now we extract...
