@@ -55,10 +55,9 @@ def main(save_filename):
     lows = range(0, N_TESTS * N_SCORES, N_TESTS)
     highs = range(N_TESTS, N_TESTS * (N_SCORES + 1), N_TESTS)
 
-    color ='#43a2ca'
-    color2 = '#a8ddb5'
-
-    colors = [COLORS[4], COLORS[6], COLORS[8]]
+    dotted_color = COLORS[4]
+    #colors = [COLORS[4], COLORS[6], COLORS[8]]
+    colors = ['#777777', '#cccccc', '#ffffff']
 
     # make top-1 data
     fig = plt.figure(figsize=(8,8))
@@ -93,14 +92,15 @@ def main(save_filename):
         # do plotting all at once (old: do for top 5 now)
         if len(t5xs) > 0:
             dotted_line = plt.bar(t5xs, t5ys, color='white',
-                edgecolor=ALMOST_BLACK, ls='dotted', label='Top 5')
+                edgecolor=dotted_color, ls='dashed', label='Top 5',
+                lw=4)
         # plot each score function in different color
         # Collect lines from last
         lines = []
         for i in range(len(xs)):
             l = plt.bar(xs[i], ys[i], color=colors[i])
             lines += [l]
-        plt.title('Task ' + str(task_no + 1), size=20)
+        plt.title('Action ' + str(task_no + 1), size=20)
         # Only plot x label in middle
         if task_no == 1:
             plt.xlabel('Score function', size=15)
@@ -114,8 +114,10 @@ def main(save_filename):
         #ax.set_xticklabels(['s' + str(i) for i in range(1, N_SCORES + 1)])
 
         # Make tick font larger
-        for label in ax.get_xticklabels() + ax.get_yticklabels():
-            label.set_fontsize(20)
+        for label in ax.get_xticklabels():
+            label.set_fontsize(30)
+        for label in ax.get_yticklabels():
+            label.set_fontsize(20)            
 
         beautify_bar_plot(ax, task_no)
 

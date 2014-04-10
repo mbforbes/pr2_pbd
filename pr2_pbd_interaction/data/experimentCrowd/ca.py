@@ -49,7 +49,13 @@ def heat(save_filename=None):
     os.chdir(os.path.dirname(os.path.realpath(__file__)))
     data = np.genfromtxt('confidences.txt', delimiter=',', dtype='int8')
 
-    fnuns = np.repeat(nuns, len(data))
+    # Copy nuns len(data) times into big flat array (fnuns).
+    fnuns = np.zeros(len(data) * len(nuns))
+    for i in range(len(data)):
+        fnuns[i*len(nuns):(i+1)*len(nuns)] = nuns
+
+    # Old way that I think was buggy.
+    #fnuns = np.repeat(nuns, len(data))
     fdata = data.flatten()
 
     xedges = np.arange(1,7,1)
@@ -78,7 +84,7 @@ def heat(save_filename=None):
     ax.set_xticklabels([str(i) for i in [1,2,3,4,5]])
 
     # labels
-    plt.title('Crowd confidence', size=20)
+    #plt.title('Crowd confidence', size=20)
     plt.xlabel('Start no. unreachable poses', size=15)
     plt.ylabel('Confidence from 0 - 100', size=15)
 

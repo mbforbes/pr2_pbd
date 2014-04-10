@@ -47,7 +47,7 @@ def computeLines(logfile):
         skip_header=1)
 
     # settings
-    n_runs = 100
+    n_runs = 1 # 100 for graph 1, 1 for graph 2
     n_splits = 1 # ~10 for graph 1, 1 for graph 2
 
     # compute from settings...
@@ -129,8 +129,8 @@ def computeLines(logfile):
                             #
                             # (a); are there any fixes that get 0 unreachable
                             # poses as a result on this test?
-                            #run_res = 1 if \
-                            #   sum(run_data[:,col_nun_res] == 0) >= 1 else 0
+                            run_res = 1 if \
+                              sum(run_data[:,col_nun_res] == 0) >= 1 else 0
 
                             # (b) what's the average number of unreachable poses
                             # gotten as a result? sanity check: should be
@@ -144,8 +144,8 @@ def computeLines(logfile):
                             # (d) what potion of users' fixes got the test to 0
                             # unreachable? note: should also be constant vs
                             # amt. of data
-                            run_res = sum(run_data[:,col_nun_res] == 0) \
-                                / float(split_amt)
+                            # run_res = sum(run_data[:,col_nun_res] == 0) \
+                                # / float(split_amt)
 
                             split_res[run] = run_res
                         test_act_res[split - 1] = split_res
@@ -164,13 +164,26 @@ def computeLines(logfile):
             # shape: n_splits
             nun_start_avg_across_runs = np.average(nun_start_avg_across_tests,
                 axis=1)
+
+            # How to compute std dev:
+            # ------------------------------------------------------------------
+            # When doing multiple splits (graph 1), want to average across runs.
+
             # shape: n_splits
             nun_start_std_across_runs = np.std(nun_start_avg_across_tests,
                 axis=1)
-            task_res.append({'avgs': nun_start_avg_across_runs,
-                'stds': nun_start_std_across_runs})
-        overall_res.append(task_res)
 
+            # When just using full data (graph 2), want to average across tests.
+            # shape: 1 el (would be (n_splits, n_runs), but both are 1 if g2,
+            # and we're taking el 0)
+            nun_start_std_across_tests = np.std(nun_start_res, axis=0)[0]
+
+            # Make your decision here
+            stds = nun_start_std_across_tests
+
+            # Append result
+            task_res.append({'avgs': nun_start_avg_across_runs, 'stds': stds})
+        overall_res.append(task_res)
     overall_res = np.array(overall_res)
     # save
     if len(sys.argv) >= 4:
@@ -357,16 +370,16 @@ def plot1(logfile, plot_let, save_filename=None):
         ax = plt.subplot(1, # nrows
             3, # ncols
             i + 1) # plot_number
-        plt.title('Task ' + str(i + 1))
+        plt.title('Action ' + str(i + 1))
         # Plot x axis only in middle
         if i == 1:
-            plt.xlabel('Amount of user fixes')
+            plt.xlabel('Number of crowd demonstrations')
 
         # Because graphs a bit more cramped, only plt y axis once (left)
         if i == 0:
             if plot_let == 'a':
                 # a
-                plt.ylabel('Portion of test scenarios\nmade reachable')
+                plt.ylabel('Test reachability')
             elif plot_let == 'd':
                 # d
                 plt.ylabel('Portion of fixes reachable on test set')
@@ -411,7 +424,7 @@ def plot1(logfile, plot_let, save_filename=None):
         fancybox=True,
         shadow=True,
         ncol=5,
-        title='Starting no. unreachable poses',
+        title='Starting number of unreachable poses',
         prop={'size':15, 'family':'serif'})
 
     # And no font color property, so now we extract...
@@ -499,12 +512,12 @@ def plot2ad(logdir, save_filename=None):
     results = [d['overall_res'] for d in datas]
     amounts = [d['data_amt'] for d in datas]
     print 'Loaded from ' + logdir + '2[a,d].npz'
-    ylabels = ['Portion of test scenarios made reachable', \
-        'Portion of fixes reachable on test set']
-    fig = plt.figure(figsize=(8,8))
+    ylabels = ['Test reachability', \
+        'Crowd effectiveness']
+    fig = plt.figure(figsize=(8,5))
     plt.subplots_adjust(wspace=0.45)
     #plt.title('Task ' + str(i + 1))
-    yranges = [[0.3, 1.02], [0.0, 0.41]]
+    yranges = [[0.3, 1.02], [-0.01, 0.53]]
     for r_idx, r in enumerate(results):
         ax = plt.subplot(1, # nrows
             2, # ncols
@@ -516,14 +529,17 @@ def plot2ad(logdir, save_filename=None):
             ys, stds = [], []
             for nun_start in task:
                 ys += [nun_start['avgs'][0]]
-                stds += [nun_start['stds'][0]]
+                if r_idx == 1:
+                    stds += [nun_start['stds'][0]]
+                else:
+                    stds += [0]
             l = ax.errorbar(x=xs,
                 y=ys,
                 color=COLORS[t_idx*2 + 4],
                 lw=4,
                 ls=styles[t_idx], # local styles for readability
                 marker=MARKERS[t_idx + 1],
-                elinewidth=1,
+                elinewidth=2,
                 yerr=stds)
             lines += [l]
         # labels
@@ -535,10 +551,10 @@ def plot2ad(logdir, save_filename=None):
         ax.xaxis.set_major_locator(majorLocator)
         beautify_line_plots(ax, 0, 3)
 
-        # shrink for legend (15%)
+        # shrink for legend
         box = ax.get_position()
-        ax.set_position([box.x0, box.y0 + box.height * 0.10, box.width,
-            box.height * 0.90])
+        ax.set_position([box.x0, box.y0 + box.height * 0.15, box.width,
+            box.height * 0.85])
 
         # Make tick font larger
         for label in ax.get_xticklabels() + ax.get_yticklabels():
@@ -547,7 +563,7 @@ def plot2ad(logdir, save_filename=None):
     # Make legend
     # Put a legend below current axis
     legend = fig.legend(lines,
-        ['Task ' + str(n) for n in range(1,6)],
+        ['Action ' + str(n) for n in range(1,6)],
         loc='lower center',
         frameon=False,
         bbox_to_anchor=(0.46, -0.02),
