@@ -265,7 +265,7 @@ def plot_times(resarr, save_filename=None):
 
     # assuming plot == plot_fx
     ylabel = 'Avg. Marker\nFix Time (s)'
-    fig = plt.figure(figsize=(8,6))
+    fig = plt.figure(figsize=(8,5))
     for row_idx, user_group in enumerate(users):
         for col_idx, user in enumerate(user_group):
             ax = plt.subplot(2, # nrows

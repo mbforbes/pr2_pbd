@@ -67,11 +67,11 @@ def heat(save_filename=None):
             fdata[i] = 99
     # Pick colors here:
     # http://wiki.scipy.org/Cookbook/Matplotlib/Show_colormaps
-    plt.figure(figsize=(8,6))
+    plt.figure(figsize=(8,4))
     plt.hist2d(fnuns, fdata, bins=[xedges,yedges], cmap='OrRd')
 
     # Make and configure colorbar
-    cbar = plt.colorbar(orientation='horizontal')
+    cbar = plt.colorbar(orientation='vertical')
     cbar.ax.tick_params(axis='x', which='major', color=ALMOST_BLACK, length=4)
     #cbar.set_ticks([])
     for label in cbar.ax.get_xticklabels():
@@ -85,7 +85,7 @@ def heat(save_filename=None):
 
     # labels
     #plt.title('Crowd confidence', size=20)
-    plt.xlabel('Start no. unreachable poses', size=15)
+    plt.xlabel('Difficulty', size=15)
     plt.ylabel('Confidence from 0 - 100', size=15)
 
     # Prettify

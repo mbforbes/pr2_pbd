@@ -60,7 +60,9 @@ def main(save_filename):
     colors = ['#777777', '#cccccc', '#ffffff']
 
     # make top-1 data
-    fig = plt.figure(figsize=(8,8))
+    fig = plt.figure(figsize=(8,6))
+    # Make subplots close together
+    plt.subplots_adjust(wspace=0.01)
     more_grey = '#929292'    
     dotted_line = None
 
@@ -128,11 +130,15 @@ def main(save_filename):
         # # Legend manip from
         # # http://stackoverflow.com/questions/4700614/how-to-put-the-legend-out-of-the-plot
 
-        # Shink current axis's height by 10% on the bottom
-        box = ax.get_position()
-        ax.set_position([box.x0, box.y0 + box.height * 0.1,
-            box.width, box.height * 0.9])
-        
+        # Shink current axis's height on the bottom
+        #box = ax.get_position()
+        #ax.set_position([box.x0, box.y0 + box.height * 0.15,
+        #    box.width, box.height * 0.85])
+
+        # Shrink curren axis width on the right
+        #box = ax.get_position()
+        #ax.set_position([box.x0, box.y0, box.width * 0.8, box.height])
+
         # # Put a legend below current axis
         # ax.legend(handles[::-1], labels[::-1], loc='upper center',
         #     bbox_to_anchor=(0.5, -0.10), fancybox=True, shadow=True, ncol=5)
@@ -140,12 +146,13 @@ def main(save_filename):
     # Put a legend below current axis
     legend = fig.legend(lines + [dotted_line],
         ['Confidence', 'Seed distance', 'Compactness', 'Top 5'],
-        loc='lower center',
+        loc='upper right',
         frameon=False,
-        #bbox_to_anchor=(0.5, -0.10),
+        #bbox_to_anchor=(0.5, -0.10), # old (bottom)
+        bbox_to_anchor=(1.0, .96), # new (top right)
         fancybox=True,
         shadow=True,
-        ncol=4,
+        ncol=1,
         #title='Score functions',
         prop={'size':15, 'family':'serif'})
     # And no font color property, so now we extract...

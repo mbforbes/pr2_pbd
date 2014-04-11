@@ -361,7 +361,7 @@ def plot1(logfile, plot_let, save_filename=None):
     step = 1.0 / float(n_splits)
     xs = np.arange(0.0, 1.0 + step, step) * data_amt
 
-    fig = plt.figure(figsize=(12,5))
+    fig = plt.figure(figsize=(12,3))
     # Adjustments for viewability
     plt.subplots_adjust(wspace=0.05)
 
@@ -411,20 +411,20 @@ def plot1(logfile, plot_let, save_filename=None):
         beautify_line_plots(ax, i, 1)
 
         # Shink current axis's height by 15% on the bottom
-        box = ax.get_position()
-        ax.set_position([box.x0, box.y0 + box.height * 0.15, box.width,
-            box.height * 0.85])
+        # box = ax.get_position()
+        # ax.set_position([box.x0, box.y0 + box.height * 0.15, box.width,
+        #     box.height * 0.85])
 
     # Put a legend below current axis
     legend = fig.legend(lines,
         [str(n) for n in range(1,6)],
-        loc='lower center',
+        loc='right',
         frameon=False,
-        bbox_to_anchor=(0.47, -0.03),
+        #bbox_to_anchor=(0.47, -0.03),
         fancybox=True,
         shadow=True,
-        ncol=5,
-        title='Starting number of unreachable poses',
+        ncol=1,
+        title='Difficulty',
         prop={'size':15, 'family':'serif'})
 
     # And no font color property, so now we extract...
@@ -457,7 +457,7 @@ def plot2(logfile, plot_let, save_filename=None):
         plt.title('Task ' + str(i + 1))
         # only xlabel for middle
         if i == 1:
-            plt.xlabel('Start no. unreachable')
+            plt.xlabel('Difficulty')
         # only ylabel for left (first)
         if i == 0:
             if plot_let == 'a':            
@@ -543,7 +543,7 @@ def plot2ad(logdir, save_filename=None):
                 yerr=stds)
             lines += [l]
         # labels
-        plt.xlabel('Start no. unreachable')
+        plt.xlabel('Difficulty')
         # only ylabel for left (first)
         plt.ylabel(ylabels[r_idx])
         plt.axis([0.5, 5.5] + yranges[r_idx])
