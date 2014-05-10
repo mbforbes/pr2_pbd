@@ -1,0 +1,1 @@
+RecognizedSpeech[] RecognizedSpeechArray

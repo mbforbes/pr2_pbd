@@ -1,10 +1,19 @@
 <launch>
 
-  <node name="recognizer" pkg="pocketsphinx" type="recognizer.py" output="screen">
-    <param name="lm" value="$(find pr2_pbd_speech_recognition)/data/commands.lm"/>
-    <param name="dict" value="$(find pr2_pbd_speech_recognition)/data/commands.dic"/>
-  </node>
+	<!-- NOTE(max): Not using pocketsphinx for now; trying arbitrary text
+	   recognition using gspeech (Google's API). -->
+	<!-- 	<node name="recognizer" pkg="pocketsphinx" type="recognizer.py" output="screen">
+		<param name="lm" value="$(find pr2_pbd_speech_recognition)/data/full.lm"/>
+		<param name="dict" value="$(find pr2_pbd_speech_recognition)/data/full.dic"/>
+	</node>
+	-->
 
-  <node name="command_recognizer" pkg="pr2_pbd_speech_recognition" type="recognize_commands.py" output="screen"></node>
+	<!-- This launches the Google speech recognizer via a wrapper (gspeech) -->
+	<node name="gspeech" pkg="pr2_pbd_speech_recognition" type="recognize_speech.py" output="screen"></node>
+
+	<!-- This is our node to listen to recognized speech and process the
+	   results, either directly (default, w/ pocketsphinx), or sending
+	   the data off to the semantic NLP folks (w/ gspeech). -->
+	<node name="command_recognizer" pkg="pr2_pbd_speech_recognition" type="recognize_commands.py" output="screen"></node>
 
 </launch>
