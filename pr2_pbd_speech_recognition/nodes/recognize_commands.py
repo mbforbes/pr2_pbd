@@ -9,6 +9,7 @@ import rospy
 import requests
 
 # Local imports
+from robotstate import RobotState
 from std_msgs.msg import String
 from pr2_pbd_speech_recognition.msg import Command
 from pr2_pbd_speech_recognition.msg import RecognizedSpeech
@@ -23,6 +24,10 @@ class CommandRecognizer:
     command.'''
 
     def __init__(self):
+        # Construct RobotState so that it can track / return state info
+        # for smarter NLP processing.
+        self.robotState = RobotState()
+
         # Subscribe to pocketsphinx (if it exists).
         rospy.Subscriber('recognizer/output', String, self.receiveSphinxData)
 
@@ -58,29 +63,6 @@ class CommandRecognizer:
             Command.STOP_RECORDING_MOTION
         ]
 
-    def receiveGspeechData(self, recognizedSpeech):
-        '''Gspeech should recognize arbitrary speech. We'll then send
-        this to the NLP semantic-parsing pipeline.'''
-        params = {'sentence': recognizedSpeech.text}
-        print 'RECOGNIZER RETURNED:', recognizedSpeech.text
-        try:
-            response = requests.get('%s:%d' % (NLP_SERVER, NLP_PORT),
-                params=params).text.strip()
-            # Make sure we got something non-empty back.
-            print 'NLP RETURNED:', response
-            if len(response) > 0 and len(eval(response)) > 0:
-                cmd = eval(response)[0]
-                # Do sanity checking.
-                if cmd in self.allCommands:
-                    recognizedCommand = cmd
-                else:
-                    recognizedCommand = Command.UNRECOGNIZED
-                # Send it off
-                self.commandOutput.publish(Command(recognizedCommand))
-        except requests.exceptions.ConnectionError as e:
-            rospy.logwarn('NLP server not running. Dropping recognized ' +
-                'speech: ' + recognizedSpeech.text)
-
     def receiveSphinxData(self, data):
         '''Sphinx is trained only with the commands.'''
         print data
@@ -98,6 +80,33 @@ class CommandRecognizer:
         command = Command()
         command.command = recognizedCommand
         self.commandOutput.publish(command)
+
+    def receiveGspeechData(self, recognizedSpeech):
+        '''Gspeech should recognize arbitrary speech. We'll then send
+        this to the NLP semantic-parsing pipeline.'''
+        print '[NLP] Recognizer heard:', recognizedSpeech.text
+        params = {
+            'sentence': recognizedSpeech.text,
+            'state': self.robotState.getState()
+        }
+        print '[NLP] Robot state:', params
+        try:
+            response = requests.get('%s:%d' % (NLP_SERVER, NLP_PORT),
+                params=params).text.strip()
+            # Make sure we got something non-empty back.
+            print '[NLP] Semantically parsed:', response
+            if len(response) > 0 and len(eval(response)) > 0:
+                cmd = eval(response)[0]
+                # Do sanity checking.
+                if cmd in self.allCommands:
+                    recognizedCommand = cmd
+                else:
+                    recognizedCommand = Command.UNRECOGNIZED
+                # Send it off
+                self.commandOutput.publish(Command(recognizedCommand))
+        except requests.exceptions.ConnectionError as e:
+            rospy.logwarn('NLP server not running. Dropping recognized ' +
+                'speech: ' + recognizedSpeech.text)
 
 if __name__ == '__main__':
     rospy.init_node('command_recognizer')
