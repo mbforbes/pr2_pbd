@@ -88,7 +88,7 @@ class CommandRecognizer:
         print '[NLP] Recognizer heard:', recognizedSpeech.text
         params = {
             'sentence': recognizedSpeech.text,
-            'state': json.dumps(self.robotState.getState())
+            'state': json.dumps(self.robotState.get_state())
         }
         print '[NLP] Robot state:', params
         try:
