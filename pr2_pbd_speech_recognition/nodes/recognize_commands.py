@@ -6,6 +6,7 @@ roslib.load_manifest('pr2_pbd_speech_recognition')
 import rospy
 
 # 3rd party
+import json
 import requests
 
 # Local imports
@@ -87,7 +88,7 @@ class CommandRecognizer:
         print '[NLP] Recognizer heard:', recognizedSpeech.text
         params = {
             'sentence': recognizedSpeech.text,
-            'state': self.robotState.getState()
+            'state': json.dumps(self.robotState.getState())
         }
         print '[NLP] Robot state:', params
         try:
@@ -95,6 +96,7 @@ class CommandRecognizer:
                 params=params).text.strip()
             # Make sure we got something non-empty back.
             print '[NLP] Semantically parsed:', response
+            print
             if len(response) > 0 and len(eval(response)) > 0:
                 cmd = eval(response)[0]
                 # Do sanity checking.

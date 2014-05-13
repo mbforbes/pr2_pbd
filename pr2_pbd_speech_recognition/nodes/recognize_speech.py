@@ -83,8 +83,11 @@ def speech():
 
     args_recognize = shlex.split(cmd_recognize)
     while not rospy.is_shutdown():
+        print '[ASR] Listening...'
         os.system(cmd_record)
+        print '[ASR] Normalizing...'
         os.system(cmd_norm)
+        print '[ASR] Recognizing...'
         output, error = subprocess.Popen(
             args_recognize,
             stdout=subprocess.PIPE,
