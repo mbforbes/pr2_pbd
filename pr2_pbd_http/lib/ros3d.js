@@ -1,0 +1,1 @@
+/home/mbforbes/repos/ros3djs/build/ros3d.js

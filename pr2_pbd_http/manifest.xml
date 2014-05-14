@@ -1,0 +1,14 @@
+<package>
+  <description brief="pr2_pbd_http">
+
+     pr2_pbd_http
+
+  </description>
+  <author>Max</author>
+  <license>BSD</license>
+  <review status="unreviewed" notes=""/>
+  <url>http://ros.org/wiki/pr2_pbd_http</url>
+
+</package>
+
+
