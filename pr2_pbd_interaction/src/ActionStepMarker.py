@@ -5,7 +5,7 @@ roslib.load_manifest('pr2_pbd_interaction')
 import numpy
 import rospy
 import tf
-from pr2_pbd_interaction.msg import ActionStep, ArmState, Object, GripperState
+from pr2_pbd_msgs.msg import ActionStep, ArmState, Object, GripperState
 from geometry_msgs.msg import Quaternion, Vector3, Point, Pose
 from std_msgs.msg import Header, ColorRGBA
 from visualization_msgs.msg import Marker, InteractiveMarker

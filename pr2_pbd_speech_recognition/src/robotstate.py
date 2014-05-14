@@ -19,10 +19,11 @@ import rospy
 import time
 
 # Local imports.
-from pr2_pbd_speech_recognition.msg import Command
-from pr2_pbd_interaction.msg import Side
-from pr2_pbd_interaction.msg import GripperState, GripperStateChange
-from pr2_pbd_interaction.msg import ArmMode, ArmModeChange
+from pr2_pbd_msgs.msg import Command
+from pr2_pbd_msgs.msg import Side
+from pr2_pbd_msgs.msg import GripperState, GripperStateChange
+from pr2_pbd_msgs.msg import ArmMode, ArmModeChange
+from pr2_pbd_msgs.srv import GetGripperStates, GetArmModes
 
 ########################################################################
 # CONSTANTS

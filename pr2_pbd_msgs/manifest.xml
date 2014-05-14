@@ -9,6 +9,8 @@
   <review status="unreviewed" notes=""/>
   <url>http://ros.org/wiki/pr2_pbd_msgs</url>
 
+  <depend package="geometry_msgs"/>
+
 </package>
 
 

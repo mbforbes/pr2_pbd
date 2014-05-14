@@ -14,11 +14,11 @@ from python_qt_binding import QtGui,QtCore
 from python_qt_binding.QtGui import QWidget, QFrame
 from python_qt_binding.QtGui import QGroupBox, QIcon, QTableView
 from python_qt_binding.QtCore import Slot, qDebug, QSignalMapper, QTimer, qWarning, Signal
-from pr2_pbd_speech_recognition.msg import Command
-from pr2_pbd_interaction.msg import GuiCommand
+from pr2_pbd_msgs.msg import Command
+from pr2_pbd_msgs.msg import GuiCommand
 from sound_play.msg import SoundRequest
-from pr2_pbd_interaction.msg import ExperimentState
-from pr2_pbd_interaction.srv import GetExperimentState
+from pr2_pbd_msgs.msg import ExperimentState
+from pr2_pbd_msgs.srv import GetExperimentState
 
 
 class ClickableLabel(QtGui.QLabel):

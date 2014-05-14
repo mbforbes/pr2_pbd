@@ -25,6 +25,7 @@
   <depend package="pr2_interactive_object_detection"/>
   <depend package="pr2_mechanism_controllers"/>
   <depend package="pr2_mechanism_msgs"/>
+  <depend package="pr2_pbd_msgs"/>
   <depend package="pr2_pbd_speech_recognition"/>
   <depend package="pr2_social_gaze"/>
   <depend package="rospy"/>

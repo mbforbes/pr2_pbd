@@ -4,9 +4,9 @@ from ProgrammedAction import ProgrammedAction
 import rospy
 import os
 import yaml
-from pr2_pbd_interaction.msg import ExperimentState
-from pr2_pbd_interaction.srv import GetExperimentState
-from pr2_pbd_interaction.srv import GetExperimentStateResponse
+from pr2_pbd_msgs.msg import ExperimentState
+from pr2_pbd_msgs.srv import GetExperimentState
+from pr2_pbd_msgs.srv import GetExperimentStateResponse
 
 
 class Session:

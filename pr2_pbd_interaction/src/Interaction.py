@@ -15,11 +15,11 @@ from Session import Session
 from Response import Response
 from Arms import Arms
 from Arm import ArmMode
-from pr2_pbd_interaction.msg import ArmState, GripperState
-from pr2_pbd_interaction.msg import ActionStep, ArmTarget, Object
-from pr2_pbd_interaction.msg import GripperAction, ArmTrajectory
-from pr2_pbd_interaction.msg import ExecutionStatus, GuiCommand
-from pr2_pbd_speech_recognition.msg import Command
+from pr2_pbd_msgs.msg import ArmState, GripperState
+from pr2_pbd_msgs.msg import ActionStep, ArmTarget, Object
+from pr2_pbd_msgs.msg import GripperAction, ArmTrajectory
+from pr2_pbd_msgs.msg import ExecutionStatus, GuiCommand
+from pr2_pbd_msgs.msg import Command
 from pr2_social_gaze.msg import GazeGoal
 
 

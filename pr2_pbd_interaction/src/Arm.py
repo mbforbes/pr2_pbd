@@ -21,8 +21,8 @@ from sensor_msgs.msg import JointState
 from kinematics_msgs.srv import GetKinematicSolverInfo, GetPositionIK
 from kinematics_msgs.srv import GetPositionIKRequest
 from geometry_msgs.msg import Quaternion, Point, Pose
-from pr2_pbd_interaction.msg import GripperState, ArmMode, Side
-from pr2_pbd_interaction.msg import GripperStateChange, ArmModeChange
+from pr2_pbd_msgs.msg import GripperState, ArmMode, Side
+from pr2_pbd_msgs.msg import GripperStateChange, ArmModeChange
 from World import World
 
 

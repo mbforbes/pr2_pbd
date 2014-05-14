@@ -8,7 +8,7 @@ from pr2_social_gaze.msg import GazeGoal, GazeAction
 from sound_play.msg import SoundRequest
 from sound_play.libsoundplay import SoundClient
 import os
-from pr2_pbd_interaction.msg import RobotSound
+from pr2_pbd_msgs.msg import RobotSound
 
 
 class Response:
@@ -138,6 +138,6 @@ class Response:
             Response._sound_client.playWave(os.path.join(Response._sounds_dir,
                                               requested_sound + '.wav'))
         else:
-            Response._sound_client.playWave(os.path.join(Response._sounds_dir, 
+            Response._sound_client.playWave(os.path.join(Response._sounds_dir,
                                                          'OTHER.wav'))
 

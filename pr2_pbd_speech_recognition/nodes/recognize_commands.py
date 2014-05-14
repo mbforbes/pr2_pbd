@@ -12,8 +12,8 @@ import requests
 # Local imports
 from robotstate import RobotState
 from std_msgs.msg import String
-from pr2_pbd_speech_recognition.msg import Command
-from pr2_pbd_speech_recognition.msg import RecognizedSpeech
+from pr2_pbd_msgs.msg import Command
+from pr2_pbd_msgs.msg import RecognizedSpeech
 
 # Constants
 NLP_SERVER = 'http://robomackerel.cs.washington.edu'

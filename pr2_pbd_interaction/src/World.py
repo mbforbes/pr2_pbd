@@ -29,7 +29,7 @@ from actionlib_msgs.msg import GoalStatus
 import actionlib
 
 # Local stuff
-from pr2_pbd_interaction.msg import Object, ArmState
+from pr2_pbd_msgs.msg import Object, ArmState
 from pr2_social_gaze.msg import GazeGoal
 from Response import Response
 

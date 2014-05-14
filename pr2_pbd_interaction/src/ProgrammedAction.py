@@ -12,9 +12,9 @@ from visualization_msgs.msg import MarkerArray, Marker
 # ROS Libraries
 import rospy
 import rosbag
-from pr2_pbd_interaction.msg import ArmState, ActionStepSequence
-from pr2_pbd_interaction.msg import ActionStep, ArmTarget
-from pr2_pbd_interaction.msg import GripperAction, ArmTrajectory
+from pr2_pbd_msgs.msg import ArmState, ActionStepSequence
+from pr2_pbd_msgs.msg import ActionStep, ArmTarget
+from pr2_pbd_msgs.msg import GripperAction, ArmTrajectory
 from ActionStepMarker import ActionStepMarker
 from std_msgs.msg import Header, ColorRGBA
 

@@ -31,7 +31,7 @@ import subprocess
 import sys
 
 # Local imports
-from pr2_pbd_speech_recognition.msg import RecognizedSpeech
+from pr2_pbd_msgs.msg import RecognizedSpeech
 
 # Constants
 # ----------------------------------------------------------------------
@@ -109,6 +109,8 @@ def speech():
                 trans = str(top['transcript'])
             # Publish.
             pub.publish(RecognizedSpeech(trans, conf))
+        else:
+            print '[ASR] Recognizer got error:', error
 
 if __name__ == '__main__':
     rospy.init_node('gspeech')

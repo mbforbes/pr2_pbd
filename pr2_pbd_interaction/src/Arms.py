@@ -5,9 +5,10 @@ import rospy
 
 import time
 import threading
-from pr2_pbd_interaction.msg import ArmState, GripperState
-from pr2_pbd_interaction.msg import ActionStep, Side
-from pr2_pbd_interaction.msg import ExecutionStatus
+from pr2_pbd_msgs.msg import ArmState, GripperState
+from pr2_pbd_msgs.srv import GetGripperStates, GetArmModes
+from pr2_pbd_msgs.msg import ActionStep, Side
+from pr2_pbd_msgs.msg import ExecutionStatus
 from pr2_social_gaze.msg import GazeGoal
 from geometry_msgs.msg import Pose, Point
 from Response import Response
