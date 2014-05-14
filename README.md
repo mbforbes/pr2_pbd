@@ -5,10 +5,20 @@ This means there are lots of branches, and it can be hard to tell what is what.
 
 Git's branching system doesn't support branch descriptions, and branch names need to be concise, so the this `README.md` file in the root of the repository will contain information about the branch it's in.
 
-## branch: mock-objects
+## branch: mock-objects-http
 
 ### Purpose
-Run user studies with this branch.
+Run user studies on "true" crowd (MTurk) with this branch.
 
 ### Description
-This is the branch on which the Crowd PbD project is based. It serves as the "main branch" off of which most other code is branched. User studies may be run using this branch.
+We need to do some serious work before `mock-objects` is ready for "the crowd:"
+
+* GUI improvements (top 5 suggestions from user study)
+
+* Rviz &rarr; ros3djs ([website](http://robotwebtools.org/tools.html), [github](https://github.com/RobotWebTools/ros3djs))
+
+* RQT &rarr; HTML/CSS/JS; also need roslibjs ([website](http://robotwebtools.org/tools.html), [github](https://github.com/RobotWebTools/roslibjs))
+
+* ROS on servers (AWS?)
+
+This was branched directly off of `mock-objects`.
