@@ -26,7 +26,7 @@ class Arms:
         self.attended_arm = -1
         self.action = None
         self.preempt = False
-	self.z_offset = 0
+        self.z_offset = 0
 
         rospy.loginfo('Arms have been initialized.')
 
@@ -37,6 +37,38 @@ class Arms:
         Arms.arms[Side.RIGHT].close_gripper()
         Arms.arms[Side.LEFT].close_gripper()
         self.status = ExecutionStatus.NOT_EXECUTING
+
+        # NOTE(max): Provide services for querying arm modes and gripper
+        # states.
+        rospy.Service('get_gripper_states', GetGripperStates,
+            'get_gripper_states_cb')
+        rospy.Service('get_arm_modes', GetArmModes, 'get_arm_modes_cb')
+
+    def get_gripper_states_cb(self, getGripperStatesRequest):
+        '''Callback for getting gripper states.
+
+        Args:
+            getGripperStatesRequest (GetGripperStatesRequest): unused
+
+        Returns:
+            GetGripperStatesResponse
+        '''
+        return GetGripperStatesResponse(
+            Arms.arms[Side.LEFT].get_gripper_state(),
+            Arms.arms[Side.RIGHT].get_gripper_state())
+
+    def get_arm_modes_cb(self, getArmModesRequest):
+        '''Callback for getting arm modes.
+
+        Args:
+            getArmModesRequest (GetArmModesRequest): unused
+
+        Returns:
+            GetArmModesResponse
+        '''
+        return GetArmModesResponse(
+            Arms.arms[Side.LEFT].get_mode(),
+            Arms.arms[Side.RIGHT].get_mode())
 
     @staticmethod
     def set_arm_mode(arm_index, mode):
@@ -70,7 +102,7 @@ class Arms:
         # This will take long, create a thread
         self.action = action.copy()
         self.preempt = False
-	self.z_offset = z_offset
+        self.z_offset = z_offset
         thread = threading.Thread(group=None, target=self.execute_action,
                                   name='skill_execution_thread')
         thread.start()

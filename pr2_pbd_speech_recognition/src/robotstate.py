@@ -20,7 +20,9 @@ import time
 
 # Local imports.
 from pr2_pbd_speech_recognition.msg import Command
-
+from pr2_pbd_interaction.msg import Side
+from pr2_pbd_interaction.msg import GripperState, GripperStateChange
+from pr2_pbd_interaction.msg import ArmMode, ArmModeChange
 
 ########################################################################
 # CONSTANTS
@@ -150,6 +152,10 @@ class RobotState:
     def __init__(self):
         # Subscribe to relevant messages for state updates.
         rospy.Subscriber('recognized_command', Command, self.command_cb)
+        rospy.Subscriber('gripper_state_change', GripperStateChange,
+            self.gripper_state_change_cb)
+        rospy.Subscriber('arm_mode_change', ArmModeChange,
+            self.arm_mode_change_cb)
 
         # NOTE(max): We're not subscribing to (gui_command, GuiCommand)
         # because we're assuming only speech interaction for this study.
@@ -164,6 +170,24 @@ class RobotState:
         for val in self.obj_dict.itervalues():
             val['last-referred'] = construct_time
             val['last-changed'] = construct_time
+
+        # Initialize gripper states and arm modes by calling an Arms
+        # service.
+        self.gripper_states = [0, 0]
+        rospy.wait_for_service('get_gripper_states')
+        gripper_states_srv = rospy.ServiceProxy(
+            'get_gripper_states', GetGripperStates)
+        grips = gripper_states_srv()
+        self.gripper_states[Side.LEFT] = grips.left
+        self.gripper_states[Side.RIGHT] = grips.right
+
+        self.arm_modes = [0, 0]
+        rospy.wait_for_service('get_arm_modes')
+        arm_modes_srv = rospy.ServiceProxy(
+            'get_arm_modes', GetArmModes)
+        modes = arm_modes_srv()
+        self.arm_modes[Side.LEFT] = modes.left
+        self.arm_modes[Side.RIGHT] = modes.right
 
     ####################################################################
     # STATE-GETTING FUNCTIONS
@@ -335,6 +359,7 @@ class RobotState:
 
         returns string Obj
         '''
+        return 'NULL'
         return self.get_most_recent_selector('last-changed',
             list(self.obj_dict.iteritems()))
 
@@ -344,6 +369,7 @@ class RobotState:
 
         returns {string: string} (Map<String, Obj>)
         '''
+        return {}
         return self.get_last_x_by_y('last-changed', 'property')
 
     def get_last_changed_obj_by_type(self):
@@ -352,6 +378,7 @@ class RobotState:
 
         returns {string: string} (Map<String, Obj>)
         '''
+        return {}
         return self.get_last_x_by_y('last-changed', 'type')
 
     def get_last_referred(self):
@@ -384,8 +411,14 @@ class RobotState:
 
         returns {string: string} (Map<Obj, String>)
         '''
-        # TODO(max): Implement.
-        return {}
+        return {
+            'right-hand': self.gripper_state_str(
+                self.gripper_states[Side.RIGHT]),
+            'left-hand': self.gripper_state_str(
+                self.gripper_states[Side.LEFT]),
+            'right-arm': self.arm_mode_str(self.arm_modes[Side.RIGHT]),
+            'left-arm': self.arm_mode_str(self.arm_modes[Side.LEFT])
+        }
 
     ####################################################################
     # STATE-GETTING UTILITY FUNCTIONS
@@ -424,7 +457,6 @@ class RobotState:
         # So, just going for a loop.
         last_time = 0 # OK baseline as default is construct time (> 0)
         for t in tuples:
-            print t
             key, val = t[0], t[1]
             if val[selector] > last_time:
                 best_key = key
@@ -441,6 +473,30 @@ class RobotState:
         return list(set([val[y] for val in self.obj_dict.itervalues()
             if val[y] is not None]))
 
+    def gripper_state_str(self, gripper_state):
+        '''Takes a gripper state integer and turns it into a string.
+
+        Args:
+            gripper_state (int): GripperState.OPEN | GripperState.CLOSED
+
+        Returns:
+            string: 'open' | 'closed'
+        '''
+        return ('open' if gripper_state == GripperState.OPEN else
+            'closed')
+
+    def arm_mode_str(self, arm_mode):
+        '''Takes an arm mode and turns it into a string.
+
+        Args:
+            arm_mode (int): ArmMode.RELEASE | ArmMode.HOLD
+
+        Returns:
+            string: 'frozen' | 'relaxed'
+        '''
+        return ('frozen' if arm_mode == ArmMode.HOLD else
+            'relaxed')
+
     ####################################################################
     # MESSAGE LISTENER / ROBOT-RESPONSIVE FUNCTIONS
     ####################################################################
@@ -455,5 +511,40 @@ class RobotState:
         if nlp_obj is not '':
             now = time.time()
             self.obj_dict[nlp_obj]['last-referred'] = now
-            # TODO(max): Is referring also considered changing?
-            self.obj_dict[nlp_obj]['last-changed'] = now
+
+    def gripper_state_change_cb(self, gripperStateChange):
+        '''Callback for when the robot's gripper state changes (only
+        when it actually happens; open -> open won't trigger this, for
+        example)
+
+        Args:
+            gripperStateChange (GripperStateChange
+                [GripperStateChange.msg])
+        '''
+        # Set this object as changed.
+        now = time.time()
+        if gripperStateChange.side == Side.LEFT:
+            self.obj_dict['left-hand']['last-changed'] = now
+        else:
+            self.obj_dict['right-hand']['last-changed'] = now
+
+        # Change the saved state.
+        self.gripper_states[gripperStateChange.side] = gripperStateChange.state
+
+    def arm_mode_change_cb(self, armModeChange):
+        '''Callback for when the robot's arm mode changes (only when it
+        actually happens; relaxed -> relaxed won't trigger this, for
+        example)
+
+        Args:
+            armModeChange (ArmModeChange [ArmModeChange.msg])
+        '''
+        # Set this object as changed.
+        now = time.time()
+        if armModeChange.side == Side.LEFT:
+            self.obj_dict['left-arm']['last-changed'] = now
+        else:
+            self.obj_dict['right-arm']['last-changed'] = now
+
+        # Change saved state
+        self.arm_modes[armModeChange.side] = armModeChange.mode

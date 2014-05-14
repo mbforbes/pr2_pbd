@@ -22,6 +22,7 @@ from kinematics_msgs.srv import GetKinematicSolverInfo, GetPositionIK
 from kinematics_msgs.srv import GetPositionIKRequest
 from geometry_msgs.msg import Quaternion, Point, Pose
 from pr2_pbd_interaction.msg import GripperState, ArmMode, Side
+from pr2_pbd_interaction.msg import GripperStateChange, ArmModeChange
 from World import World
 
 
@@ -86,6 +87,13 @@ class Arm:
         self.gripper_client.wait_for_server()
         rospy.loginfo('Got response form gripper server for '
                       + self._side() + ' arm.')
+
+        # NOTE(max): Adding this to easily publish gripper state and arm
+        # mode when they change to robot state.
+        self.gripper_pub = rospy.Publisher('gripper_state_change',
+            GripperStateChange)
+        self.arm_pub = rospy.Publisher('arm_mode_change',
+            ArmModeChange)
 
         filter_srv_name = '/trajectory_filter/filter_trajectory'
         rospy.wait_for_service(filter_srv_name)
@@ -229,6 +237,7 @@ class Arm:
         try:
             self.switch_service(start_controllers, stop_controllers, 1)
             self.arm_mode = mode
+            self.arm_pub.publish(ArmModeChange(self.arm_index, mode))
         except rospy.ServiceException:
             rospy.logerr("Service did not process request")
 
@@ -275,11 +284,15 @@ class Arm:
         '''Opens gripper'''
         self._send_gripper_command(pos, eff, wait)
         self.gripper_state = GripperState.OPEN
+        self.gripper_pub.publish(GripperStateChange(self.arm_index,
+            GripperState.OPEN))
 
     def close_gripper(self, pos=0.0, eff=30.0, wait=False):
         '''Closes gripper'''
         self._send_gripper_command(pos, eff, wait)
         self.gripper_state = GripperState.CLOSED
+        self.gripper_pub.publish(GripperStateChange(self.arm_index,
+            GripperState.CLOSED))
 
     def set_gripper(self, gripper_state):
         '''Sets gripper to the desired state'''

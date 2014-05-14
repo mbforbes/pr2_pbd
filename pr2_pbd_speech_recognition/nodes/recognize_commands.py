@@ -16,7 +16,7 @@ from pr2_pbd_speech_recognition.msg import Command
 from pr2_pbd_speech_recognition.msg import RecognizedSpeech
 
 # Constants
-NLP_SERVER = 'http://localhost'
+NLP_SERVER = 'http://robomackerel.cs.washington.edu'
 NLP_PORT = 10001
 
 class CommandRecognizer:
@@ -97,7 +97,8 @@ class CommandRecognizer:
             # Make sure we got something non-empty back.
             print '[NLP] Semantically parsed:', response
             print
-            if len(response) > 0 and len(eval(response)) > 0:
+            if len(response) > 0 and response != 'Error: 500' and \
+                    len(eval(response)) > 0:
                 cmd = eval(response)[0]
                 # Do sanity checking.
                 if cmd in self.allCommands:
