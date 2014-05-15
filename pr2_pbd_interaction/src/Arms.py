@@ -56,8 +56,8 @@ class Arms:
             GetGripperStatesResponse
         '''
         return GetGripperStatesResponse(
-            Arms.arms[Side.LEFT].get_gripper_state(),
-            Arms.arms[Side.RIGHT].get_gripper_state())
+            GripperState(Arms.arms[Side.LEFT].get_gripper_state()),
+            GripperState(Arms.arms[Side.RIGHT].get_gripper_state()))
 
     def get_arm_modes_cb(self, getArmModesRequest):
         '''Callback for getting arm modes.
@@ -69,8 +69,8 @@ class Arms:
             GetArmModesResponse
         '''
         return GetArmModesResponse(
-            Arms.arms[Side.LEFT].get_mode(),
-            Arms.arms[Side.RIGHT].get_mode())
+            ArmMode(Arms.arms[Side.LEFT].get_mode()),
+            ArmMode(Arms.arms[Side.RIGHT].get_mode()))
 
     @staticmethod
     def set_arm_mode(arm_index, mode):

@@ -237,7 +237,9 @@ class Arm:
         try:
             self.switch_service(start_controllers, stop_controllers, 1)
             self.arm_mode = mode
-            self.arm_pub.publish(ArmModeChange(self.arm_index, mode))
+            self.arm_pub.publish(ArmModeChange(
+                Side(self.arm_index),
+                ArmMode(mode)))
         except rospy.ServiceException:
             rospy.logerr("Service did not process request")
 
@@ -284,8 +286,9 @@ class Arm:
         '''Opens gripper'''
         self._send_gripper_command(pos, eff, wait)
         self.gripper_state = GripperState.OPEN
-        self.gripper_pub.publish(GripperStateChange(self.arm_index,
-            GripperState.OPEN))
+        self.gripper_pub.publish(GripperStateChange(
+            Side(self.arm_index),
+            GripperState(GripperState.OPEN)))
 
     def close_gripper(self, pos=0.0, eff=30.0, wait=False):
         '''Closes gripper'''

@@ -8,8 +8,13 @@
 	</node>
 	-->
 
-	<!-- This launches the Google speech recognizer via a wrapper (gspeech) -->
-	<node name="gspeech" pkg="pr2_pbd_speech_recognition" type="recognize_speech.py" output="screen"></node>
+	<!-- This launches the Google speech recognizer API caller via a wrapper (gspeech) -->
+	<!--
+	<node name="gspeech" pkg="pr2_pbd_speech_recognition" type="recognize_speech_api.py" output="screen"></node>p
+	-->
+
+	<!-- This launches the chrome Google speech recognizer via a wrapper (chrome) -->
+	<node name="chromeASR" pkg="pr2_pbd_speech_recognition" type="recognize_speech_chrome.py" output="screen"></node>
 
 	<!-- This is our node to listen to recognized speech and process the
 	   results, either directly (default, w/ pocketsphinx), or sending

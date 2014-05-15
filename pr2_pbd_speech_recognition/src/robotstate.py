@@ -29,88 +29,69 @@ from pr2_pbd_msgs.srv import GetGripperStates, GetArmModes
 # CONSTANTS
 ########################################################################
 
-# Each object is composed of a type and optionally a property.
+# Each object is composed of one or more properties.
 OBJ_DICT = {
-    # No properties
+    # One property
     # -------------
     'execution': {
-        'type': 'execution',
-        'property': None
+        'properties': ['execution']
     },
     'microphone': {
-        'type': 'microphone',
-        'property': None
+        'properties': ['microphone']
     },
     'motion': {
-        'type': 'motion',
-        'property': None
+        'properties': ['motion']
     },
-
-    # One property
-    # ------------
-    'command': {
-        'type': 'command',
-        'property': 'last'
+    'action': {
+        'properties': ['action']
+    },
+    'pose': {
+        'properties': ['pose']
     },
 
     # Multiple properties
     # -------------------
+    # Misc
+    'command': {
+        'properties': ['last', 'command']
+    },
+    'object-pose': {
+        'properties': ['pose', 'object']
+    },
+
     # Hands
     'right-hand': {
-        'type': 'hand',
-        'property': 'right'
+        'properties': ['right', 'hand']
     },
     'left-hand': {
-        'type': 'hand',
-        'property': 'left'
+        'properties': ['left', 'hand']
     },
 
     # Arms
     'right-arm': {
-        'type': 'arm',
-        'property': 'right'
+        'properties': ['right', 'arm']
     },
     'left-arm': {
-        'type': 'arm',
-        'property': 'left'
+        'properties': ['left', 'arm']
     },
 
     # Actions
     'new-action': {
-        'type': 'action',
-        'property': 'new'
+        'properties': ['new', 'action']
     },
     'next-action': {
-        'type': 'action',
-        'property': 'next'
+        'properties': ['next', 'action']
     },
     'previous-action': {
-        'type': 'action',
-        'property': 'previous'
-    },
-    'action': {
-        'type': 'action',
-        'property': None
-    },
-
-    # Poses
-    'object-pose': {
-        'type': 'pose',
-        'property': 'object'
-    },
-    'pose': {
-        'type': 'pose',
-        'property': None
+        'properties': ['previous', 'action']
     },
 
     # Steps
     'all-step': {
-        'type': 'step',
-        'property': 'all'
+        'properties': ['all', 'step']
     },
     'last-step': {
-        'type': 'step',
-        'property': 'last'
+        'properties': ['last', 'step']
     },
 }
 
@@ -234,14 +215,6 @@ class RobotState:
 
 
         /**
-         * For each {@link Obj#getLabel()}, the last object that changed its state.
-         */
-        private final Map<String, Obj>  lastChangedObjByType;
-
-        arm: left-arm || right-arm
-
-
-        /**
          * The last object in the system that was referred by the user.
          */
         private final Obj               lastReferred;
@@ -256,16 +229,6 @@ class RobotState:
         for all objects that include this property, which was the most
         recently referred to
 
-
-        /**
-         * For each {@link Obj#getLabel()}, the last object referred to by the user.
-         */
-        private final Map<String, Obj>  lastReferredByType;
-
-        for all objects that include this type, which was the most
-        recently referred to
-
-
         /**
          * For each {@link Obj} the current state.
          */
@@ -276,85 +239,32 @@ class RobotState:
         - exection: started / stopped
 
 
-        Enumeration of possibilities
-        ============================
+        Here's the list of all objects in the system and their properties:
+        microphone --> [microphone]
+        right-arm --> [right, arm]
+        left-arm --> [left, arm]
+        left-hand --> [left, hand]
+        right-hand --> [right, hand]
+        execution --> [execution]
+        last-command --> [last, command]
+        all-steps --> [all, step]
+        last-step --> [last, step]
+        object-pose --> [pose, object]
+        new-action --> [new, action]
+        next-action --> [next, action]
+        previous-action --> [previous, action]
+        action --> [action]
+        pose --> [pose]
+        motion --> [motion]
 
-        Objects (16):
-        -------------
-        left-hand
-        execution
-        right-arm
-        last-command
-        new-action
-        action
-        microphone
-        left-arm
-        next-action
-        motion
-        pose
-        object-pose
-        right-hand
-        last-step
-        previous-action
-        all-step
+        The names of the two maps are:
+        lastChangedByProperty
+        lastReferredByProperty
 
-        Types (9):
-        ----------
-        execution
-        motion
-        pose
-        action
-        step
-        microphone
-        arm
-        command
-        hand
-
-        Properties (8):
-        ---------------
-        next
-        all
-        new
-        last
-        previous
-        left
-        right
-        object
-
-
-        How types & properties combine to form objects:
-        ===============================================
-
-        No combination (3)
-        ------------------
-        - execution
-        - microphone
-        - motion
-
-        Only one combination (1)
-        ------------------------
-        - command
-            - last
-
-        Multiple combinations (12)
-        --------------------------
-        - hand
-            - left
-            - right
-        - arm
-            - left
-            - right
-        - action
-            - new
-            - next
-            - previous
-            - ''
-        - pose
-            - ''
-            - object
-        - step
-            - all
-            - last
+        In addition, the state should still include:
+        lastReferred
+        lastChanged
+        stateByObj
 
 
         When something's not implemented:
@@ -365,10 +275,8 @@ class RobotState:
         return {
             'lastChanged': self.get_last_changed(),
             'lastChangedByProperty': self.get_last_changed_by_property(),
-            'lastChangedObjByType': self.get_last_changed_obj_by_type(),
             'lastReferred': self.get_last_referred(),
             'lastReferredByProperty': self.get_last_referred_by_property(),
-            'lastReferredByType': self.get_last_referred_by_type(),
             'stateByObj': self.get_state_by_obj()
         }
 
@@ -377,7 +285,6 @@ class RobotState:
 
         returns string Obj
         '''
-        return 'NULL'
         return self.get_most_recent_selector('last-changed',
             list(self.obj_dict.iteritems()))
 
@@ -387,17 +294,7 @@ class RobotState:
 
         returns {string: string} (Map<String, Obj>)
         '''
-        return {}
-        return self.get_last_x_by_y('last-changed', 'property')
-
-    def get_last_changed_obj_by_type(self):
-        '''For each {@link Obj#getLabel()}, the last object that changed
-        its state.
-
-        returns {string: string} (Map<String, Obj>)
-        '''
-        return {}
-        return self.get_last_x_by_y('last-changed', 'type')
+        return self.get_last_x_by_property('last-changed')
 
     def get_last_referred(self):
         '''The last object in the system that was referred by the user.
@@ -413,16 +310,7 @@ class RobotState:
 
         returns {string: string} (Map<String, Obj>)
         '''
-        return self.get_last_x_by_y('last-referred', 'property')
-
-    def get_last_referred_by_type(self):
-        '''
-        For each {@link Obj#getLabel()}, the last object referred to by
-        the user.
-
-        returns {string: string} (Map<String, Obj>)
-        '''
-        return self.get_last_x_by_y('last-referred', 'type')
+        return self.get_last_x_by_property('last-referred')
 
     def get_state_by_obj(self):
         '''For each {@link Obj} the current state.
@@ -442,18 +330,17 @@ class RobotState:
     # STATE-GETTING UTILITY FUNCTIONS
     ####################################################################
 
-    def get_last_x_by_y(self, x, y):
+    def get_last_x_by_property(self, x):
         '''Generalized accessor.
 
         Args:
             x (string): 'last-referred' | 'last-changed'
-            y (string): 'property' | 'type'
         '''
         res = {}
-        for y_item in self.get_ys(y):
+        for prop in self.get_properties():
             tuples = [pair for pair in self.obj_dict.iteritems()
-                if pair[1][y] == y_item]
-            res[y_item] = self.get_most_recent_selector(x, tuples)
+                    if prop in pair[1]['properties']]
+            res[prop] = self.get_most_recent_selector(x, tuples)
         return res
 
     def get_most_recent_selector(self, selector, tuples):
@@ -481,15 +368,16 @@ class RobotState:
                 last_time = val[selector]
         return best_key
 
-    def get_ys(self, y):
-        '''Returns a list of all of the properties or types
-        (pass as y).
+    def get_properties(self):
+        '''Returns a list of all of the properties.
 
-        Args:
-            y (string): 'property' | 'type'
+        Returns:
+            list(str)
         '''
-        return list(set([val[y] for val in self.obj_dict.itervalues()
-            if val[y] is not None]))
+        all_props = set()
+        for val in self.obj_dict.itervalues():
+            all_props = all_props.union(set(val['properties']))
+        return list(all_props)
 
     def gripper_state_str(self, gripper_state):
         '''Takes a gripper state integer and turns it into a string.
@@ -547,7 +435,8 @@ class RobotState:
             self.obj_dict['right-hand']['last-changed'] = now
 
         # Change the saved state.
-        self.gripper_states[gripperStateChange.side] = gripperStateChange.state
+        self.gripper_states[gripperStateChange.side.side] = \
+                gripperStateChange.state
 
     def arm_mode_change_cb(self, armModeChange):
         '''Callback for when the robot's arm mode changes (only when it
@@ -565,4 +454,4 @@ class RobotState:
             self.obj_dict['right-arm']['last-changed'] = now
 
         # Change saved state
-        self.arm_modes[armModeChange.side] = armModeChange.mode
+        self.arm_modes[armModeChange.side.side] = armModeChange.mode
