@@ -294,8 +294,9 @@ class Arm:
         '''Closes gripper'''
         self._send_gripper_command(pos, eff, wait)
         self.gripper_state = GripperState.CLOSED
-        self.gripper_pub.publish(GripperStateChange(self.arm_index,
-            GripperState.CLOSED))
+        self.gripper_pub.publish(GripperStateChange(
+            Side(self.arm_index),
+            GripperState(GripperState.CLOSED)))
 
     def set_gripper(self, gripper_state):
         '''Sets gripper to the desired state'''
