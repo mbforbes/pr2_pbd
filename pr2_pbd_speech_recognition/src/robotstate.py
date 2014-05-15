@@ -174,21 +174,38 @@ class RobotState:
 
         # Initialize gripper states and arm modes by calling an Arms
         # service.
-        self.gripper_states = [0, 0]
+        # TODO(max): Hack: initialize to ArmMode.HOLD as that's what
+        # Arms.py does; when service works, can remove.
+        self.gripper_states = [ArmMode.HOLD, ArmMode.HOLD]
         rospy.wait_for_service('get_gripper_states')
         gripper_states_srv = rospy.ServiceProxy(
             'get_gripper_states', GetGripperStates)
-        grips = gripper_states_srv()
-        self.gripper_states[Side.LEFT] = grips.left
-        self.gripper_states[Side.RIGHT] = grips.right
+        print 'gripper_states_srv:', gripper_states_srv
+        print '\ttype:', type(gripper_states_srv)
+        try:
+            grips = gripper_states_srv()
+            self.gripper_states[Side.LEFT] = grips.left
+            self.gripper_states[Side.RIGHT] = grips.right
+        except rospy.ServiceException as exc:
+            print ('get_gripper_states service could not process ' +
+                'request: ', exc)
 
-        self.arm_modes = [0, 0]
+        # TODO(max): Hack: initialize to GripperState.CLOSED as that's
+        # what Arms.py does; when service works, can remove.
+        self.arm_modes = [GripperState.CLOSED, GripperState.CLOSED]
         rospy.wait_for_service('get_arm_modes')
         arm_modes_srv = rospy.ServiceProxy(
             'get_arm_modes', GetArmModes)
-        modes = arm_modes_srv()
-        self.arm_modes[Side.LEFT] = modes.left
-        self.arm_modes[Side.RIGHT] = modes.right
+        print 'arm_modes_srv:', arm_modes_srv
+        print '\ttype:', type(arm_modes_srv)
+        try:
+            modes = arm_modes_srv()
+            self.arm_modes[Side.LEFT] = modes.left
+            self.arm_modes[Side.RIGHT] = modes.right
+        except rospy.ServiceException as exc:
+            print ('get_arm_modes service could not process ' +
+                'request: ', exc)
+
 
     ####################################################################
     # STATE-GETTING FUNCTIONS

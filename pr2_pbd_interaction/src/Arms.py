@@ -6,7 +6,8 @@ import rospy
 import time
 import threading
 from pr2_pbd_msgs.msg import ArmState, GripperState
-from pr2_pbd_msgs.srv import GetGripperStates, GetArmModes
+from pr2_pbd_msgs.srv import GetGripperStates, GetGripperStatesResponse
+from pr2_pbd_msgs.srv import GetArmModes, GetArmModesResponse
 from pr2_pbd_msgs.msg import ActionStep, Side
 from pr2_pbd_msgs.msg import ExecutionStatus
 from pr2_social_gaze.msg import GazeGoal

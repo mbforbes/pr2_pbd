@@ -18,20 +18,12 @@
 # 5/9/2014
 # m.b.forbes@gmail.com
 
-# ROS imports first
-import roslib
-roslib.load_manifest('pr2_pbd_speech_recognition')
-import rospy
-
 # System imports
 import json
 import os
 import shlex
 import subprocess
 import sys
-
-# Local imports
-from pr2_pbd_msgs.msg import RecognizedSpeech
 
 # Constants
 # ----------------------------------------------------------------------
@@ -78,11 +70,9 @@ cmd_norm='sox ' + FILENAME_BASE + ' ' + FILENAME_NORMED + ' gain -n -3'
 
 def speech():
     '''Runs in a loop to recognize speech and publish the result.'''
-    rospy.init_node('gspeech')
-    pub = rospy.Publisher('gspeech/output', RecognizedSpeech)
 
     args_recognize = shlex.split(cmd_recognize)
-    while not rospy.is_shutdown():
+    while True:
         print '[ASR] Listening...'
         os.system(cmd_record)
         print '[ASR] Normalizing...'
@@ -110,14 +100,12 @@ def speech():
                     conf = DEFAULT_CONFIDENCE
                 trans = str(top['transcript'])
             # Publish.
-            pub.publish(RecognizedSpeech(trans, conf))
+            print trans, conf
         else:
             print '[ASR] Recognizer got error:', error
 
 if __name__ == '__main__':
-    rospy.init_node('gspeech')
     try:
         speech()
-    except rospy.ROSInterruptException: pass
     except KeyboardInterrupt:
         sys.exit(1)
