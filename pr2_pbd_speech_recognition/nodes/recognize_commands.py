@@ -86,11 +86,15 @@ class CommandRecognizer:
         '''Gspeech should recognize arbitrary speech. We'll then send
         this to the NLP semantic-parsing pipeline.'''
         print '[NLP] Recognizer heard:', recognizedSpeech.text
+        state = self.robotState.get_state()
         params = {
             'sentence': recognizedSpeech.text,
-            'state': json.dumps(self.robotState.get_state())
+            'state': json.dumps(state)
         }
-        print '[NLP] Robot state:', params
+        # DEBUG: print robot state
+        print '[NLP] Robot state:'
+        for line in json.dumps(state, sort_keys=False, indent=4).splitlines():
+            print '[NLP]', line
         try:
             response = requests.get('%s:%d' % (NLP_SERVER, NLP_PORT),
                 params=params).text.strip()

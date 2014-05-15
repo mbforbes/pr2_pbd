@@ -16,6 +16,7 @@ roslib.load_manifest('pr2_pbd_speech_recognition')
 import rospy
 
 # Standard library imports.
+import pprint
 import time
 
 # Local imports.
@@ -153,11 +154,13 @@ class RobotState:
             val['last-referred'] = construct_time
             val['last-changed'] = construct_time
 
+
+        # Default gripper states / arm modes.
+        self.gripper_states = [ArmMode.HOLD, ArmMode.HOLD]
+        self.arm_modes = [GripperState.CLOSED, GripperState.CLOSED]
+
         # Initialize gripper states and arm modes by calling an Arms
         # service.
-        # TODO(max): Hack: initialize to ArmMode.HOLD as that's what
-        # Arms.py does; when service works, can remove.
-        self.gripper_states = [ArmMode.HOLD, ArmMode.HOLD]
         rospy.wait_for_service('get_gripper_states')
         gripper_states_srv = rospy.ServiceProxy(
             'get_gripper_states', GetGripperStates)
@@ -171,9 +174,6 @@ class RobotState:
             print ('get_gripper_states service could not process ' +
                 'request: ', exc)
 
-        # TODO(max): Hack: initialize to GripperState.CLOSED as that's
-        # what Arms.py does; when service works, can remove.
-        self.arm_modes = [GripperState.CLOSED, GripperState.CLOSED]
         rospy.wait_for_service('get_arm_modes')
         arm_modes_srv = rospy.ServiceProxy(
             'get_arm_modes', GetArmModes)
@@ -320,9 +320,9 @@ class RobotState:
         return {
             'right-hand': self.gripper_state_str(
                 self.gripper_states[Side.RIGHT]),
+            'right-arm': self.arm_mode_str(self.arm_modes[Side.RIGHT]),
             'left-hand': self.gripper_state_str(
                 self.gripper_states[Side.LEFT]),
-            'right-arm': self.arm_mode_str(self.arm_modes[Side.RIGHT]),
             'left-arm': self.arm_mode_str(self.arm_modes[Side.LEFT])
         }
 
@@ -429,14 +429,18 @@ class RobotState:
         '''
         # Set this object as changed.
         now = time.time()
-        if gripperStateChange.side == Side.LEFT:
+        side_raw = gripperStateChange.side.side
+        state_raw = gripperStateChange.state.state
+        if side_raw == Side.LEFT:
             self.obj_dict['left-hand']['last-changed'] = now
+            print '[STATE] left-hand (gripper) most recent'
         else:
             self.obj_dict['right-hand']['last-changed'] = now
+            print '[STATE] right-hand (gripper) most recent'
 
         # Change the saved state.
-        self.gripper_states[gripperStateChange.side.side] = \
-                gripperStateChange.state
+        self.gripper_states[side_raw] = state_raw
+        print '[STATE] new gripper states:', self.gripper_states
 
     def arm_mode_change_cb(self, armModeChange):
         '''Callback for when the robot's arm mode changes (only when it
@@ -448,10 +452,15 @@ class RobotState:
         '''
         # Set this object as changed.
         now = time.time()
-        if armModeChange.side == Side.LEFT:
+        side_raw = armModeChange.side.side
+        mode_raw = armModeChange.mode.mode
+        if side_raw == Side.LEFT:
             self.obj_dict['left-arm']['last-changed'] = now
+            print '[STATE] left-arm (mode) most recent'
         else:
             self.obj_dict['right-arm']['last-changed'] = now
+            print '[STATE] right-arm (mode) most recent'
 
         # Change saved state
-        self.arm_modes[armModeChange.side.side] = armModeChange.mode
+        self.arm_modes[side_raw] = mode_raw
+        print '[STATE] new arm modes:', self.arm_modes
