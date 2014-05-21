@@ -8,6 +8,7 @@ import threading
 from pr2_pbd_msgs.msg import ArmState, GripperState
 from pr2_pbd_msgs.srv import GetGripperStates, GetGripperStatesResponse
 from pr2_pbd_msgs.srv import GetArmModes, GetArmModesResponse
+from pr2_pbd_msgs.srv import GetExecutionStatus, GetExecutionStatusResponse
 from pr2_pbd_msgs.msg import ActionStep, Side
 from pr2_pbd_msgs.msg import ExecutionStatus
 from pr2_social_gaze.msg import GazeGoal
@@ -40,11 +41,26 @@ class Arms:
         Arms.arms[Side.LEFT].close_gripper()
         self.status = ExecutionStatus.NOT_EXECUTING
 
-        # NOTE(max): Provide services for querying arm modes and gripper
-        # states.
+        # NOTE(max): Provide services for querying arm modes, gripper
+        # states, and execution status.
         rospy.Service('get_gripper_states', GetGripperStates,
             'get_gripper_states_cb')
         rospy.Service('get_arm_modes', GetArmModes, 'get_arm_modes_cb')
+        rospy.Service('get_execution_status', GetExecutionStatus,
+            'get_execution_status_cb')
+        self.status_pub = rospy.Publisher('execution_status', ExecutionStatus)
+
+    def get_execution_status_cb(self, getExecutionStatusRequest):
+        '''Callback for getting execution status.
+
+        Args:
+            getExecutionStatusRequest (GetExecutionStatusRequest):
+                unused
+
+        Returns:
+            GetExecutionStatusResponse
+        '''
+        return GetExecutionStatusResponse(ExecutionStatus(self.status))
 
     def get_gripper_states_cb(self, getGripperStatesRequest):
         '''Callback for getting gripper states.
@@ -112,6 +128,16 @@ class Arms:
     def stop_execution(self):
         '''Preempts an ongoing execution'''
         self.preempt = True
+
+    def change_status(self, new_status):
+        '''Changes the execution status and publishes that this has been
+        done.
+
+        Args:
+            new_status (int): One of ExecutionStatus.X constants.
+        '''
+        self.status = new_status
+        self.status_pub.publish(ExecutionStatus(new_status))
 
     def solve_ik_for_action(self):
         '''Computes joint positions for all end-effector poses
@@ -212,7 +238,7 @@ class Arms:
         '''The thread function that makes the arm move to
         a target end-effector pose'''
         rospy.loginfo('Started thread to move arm ' + str(arm_index))
-        self.status = ExecutionStatus.EXECUTING
+        self.change_status(ExecutionStatus.EXECUTING)
         solution, has_solution = Arms.solve_ik_for_arm(arm_index, arm_state)
 
         if (has_solution):
@@ -222,28 +248,28 @@ class Arms:
                 is_successful = self.move_to_joints(None, solution)
 
             if (is_successful):
-                self.status = ExecutionStatus.SUCCEEDED
+                self.change_status(ExecutionStatus.SUCCEEDED)
             else:
-                self.status = ExecutionStatus.OBSTRUCTED
+                self.change_status(ExecutionStatus.OBSTRUCTED)
         else:
-            self.status = ExecutionStatus.NO_IK
+            self.change_status(ExecutionStatus.NO_IK)
 
     def execute_action(self):
         ''' Function to replay the demonstrated two-arm action
         of type ProgrammedAction'''
-        self.status = ExecutionStatus.EXECUTING
+        self.change_status(ExecutionStatus.EXECUTING)
         # Check if the very first precondition is met
         action_step = self.action.get_step(0)
         if (not Arms.is_condition_met(action_step.preCond)):
             rospy.logwarn('First precond is not met, first make sure ' +
                           'the robot is ready to execute action ' +
                           '(hand object or free hands).')
-            self.status = ExecutionStatus.CONDITION_ERROR
+            self.change_status(ExecutionStatus.CONDITION_ERROR)
         else:
             # Check that all parts of the action are reachable
             if (not self.solve_ik_for_action()):
                 rospy.logwarn('Problems in finding IK solutions...')
-                self.status = ExecutionStatus.NO_IK
+                self.change_status(ExecutionStatus.NO_IK)
             else:
                 Arms.set_arm_mode(0, ArmMode.HOLD)
                 Arms.set_arm_mode(1, ArmMode.HOLD)
@@ -253,7 +279,7 @@ class Arms:
             Arms.arms[1].reset_movement_history()
 
             if self.status == ExecutionStatus.EXECUTING:
-                self.status = ExecutionStatus.SUCCEEDED
+                self.change_status(ExecutionStatus.SUCCEEDED)
                 rospy.loginfo('Skill execution has succeeded.')
 
     def _loop_through_action_steps(self):
@@ -268,7 +294,7 @@ class Arms:
             if (not Arms.is_condition_met(action_step.preCond)):
                 rospy.logwarn('Preconditions of action step ' + str(i) +
                               ' are not satisfied. Aborting.')
-                self.status = ExecutionStatus.PREEMPTED
+                self.change_status(ExecutionStatus.PREEMPTED)
                 break
             else:
                 if (not self._execute_action_step(action_step)):
@@ -280,12 +306,12 @@ class Arms:
                 else:
                     rospy.logwarn('Post-conditions of action step ' +
                                   str(i) + ' are not satisfied. Aborting.')
-                    self.status = ExecutionStatus.PREEMPTED
+                    self.change_status(ExecutionStatus.PREEMPTED)
                     break
 
             if (self.preempt):
                 rospy.logwarn('Execution preempted by user.')
-                self.status = ExecutionStatus.PREEMPTED
+                self.change_status(ExecutionStatus.PREEMPTED)
                 break
 
             rospy.loginfo('Step ' + str(i) + ' of action is complete.')
@@ -299,7 +325,7 @@ class Arms:
 
             if (not self.move_to_joints(action_step.armTarget.rArm,
                                         action_step.armTarget.lArm)):
-                self.status = ExecutionStatus.OBSTRUCTED
+                self.change_status(ExecutionStatus.OBSTRUCTED)
                 return False
 
         # If arm trajectory action
@@ -310,7 +336,7 @@ class Arms:
             # First move to the start frame
             if (not self.move_to_joints(action_step.armTrajectory.r_arm[0],
                                         action_step.armTrajectory.l_arm[0])):
-                self.status = ExecutionStatus.OBSTRUCTED
+                self.change_status(ExecutionStatus.OBSTRUCTED)
                 return False
 
             #  Then execute the trajectory
@@ -330,7 +356,7 @@ class Arms:
                 (not Arms.arms[1].is_successful())):
                 rospy.logwarn('Aborting execution; ' +
                               'arms failed to follow trajectory.')
-                self.status = ExecutionStatus.OBSTRUCTED
+                self.change_status(ExecutionStatus.OBSTRUCTED)
                 return False
 
         # If hand action do it for both sides

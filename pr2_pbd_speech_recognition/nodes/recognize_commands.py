@@ -38,6 +38,8 @@ class CommandRecognizer:
 
         # Here's what we'll give back to the system.
         self.commandOutput = rospy.Publisher('recognized_command', Command)
+
+        # TODO(max): Check these are the right set.
         self.allCommands = [
             Command.TEST_MICROPHONE,
             Command.RELAX_RIGHT_ARM,
@@ -102,15 +104,23 @@ class CommandRecognizer:
             print '[NLP] Semantically parsed:', response
             print
             if len(response) > 0 and response != 'Error: 500' and \
-                    len(eval(response)) > 0:
-                cmd = eval(response)[0]
-                # Do sanity checking.
-                if cmd in self.allCommands:
-                    recognizedCommand = cmd
-                else:
-                    recognizedCommand = Command.UNRECOGNIZED
-                # Send it off
-                self.commandOutput.publish(Command(recognizedCommand))
+                    len(eval(response)) == 1:
+                # TODO(max): Split on a + and execute all.
+                cmds = eval(response)[0].split('+')
+                sent_commands = 0
+                for cmd in cmds:
+                    # Sanity check before sending.
+                    if cmd in self.allCommands:
+                        self.commandOutput.publish(Command(cmd))
+                        sent_commands += 1
+                # If none of the commands were supported, send the
+                # uncreognized response instead.
+                if sent_commands == 0:
+                    self.commandOutput.publish(Command(Command.UNRECOGNIZED))
+            else:
+                # No response, empty response, or multiple top
+                # responses.
+                self.commandOutput.publish(Command(Command.UNRECOGNIZED))
         except requests.exceptions.ConnectionError as e:
             rospy.logwarn('NLP server not running. Dropping recognized ' +
                 'speech: ' + recognizedSpeech.text)

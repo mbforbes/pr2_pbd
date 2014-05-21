@@ -26,6 +26,7 @@ from pr2_social_gaze.msg import GazeGoal
 class Interaction:
     '''Finite state machine for the human interaction'''
 
+    _is_executing = False
     _is_programming = True
     _is_recording_motion = False
     _arm_trajectory = None
@@ -46,7 +47,9 @@ class Interaction:
 
         self.responses = {
             Command.TEST_MICROPHONE: Response(Interaction.empty_response,
-                                [RobotSpeech.TEST_RESPONSE, GazeGoal.NOD]),
+                    [RobotSpeech.TEST_RESPONSE, GazeGoal.NOD]),
+            Command.UNRECOGNIZED: Response(Interaction.empty_response,
+                    [RobotSpeech.ERROR_UNRECOGNIZED, GazeGoal.SHAKE]),
             Command.RELAX_RIGHT_ARM: Response(self.relax_arm, 0),
             Command.RELAX_LEFT_ARM: Response(self.relax_arm, 1),
             Command.OPEN_RIGHT_HAND: Response(self.open_hand, 0),
@@ -394,7 +397,7 @@ class Interaction:
 
     def execute_action(self, dummy=None):
         '''Starts the execution of the current action'''
-	execution_z_offset = -0.00
+        execution_z_offset = -0.00
         if (self.session.n_actions() > 0):
             if (self.session.n_frames() > 1):
                 self.session.save_current_action()

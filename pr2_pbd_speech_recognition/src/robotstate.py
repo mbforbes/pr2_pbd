@@ -24,7 +24,8 @@ from pr2_pbd_msgs.msg import Command
 from pr2_pbd_msgs.msg import Side
 from pr2_pbd_msgs.msg import GripperState, GripperStateChange
 from pr2_pbd_msgs.msg import ArmMode, ArmModeChange
-from pr2_pbd_msgs.srv import GetGripperStates, GetArmModes
+from pr2_pbd_msgs.msg import ExecutionStatus
+from pr2_pbd_msgs.srv import GetGripperStates, GetArmModes, GetExecutionStatus
 
 ########################################################################
 # CONSTANTS
@@ -139,6 +140,8 @@ class RobotState:
             self.gripper_state_change_cb)
         rospy.Subscriber('arm_mode_change', ArmModeChange,
             self.arm_mode_change_cb)
+        rospy.Subscriber('execution_status', ExecutionStatus,
+            self.execution_status_cb)
 
         # NOTE(max): We're not subscribing to (gui_command, GuiCommand)
         # because we're assuming only speech interaction for this study.
@@ -158,9 +161,13 @@ class RobotState:
         # Default gripper states / arm modes.
         self.gripper_states = [ArmMode.HOLD, ArmMode.HOLD]
         self.arm_modes = [GripperState.CLOSED, GripperState.CLOSED]
+        self.execution_status = ExecutionStatus.NOT_EXECUTING
 
-        # Initialize gripper states and arm modes by calling an Arms
-        # service.
+        # Initialize
+        # - gripper states
+        # - arm modes
+        # - execution status
+        # by calling an Arms service.
         rospy.wait_for_service('get_gripper_states')
         gripper_states_srv = rospy.ServiceProxy(
             'get_gripper_states', GetGripperStates)
@@ -181,6 +188,18 @@ class RobotState:
         print '\ttype:', type(arm_modes_srv)
         try:
             modes = arm_modes_srv()
+            self.arm_modes[Side.LEFT] = modes.left
+            self.arm_modes[Side.RIGHT] = modes.right
+        except rospy.ServiceException as exc:
+            print ('get_arm_modes service could not process ' +
+                'request: ', exc)
+
+        rospy.wait_for_service('get_execution_status')
+        self.exec_status_srv = rospy.ServiceProxy(
+            'get_execution_status', GetExecutionStatus)
+        try:
+            self.execution_status = self.exec_status_srv().status.status
+
             self.arm_modes[Side.LEFT] = modes.left
             self.arm_modes[Side.RIGHT] = modes.right
         except rospy.ServiceException as exc:
@@ -323,7 +342,8 @@ class RobotState:
             'right-arm': self.arm_mode_str(self.arm_modes[Side.RIGHT]),
             'left-hand': self.gripper_state_str(
                 self.gripper_states[Side.LEFT]),
-            'left-arm': self.arm_mode_str(self.arm_modes[Side.LEFT])
+            'left-arm': self.arm_mode_str(self.arm_modes[Side.LEFT]),
+            'execution': self.execution_status_str(self.execution_status)
         }
 
     ####################################################################
@@ -388,8 +408,7 @@ class RobotState:
         Returns:
             string: 'open' | 'closed'
         '''
-        return ('open' if gripper_state == GripperState.OPEN else
-            'closed')
+        return ('open' if gripper_state == GripperState.OPEN else 'closed')
 
     def arm_mode_str(self, arm_mode):
         '''Takes an arm mode and turns it into a string.
@@ -400,8 +419,19 @@ class RobotState:
         Returns:
             string: 'frozen' | 'relaxed'
         '''
-        return ('frozen' if arm_mode == ArmMode.HOLD else
-            'relaxed')
+        return ('frozen' if arm_mode == ArmMode.HOLD else 'relaxed')
+
+    def execution_status_str(self, execution_status):
+        '''Takes an execution status and turns it into a string.
+
+        Args:
+            execution_status (int): ExecutionStatus.X
+
+        Returns:
+            string: 'started' | 'stopped'
+        '''
+        return ('started' if execution_status == ExecutionStatus.EXECUTING
+            else 'stopped')
 
     ####################################################################
     # MESSAGE LISTENER / ROBOT-RESPONSIVE FUNCTIONS
@@ -464,3 +494,14 @@ class RobotState:
         # Change saved state
         self.arm_modes[side_raw] = mode_raw
         print '[STATE] new arm modes:', self.arm_modes
+
+    def execution_status_cb(self, executionStatus):
+        '''Callback for when execution status changes.
+
+        Args:
+            executionStatus (ExecutionStatus [ExecutionStatus.msg])
+        '''
+        now = time.time()
+        status_raw = executionStatus.status
+        self.execution_status = status_raw
+        print '[STATE] new exec status:', self.execution_status

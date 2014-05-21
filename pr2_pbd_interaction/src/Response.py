@@ -65,7 +65,9 @@ class Response:
         # Speech response
         if (speech_resp != None):
             Response.say(speech_resp)
-            Response.respond_with_sound(speech_resp)
+            # NOTE(max): Not responding with sound when speech is
+            # working.
+            # Response.respond_with_sound(speech_resp)
         # Gaze response
         if (gaze_resp != None):
             Response.perform_gaze_action(gaze_resp)
