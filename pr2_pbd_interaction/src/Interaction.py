@@ -541,6 +541,29 @@ class Interaction:
             if (self.session.n_actions() > 0):
                 self.session.get_current_action().update_objects(
                                             self.world.get_frame_list())
+                # TODO Find pose
+                objs = self.world.get_frame_list
+                if len(objs) > 0:
+                    # Settings
+                    arm_index = 0 # right arm: 0, left arm: 1
+
+                    # Open hand
+                    self.open_hand(arm_index)
+
+                    # Get location
+                    obj = objs[1]
+                    print obj.pose
+                    arm_state = ArmState(0,
+                        obj.pose,
+                        [],
+                        '/base_link')
+
+                    # TODO start arm movement to it
+                    self.arms.start_move_to_pose(arm_state, arm_index)
+
+                    # Close hand
+                    self.close_hand(arm_index)
+
             return [RobotSpeech.START_STATE_RECORDED, GazeGoal.NOD]
         else:
             return [RobotSpeech.OBJECT_NOT_DETECTED, GazeGoal.SHAKE]
