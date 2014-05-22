@@ -41,29 +41,56 @@ class CommandRecognizer:
 
         # TODO(max): Check these are the right set.
         self.allCommands = [
+            # Used in system (i.e. Maya's old set)
+            # -------------------------------------
+            # "TEST MICROPHONE"
             Command.TEST_MICROPHONE,
+
+            # "RELEASE | HOLD  LEFT | RIGHT   ARM"
             Command.RELAX_RIGHT_ARM,
             Command.RELAX_LEFT_ARM,
+            Command.FREEZE_RIGHT_ARM,
+            Command.FREEZE_LEFT_ARM,
+
+            # "OPEN | CLOSE  LEFT | RIGHT  HAND"
             Command.OPEN_RIGHT_HAND,
             Command.OPEN_LEFT_HAND,
             Command.CLOSE_RIGHT_HAND,
             Command.CLOSE_LEFT_HAND,
-            Command.STOP_EXECUTION,
-            Command.UNDO,
-            Command.DELETE_ALL_STEPS,
-            Command.DELETE_LAST_STEP,
-            Command.FREEZE_RIGHT_ARM,
-            Command.FREEZE_LEFT_ARM,
-            Command.RECORD_OBJECT_POSE,
+
+            # "CREATE SKILL"
             Command.CREATE_NEW_ACTION,
+
+            # "SAVE POSE"
+            Command.SAVE_POSE,
+            # "Command.DELETE_LAST_STEP,"
+
+            # "EXECUTE SKILL"
             Command.EXECUTE_ACTION,
+            # "Command.STOP_EXECUTION,"
+
+            # "CLEAR SKILL"
+            Command.DELETE_ALL_STEPS,
+
+            # "NEXT | PREVIOUS  SKILL"
             Command.NEXT_ACTION,
             Command.PREV_ACTION,
-            Command.SAVE_ACTION,
-            Command.EDIT_ACTION,
-            Command.SAVE_POSE,
-            Command.START_RECORDING_MOTION,
-            Command.STOP_RECORDING_MOTION
+
+            # "UNDO LAST COMMAND"
+            Command.UNDO,
+
+
+            # Depricated
+            # ----------
+            # Command.SAVE_ACTION,
+            # Command.EDIT_ACTION,
+
+
+            # New features:
+            # -------------
+            # Command.RECORD_OBJECT_POSE,
+            # Command.START_RECORDING_MOTION,
+            # Command.STOP_RECORDING_MOTION
         ]
 
     def receiveSphinxData(self, data):
