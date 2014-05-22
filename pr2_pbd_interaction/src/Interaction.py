@@ -518,8 +518,6 @@ class Interaction:
                 # rospy.logwarn('')
 
                 action.reset_targets(0)
-            else:
-                rospy.logerr('r_target is None')
             l_target = action.get_requested_targets(1)
             if (l_target != None):
                 self.arms.start_move_to_pose(l_target, 1)
@@ -559,6 +557,7 @@ class Interaction:
                                             self.world.get_frame_list())
                 # # TODO Find pose
                 objs = self.world.get_frame_list
+                rospy.logwarn('number of objects found: ' + str(len(objs)))
                 if len(objs) > 0:
                     # Settings
                     arm_index = 0 # right arm: 0, left arm: 1
@@ -568,7 +567,7 @@ class Interaction:
 
                     # Get location
                     obj = objs[1]
-                    print obj.pose
+                    rospy.logwarn('object at: ' + str(obj.pose))
 
                     # Start of grasping data
                     # -----------------------------------------------------
@@ -618,6 +617,7 @@ class Interaction:
                     )
 
                     # start arm movement to it
+                    rospy.logwarn('moving to arm state: ' + str(arm_state))
                     self.arms.start_move_to_pose(arm_state, arm_index)
 
                     # Go to object
