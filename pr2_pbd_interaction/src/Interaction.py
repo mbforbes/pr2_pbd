@@ -7,6 +7,7 @@ roslib.load_manifest('pr2_pbd_interaction')
 import rospy
 import time
 from visualization_msgs.msg import MarkerArray
+from geometry_msgs.msg import Quaternion, Vector3, Point, Pose
 
 # Local stuff
 from World import World
@@ -557,60 +558,79 @@ class Interaction:
                 self.session.get_current_action().update_objects(
                                             self.world.get_frame_list())
                 # # TODO Find pose
-                # objs = self.world.get_frame_list
-                # if len(objs) > 0:
-                #     # Settings
-                #     arm_index = 0 # right arm: 0, left arm: 1
+                objs = self.world.get_frame_list
+                if len(objs) > 0:
+                    # Settings
+                    arm_index = 0 # right arm: 0, left arm: 1
 
-                #     # Open hand
-                #     self.open_hand(arm_index)
+                    # Open hand
+                    self.open_hand(arm_index)
 
-                #     # Get location
-                #     obj = objs[1]
-                #     print obj.pose
+                    # Get location
+                    obj = objs[1]
+                    print obj.pose
 
+                    # Start of grasping data
+                    # -----------------------------------------------------
+                    #  refFrame: 0
+                    # ee_pose:
+                    #   position:
+                    #     x: 0.722373452614
+                    #     y: -0.0157659750775
+                    #     z: 1.14839023874
+                    #   orientation:
+                    #     x: -0.69987504269
+                    #     y: -0.0289561889715
+                    #     z: 0.712701230833
+                    #     w: -0.0373285320999
+                    # joint_pose: [  0.20002106  -0.35347237  -3.04645402  -0.52702965  31.31729613
+                    #   -1.41955357   0.15604402]
+                    # refFrameObject:
+                    #   type: 0
+                    #   name: ''
+                    #   pose:
+                    #     position:
+                    #       x: 0.0
+                    #       y: 0.0
+                    #       z: 0.0
+                    #     orientation:
+                    #       x: 0.0
+                    #       y: 0.0
+                    #       z: 0.0
+                    #       w: 0.0
+                    #   dimensions:
+                    #     x: 0.0
+                    #     y: 0.0
+                    #     z: 0.0
 
-                # [WARN] [WallTime: 1400799096.311692] [3058.713000] refFrame: 0
-                # ee_pose:
-                #   position:
-                #     x: 0.383047588708
-                #     y: -0.0487703532201
-                #     z: 0.861641987679
-                #   orientation:
-                #     x: 0.835419394584
-                #     y: 0.0384778538971
-                #     z: -0.548208336239
-                #     w: -0.00784283047894
-                # joint_pose: [-0.3878849  -0.32687114 -1.48584714 -1.98590866 -1.65011036 -1.45918788
-                #   1.59336309]
-                # refFrameObject:
-                #   type: 0
-                #   name: ''
-                #   pose:
-                #     position:
-                #       x: 0.0
-                #       y: 0.0
-                #       z: 0.0
-                #     orientation:
-                #       x: 0.0
-                #       y: 0.0
-                #       z: 0.0
-                #       w: 0.0
-                #   dimensions:
-                #     x: 0.0
-                #     y: 0.0
-                #     z: 0.0
+                    # Go to above object
+                    arm_state = ArmState(
+                        0,
+                        Pose(
+                            Point(0.722373452614, -0.0157659750775,
+                                1.14839023874),
+                            Quaternion(-0.69987504269, -0.0289561889715,
+                                0.712701230833, -0.0373285320999)
+                        ),
+                        [0.20002106, -0.35347237, -3.04645402, -0.52702965,
+                            31.31729613, -1.41955357, 0.15604402],
+                        Object(0,'', Pose(Point(),Quaternion()), Vector3())
+                    )
 
-                # arm_state = ArmState(0,
-                #     obj.pose,
-                #     [],
-                #     Object(0, '', Pose(), Vector3()))
+                    # start arm movement to it
+                    self.arms.start_move_to_pose(arm_state, arm_index)
 
-                #     # TODO start arm movement to it
-                #     self.arms.start_move_to_pose(arm_state, arm_index)
+                    # Go to object
+                    # arm_state = ArmState(0,
+                    #     obj.pose,
+                    #     [],
+                    #     Object(0, '', Pose(), Vector3()))
 
-                #     # Close hand
-                #     self.close_hand(arm_index)
+                    #     # TODO start arm movement to it
+                    #     self.arms.start_move_to_pose(arm_state, arm_index)
+
+                    #     # Close hand
+                    #     self.close_hand(arm_index)
 
             return [RobotSpeech.START_STATE_RECORDED, GazeGoal.NOD]
         else:
