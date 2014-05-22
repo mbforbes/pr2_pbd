@@ -70,7 +70,7 @@ class Arms:
         # This will take long, create a thread
         self.action = action.copy()
         self.preempt = False
-	self.z_offset = z_offset
+        self.z_offset = z_offset
         thread = threading.Thread(group=None, target=self.execute_action,
                                   name='skill_execution_thread')
         thread.start()
@@ -262,6 +262,16 @@ class Arms:
         # If arm target action
         if (action_step.type == ActionStep.ARM_TARGET):
             rospy.loginfo('Will perform arm target action step.')
+
+            # NOTE(max) Vomiting (for fun).
+            r_state = action_step.armTarget.rArm
+            rospy.logwarn('')
+            rospy.logwarn('r_state:')
+            rospy.logwarn(str(r_state))
+            rospy.logwarn(str(r_state.ee_pose))
+            rospy.logwarn(str(r_state.joint_pose))
+            rospy.logwarn(str(r_state.refFrameObject))
+            rospy.logwarn('')
 
             if (not self.move_to_joints(action_step.armTarget.rArm,
                                         action_step.armTarget.lArm)):
