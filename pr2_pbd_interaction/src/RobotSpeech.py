@@ -46,7 +46,7 @@ class RobotSpeech:
     LEFT_ARM_ALREADY_HOLDING = 'Left arm holding.'
     RIGHT_ARM_ALREADY_RELEASED = 'Right arm released.'
     LEFT_ARM_ALREADY_RELEASED = 'Left arm released.'
-    SKILL_CLEARED = 'All poses deleted.'
+    SKILL_CLEARED = 'All poses deleted, skill cleared.'
     LAST_POSE_DELETED = 'Last pose deleted.'
     ALL_POSES_RESUMED = 'All poses resumed.'
     START_STATE_RECORDED = 'Object poses recorded.'

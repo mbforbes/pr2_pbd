@@ -154,8 +154,11 @@ class RobotState:
         self.obj_dict = OBJ_DICT.copy()
         construct_time = time.time()
         for val in self.obj_dict.itervalues():
-            val['last-referred'] = construct_time
-            val['last-changed'] = construct_time
+            # NOTE(max): Now not initializing times and just setting
+            # when accessed.
+            pass
+            # val['last-referred'] = construct_time
+            # val['last-changed'] = construct_time
 
 
         # Default gripper states / arm modes.
@@ -291,13 +294,29 @@ class RobotState:
         - 'NULL' (for string)
         - {} (for map)
         '''
-        return {
-            'lastChanged': self.get_last_changed(),
-            'lastChangedByProperty': self.get_last_changed_by_property(),
-            'lastReferred': self.get_last_referred(),
-            'lastReferredByProperty': self.get_last_referred_by_property(),
-            'stateByObj': self.get_state_by_obj()
-        }
+        retobj = {}
+
+        last_changed = self.get_last_changed()
+        if last_changed is not '':
+            retobj['lastChanged'] = last_changed
+
+        last_referred = self.get_last_referred()
+        if last_referred is not '':
+            retobj['lastReferred'] = last_referred
+
+        last_changed_by_property = self.get_last_changed_by_property()
+        if len(last_changed_by_property) > 0:
+            retobj['lastChangedByProperty'] = last_changed_by_property
+
+        last_referred_by_property = self.get_last_referred_by_property()
+        if len(last_referred_by_property) > 0:
+            retobj['lastReferredByProperty'] = last_referred_by_property
+
+        # State by obj should always be fine; always have robot state.
+        state_by_obj = self.get_state_by_obj()
+        retobj['stateByObj'] = state_by_obj
+
+        return retobj
 
     def get_last_changed(self):
         '''The last object in the system that changed.
@@ -360,7 +379,9 @@ class RobotState:
         for prop in self.get_properties():
             tuples = [pair for pair in self.obj_dict.iteritems()
                     if prop in pair[1]['properties']]
-            res[prop] = self.get_most_recent_selector(x, tuples)
+            most_recent = self.get_most_recent_selector(x, tuples)
+            if most_recent is not '':
+                res[prop] = most_recent
         return res
 
     def get_most_recent_selector(self, selector, tuples):
@@ -381,9 +402,10 @@ class RobotState:
         # reduces are messy, and reduces over dictionaries are messy.
         # So, just going for a loop.
         last_time = 0 # OK baseline as default is construct time (> 0)
+        best_key = ''
         for t in tuples:
             key, val = t[0], t[1]
-            if val[selector] > last_time:
+            if val.has_key(selector) and val[selector] > last_time:
                 best_key = key
                 last_time = val[selector]
         return best_key

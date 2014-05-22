@@ -43,7 +43,7 @@ class Interaction:
         rospy.Subscriber('recognized_command', Command, self.speech_command_cb)
         rospy.Subscriber('gui_command', GuiCommand, self.gui_command_cb)
 
-        self._undo_function = None
+        self._undo_function, self._undo_param = None, None
 
         self.responses = {
             Command.TEST_MICROPHONE: Response(Interaction.empty_response,
@@ -81,9 +81,14 @@ class Interaction:
         if self.arms.set_gripper_state(arm_index, GripperState.OPEN):
             speech_response = Response.open_responses[arm_index]
             if (Interaction._is_programming and self.session.n_actions() > 0):
-                self.save_gripper_step(arm_index, GripperState.OPEN)
+                # NOTE(max): Reverting to old style, not saving poses
+                # when gripper opened / closed.
+                #self.save_gripper_step(arm_index, GripperState.OPEN)
                 speech_response = (speech_response + ' ' +
                                    RobotSpeech.STEP_RECORDED)
+                # NOTE(max): Adding undo capabilities.
+                self._undo_function = self.close_hand
+                self._undo_param = arm_index
             return [speech_response, Response.glance_actions[arm_index]]
         else:
             return [Response.already_open_responses[arm_index],
@@ -94,9 +99,14 @@ class Interaction:
         if Arms.set_gripper_state(arm_index, GripperState.CLOSED):
             speech_response = Response.close_responses[arm_index]
             if (Interaction._is_programming and self.session.n_actions() > 0):
-                self.save_gripper_step(arm_index, GripperState.CLOSED)
+                # NOTE(max): Reverting to old style, not saving poses
+                # when gripper opened / closed.
+                #self.save_gripper_step(arm_index, GripperState.CLOSED)
                 speech_response = (speech_response + ' ' +
                                    RobotSpeech.STEP_RECORDED)
+                # NOTE(max): Adding undo capabilities.
+                self._undo_function = self.open_hand
+                self._undo_param = arm_index
             return [speech_response, Response.glance_actions[arm_index]]
         else:
             return [Response.already_closed_responses[arm_index],
@@ -105,6 +115,9 @@ class Interaction:
     def relax_arm(self, arm_index):
         '''Relaxes arm on the indicated side'''
         if self.arms.set_arm_mode(arm_index, ArmMode.RELEASE):
+            # NOTE(max): Adding undo capabilities.
+            self._undo_function = self.freeze_arm
+            self._undo_param = arm_index
             return [Response.release_responses[arm_index],
                     Response.glance_actions[arm_index]]
         else:
@@ -114,6 +127,9 @@ class Interaction:
     def freeze_arm(self, arm_index):
         '''Stiffens arm on the indicated side'''
         if self.arms.set_arm_mode(arm_index, ArmMode.HOLD):
+            # NOTE(max): Adding undo capabilities.
+            self._undo_function = self.relax_arm
+            self._undo_param = arm_index
             return [Response.hold_responses[arm_index],
                     Response.glance_actions[arm_index]]
         else:
@@ -143,6 +159,10 @@ class Interaction:
         self.world.clear_all_objects()
         self.session.new_action()
         Interaction._is_programming = True
+        # NOTE(max): Adding undo capabilities. This isn't totally
+        # correct, as we should delete the new skill, but skills are
+        # currently forever, so not changing for now.
+        self._undo_function = self.previous_action
         return [RobotSpeech.SKILL_CREATED + ' ' +
                 str(self.session.current_action_index), GazeGoal.NOD]
 
@@ -150,6 +170,8 @@ class Interaction:
         '''Switches to next action'''
         if (self.session.n_actions() > 0):
             if self.session.next_action(self.world.get_frame_list()):
+                # NOTE(max): Adding undo capabilities.
+                self._undo_function = self.previous_action
                 return [RobotSpeech.SWITCH_SKILL + ' ' +
                         str(self.session.current_action_index), GazeGoal.NOD]
             else:
@@ -162,6 +184,8 @@ class Interaction:
         '''Switches to previous action'''
         if (self.session.n_actions() > 0):
             if self.session.previous_action(self.world.get_frame_list()):
+                # NOTE(max): Adding undo capabilities.
+                self._undo_function = self.next_action
                 return [RobotSpeech.SWITCH_SKILL + ' ' +
                         str(self.session.current_action_index), GazeGoal.NOD]
             else:
@@ -207,16 +231,23 @@ class Interaction:
         if (self._undo_function == None):
             return [RobotSpeech.ERROR_NOTHING_TO_UNDO, GazeGoal.SHAKE]
         else:
-            return self._undo_function()
+            result = self._undo_function(self._undo_param)
+            self._undo_function = None
+            self._undo_param = None
+            return result
 
     def _resume_all_steps(self):
         '''Resumes all steps after clearing'''
         self.session.undo_clear()
+        self._undo_function = None
+        self._undo_param = None
         return [RobotSpeech.ALL_POSES_RESUMED, GazeGoal.NOD]
 
     def _resume_last_step(self):
         '''Resumes last step after deleting'''
         self.session.resume_deleted_step()
+        self._undo_function = None
+        self._undo_param = None
         return [RobotSpeech.POSE_RESUMED, GazeGoal.NOD]
 
     def stop_execution(self, dummy=None):
@@ -354,6 +385,8 @@ class Interaction:
                                             self.arms.get_gripper_state(1))
                 self.session.add_step_to_action(step,
                                             self.world.get_frame_list())
+                # NOTE(max): Adding undo capabilities.
+                self._undo_function = self.delete_last_step
                 return [RobotSpeech.STEP_RECORDED, GazeGoal.NOD]
             else:
                 return ['Action ' + str(self.session.current_action_index) +
@@ -430,11 +463,7 @@ class Interaction:
             response = self.responses[command.command]
 
             if (not self.arms.is_executing()):
-                if (self._undo_function != None):
-                    response.respond()
-                    self._undo_function = None
-                else:
-                    response.respond()
+                response.respond()
             else:
                 if command.command == Command.STOP_EXECUTION:
                     response.respond()
