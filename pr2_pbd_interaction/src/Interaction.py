@@ -497,13 +497,28 @@ class Interaction:
             self._save_arm_to_trajectory()
 
         is_world_changed = self.world.update()
+        # rospy.logwarn('before n_actions test')
         if (self.session.n_actions() > 0):
+            # rospy.logwarn('in n_actions test')
             action = self.session.get_current_action()
             action.update_viz()
             r_target = action.get_requested_targets(0)
             if (r_target != None):
                 self.arms.start_move_to_pose(r_target, 0)
+
+                rospy.logwarn('r_target exists')
+
+                # rospy.logwarn('')
+                # rospy.logwarn('r_target:')
+                # rospy.logwarn(str(r_target))
+                # rospy.logwarn(str(r_target.ee_pose))
+                # rospy.logwarn(str(r_target.joint_pose))
+                # rospy.logwarn(str(r_target.refFrameObject))
+                # rospy.logwarn('')
+
                 action.reset_targets(0)
+            else:
+                rospy.logerr('r_target is None')
             l_target = action.get_requested_targets(1)
             if (l_target != None):
                 self.arms.start_move_to_pose(l_target, 1)
@@ -541,28 +556,61 @@ class Interaction:
             if (self.session.n_actions() > 0):
                 self.session.get_current_action().update_objects(
                                             self.world.get_frame_list())
-                # TODO Find pose
-                objs = self.world.get_frame_list
-                if len(objs) > 0:
-                    # Settings
-                    arm_index = 0 # right arm: 0, left arm: 1
+                # # TODO Find pose
+                # objs = self.world.get_frame_list
+                # if len(objs) > 0:
+                #     # Settings
+                #     arm_index = 0 # right arm: 0, left arm: 1
 
-                    # Open hand
-                    self.open_hand(arm_index)
+                #     # Open hand
+                #     self.open_hand(arm_index)
 
-                    # Get location
-                    obj = objs[1]
-                    print obj.pose
-                    arm_state = ArmState(0,
-                        obj.pose,
-                        [],
-                        '/base_link')
+                #     # Get location
+                #     obj = objs[1]
+                #     print obj.pose
 
-                    # TODO start arm movement to it
-                    self.arms.start_move_to_pose(arm_state, arm_index)
 
-                    # Close hand
-                    self.close_hand(arm_index)
+                # [WARN] [WallTime: 1400799096.311692] [3058.713000] refFrame: 0
+                # ee_pose:
+                #   position:
+                #     x: 0.383047588708
+                #     y: -0.0487703532201
+                #     z: 0.861641987679
+                #   orientation:
+                #     x: 0.835419394584
+                #     y: 0.0384778538971
+                #     z: -0.548208336239
+                #     w: -0.00784283047894
+                # joint_pose: [-0.3878849  -0.32687114 -1.48584714 -1.98590866 -1.65011036 -1.45918788
+                #   1.59336309]
+                # refFrameObject:
+                #   type: 0
+                #   name: ''
+                #   pose:
+                #     position:
+                #       x: 0.0
+                #       y: 0.0
+                #       z: 0.0
+                #     orientation:
+                #       x: 0.0
+                #       y: 0.0
+                #       z: 0.0
+                #       w: 0.0
+                #   dimensions:
+                #     x: 0.0
+                #     y: 0.0
+                #     z: 0.0
+
+                # arm_state = ArmState(0,
+                #     obj.pose,
+                #     [],
+                #     Object(0, '', Pose(), Vector3()))
+
+                #     # TODO start arm movement to it
+                #     self.arms.start_move_to_pose(arm_state, arm_index)
+
+                #     # Close hand
+                #     self.close_hand(arm_index)
 
             return [RobotSpeech.START_STATE_RECORDED, GazeGoal.NOD]
         else:
