@@ -557,7 +557,7 @@ class Interaction:
                                             self.world.get_frame_list())
                 # # TODO Find pose
                 objs = self.world.get_frame_list()
-                rospy.logwarn('number of objects found: ' + str(len(objs)))
+                rospy.loginfo('Number of objects found: ' + str(len(objs)))
                 if len(objs) > 0:
                     # Settings
                     arm_index = 0 # right arm: 0, left arm: 1
@@ -567,7 +567,9 @@ class Interaction:
 
                     # Get location
                     obj = objs[0]
-                    rospy.logwarn('object at: ' + str(obj.pose))
+                    objname = obj.get_name()
+                    rospy.loginfo('Object ' + objname + ' at: ' +
+                        str(obj.pose))
 
                     # Start of grasping data
                     # -----------------------------------------------------
@@ -603,6 +605,7 @@ class Interaction:
                     #     z: 0.0
 
                     # Go to above object
+                    rospy.loginfo('Elevating arm.')
                     arm_state = ArmState(
                         0,
                         Pose(
@@ -615,22 +618,20 @@ class Interaction:
                             31.31729613, -1.41955357, 0.15604402],
                         Object(0,'', Pose(Point(),Quaternion()), Vector3())
                     )
-
-                    # start arm movement to it
-                    rospy.logwarn('moving to arm state: ' + str(arm_state))
                     self.arms.start_move_to_pose(arm_state, arm_index)
 
                     # Go to object
-                    # arm_state = ArmState(0,
-                    #     obj.pose,
-                    #     [],
-                    #     Object(0, '', Pose(), Vector3()))
+                    rospy.loginfo('Moving arm to: ' + objname)
+                    arm_state = ArmState(0,
+                        obj.pose,
+                        [],
+                        Object(0, '', Pose(), Vector3())
+                    )
+                    self.arms.start_move_to_pose(arm_state, arm_index)
 
-                    #     # TODO start arm movement to it
-                    #     self.arms.start_move_to_pose(arm_state, arm_index)
-
-                    #     # Close hand
-                    #     self.close_hand(arm_index)
+                    # Close hand
+                    rospy.loginfo('Closing hand')
+                    self.close_hand(arm_index)
 
             return [RobotSpeech.START_STATE_RECORDED, GazeGoal.NOD]
         else:
