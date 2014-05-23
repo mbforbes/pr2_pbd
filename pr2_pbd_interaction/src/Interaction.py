@@ -556,7 +556,7 @@ class Interaction:
                 self.session.get_current_action().update_objects(
                                             self.world.get_frame_list())
                 # # TODO Find pose
-                objs = self.world.get_frame_list
+                objs = self.world.get_frame_list()
                 rospy.logwarn('number of objects found: ' + str(len(objs)))
                 if len(objs) > 0:
                     # Settings
