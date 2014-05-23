@@ -1,7 +1,15 @@
 ''' Robot speech'''
+
+# Mandatory ROS imports.
 import roslib
 roslib.load_manifest('pr2_pbd_interaction')
 import rospy
+
+# Builtins.
+import time
+from threading import Thread, Lock
+
+# ROS.
 from sound_play.msg import SoundRequest
 from sound_play.libsoundplay import SoundClient
 from visualization_msgs.msg import Marker
@@ -64,10 +72,23 @@ class RobotSpeech:
     STOPPING_EXECUTION = 'Execution stopped.'
     ERROR_UNRECOGNIZED = 'Please rephrase your request.'
 
+    # Waiting period between when we say things. SoundClient.say()
+    # neither blocks nor gives a call-back, so this heuristic appears to
+    # be the best we can do.
+    #
+    # This is emperically set by timing "Right hand is already open."
+    SAY_WAIT_PERIOD_SECONDS = 2.3
+
     def __init__(self):
         #self.sound_publisher = rospy.Publisher('robotsound', SoundRequest)
         self.soundhandle = SoundClient()
         self.marker_publisher = rospy.Publisher('visualization_marker', Marker)
+
+        self._last_said = 0
+        # NOTE(max): We don't lock when we say something as say() is
+        # non-blocking. Instead, we have some default waiting period,
+        # and use the lock to avoid threading bugs.
+        self._wait_say_lock = Lock()
 
     def say(self, text, is_using_sounds=False):
         ''' Send a TTS command'''
@@ -75,11 +96,23 @@ class RobotSpeech:
             # NOTE(max): This old way isn't saying the text (just beeps)
             # self.sound_publisher.publish(
                 # SoundRequest(command=SoundRequest.SAY, arg=text))
+            say_thread = Thread(group=None, target=self.async_say,
+                args=[text], name='async_say_thread')
+            say_thread.start()
 
-            # NOTE(max): This 'new' way should work.
-            rospy.loginfo('Trying to say:' + text)
-            self.soundhandle.say(text)
-        self.say_in_rviz(text)
+    def async_say(self, text):
+        self._wait_say_lock.acquire()
+        while True:
+            time_delta = time.time() - self._last_said
+            if time_delta < RobotSpeech.SAY_WAIT_PERIOD_SECONDS:
+                time.sleep(RobotSpeech.SAY_WAIT_PERIOD_SECONDS - time_delta)
+            else:
+                rospy.loginfo('Trying to say:' + text)
+                self.soundhandle.say(text)
+                self.say_in_rviz(text)
+                self._last_said = time.time()
+                break
+        self._wait_say_lock.release()
 
     def say_in_rviz(self, text):
         ''' Visualizes the text that is uttered by the robot in rviz'''
