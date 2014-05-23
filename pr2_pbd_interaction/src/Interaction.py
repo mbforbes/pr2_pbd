@@ -566,7 +566,7 @@ class Interaction:
                     self.open_hand(arm_index)
 
                     # Get location
-                    obj = objs[1]
+                    obj = objs[0]
                     rospy.logwarn('object at: ' + str(obj.pose))
 
                     # Start of grasping data
