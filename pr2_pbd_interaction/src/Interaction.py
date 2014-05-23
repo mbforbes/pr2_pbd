@@ -567,7 +567,7 @@ class Interaction:
 
                     # Get location
                     obj = objs[0]
-                    objname = obj.get_name()
+                    objname = obj.name
                     rospy.loginfo('Object ' + objname + ' at: ' +
                         str(obj.pose))
 
