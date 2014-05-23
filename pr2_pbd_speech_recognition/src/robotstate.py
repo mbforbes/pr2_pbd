@@ -172,42 +172,34 @@ class RobotState:
         # - execution status
         # by calling an Arms service.
         rospy.wait_for_service('get_gripper_states')
-        gripper_states_srv = rospy.ServiceProxy(
-            'get_gripper_states', GetGripperStates)
-        print 'gripper_states_srv:', gripper_states_srv
-        print '\ttype:', type(gripper_states_srv)
+        gripper_states_srv = rospy.ServiceProxy('get_gripper_states',
+            GetGripperStates)
         try:
             grips = gripper_states_srv()
-            self.gripper_states[Side.LEFT] = grips.left
-            self.gripper_states[Side.RIGHT] = grips.right
+            self.gripper_states[Side.LEFT] = grips.left.state
+            self.gripper_states[Side.RIGHT] = grips.right.state
         except rospy.ServiceException as exc:
-            print ('get_gripper_states service could not process ' +
+            rospy.logwarn('get_gripper_states service could not process ' +
                 'request: ', exc)
 
         rospy.wait_for_service('get_arm_modes')
-        arm_modes_srv = rospy.ServiceProxy(
-            'get_arm_modes', GetArmModes)
-        print 'arm_modes_srv:', arm_modes_srv
-        print '\ttype:', type(arm_modes_srv)
+        arm_modes_srv = rospy.ServiceProxy('get_arm_modes', GetArmModes)
         try:
             modes = arm_modes_srv()
-            self.arm_modes[Side.LEFT] = modes.left
-            self.arm_modes[Side.RIGHT] = modes.right
+            self.arm_modes[Side.LEFT] = modes.left.mode
+            self.arm_modes[Side.RIGHT] = modes.right.mode
         except rospy.ServiceException as exc:
-            print ('get_arm_modes service could not process ' +
-                'request: ', exc)
+            rospy.logwarn('get_arm_modes service could not process request: ',
+                exc)
 
         rospy.wait_for_service('get_execution_status')
-        self.exec_status_srv = rospy.ServiceProxy(
-            'get_execution_status', GetExecutionStatus)
+        self.exec_status_srv = rospy.ServiceProxy('get_execution_status',
+            GetExecutionStatus)
         try:
             self.execution_status = self.exec_status_srv().status.status
-
-            self.arm_modes[Side.LEFT] = modes.left
-            self.arm_modes[Side.RIGHT] = modes.right
         except rospy.ServiceException as exc:
-            print ('get_arm_modes service could not process ' +
-                'request: ', exc)
+            rospy.logwarn('get_arm_modes service could not process request: ',
+                exc)
 
 
     ####################################################################

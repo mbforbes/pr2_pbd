@@ -107,7 +107,7 @@ class RobotSpeech:
             if time_delta < RobotSpeech.SAY_WAIT_PERIOD_SECONDS:
                 time.sleep(RobotSpeech.SAY_WAIT_PERIOD_SECONDS - time_delta)
             else:
-                rospy.loginfo('Trying to say:' + text)
+                rospy.loginfo('Trying to say: ' + text)
                 self.soundhandle.say(text)
                 self.say_in_rviz(text)
                 self._last_said = time.time()

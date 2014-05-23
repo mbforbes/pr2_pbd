@@ -44,10 +44,10 @@ class Arms:
         # NOTE(max): Provide services for querying arm modes, gripper
         # states, and execution status.
         rospy.Service('get_gripper_states', GetGripperStates,
-            'get_gripper_states_cb')
-        rospy.Service('get_arm_modes', GetArmModes, 'get_arm_modes_cb')
+            self.get_gripper_states_cb)
+        rospy.Service('get_arm_modes', GetArmModes, self.get_arm_modes_cb)
         rospy.Service('get_execution_status', GetExecutionStatus,
-            'get_execution_status_cb')
+            self.get_execution_status_cb)
         self.status_pub = rospy.Publisher('execution_status', ExecutionStatus)
 
     def get_execution_status_cb(self, getExecutionStatusRequest):
