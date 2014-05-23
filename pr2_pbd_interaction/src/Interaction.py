@@ -81,11 +81,10 @@ class Interaction:
         if self.arms.set_gripper_state(arm_index, GripperState.OPEN):
             speech_response = Response.open_responses[arm_index]
             if (Interaction._is_programming and self.session.n_actions() > 0):
-                # NOTE(max): Reverting to old style, not saving poses
-                # when gripper opened / closed.
-                #self.save_gripper_step(arm_index, GripperState.OPEN)
-                speech_response = (speech_response + ' ' +
-                                   RobotSpeech.STEP_RECORDED)
+                self.save_gripper_step(arm_index, GripperState.OPEN)
+                # NOTE(max): Not saying 'save pose' when hand opened /
+                # closed.
+                speech_response = speech_response
                 # NOTE(max): Adding undo capabilities.
                 self._undo_function = self.close_hand
                 self._undo_param = arm_index
@@ -99,11 +98,10 @@ class Interaction:
         if Arms.set_gripper_state(arm_index, GripperState.CLOSED):
             speech_response = Response.close_responses[arm_index]
             if (Interaction._is_programming and self.session.n_actions() > 0):
-                # NOTE(max): Reverting to old style, not saving poses
-                # when gripper opened / closed.
-                #self.save_gripper_step(arm_index, GripperState.CLOSED)
-                speech_response = (speech_response + ' ' +
-                                   RobotSpeech.STEP_RECORDED)
+                self.save_gripper_step(arm_index, GripperState.CLOSED)
+                # NOTE(max): Not saying 'save pose' when hand opened /
+                # closed.
+                speech_response = speech_response
                 # NOTE(max): Adding undo capabilities.
                 self._undo_function = self.open_hand
                 self._undo_param = arm_index
