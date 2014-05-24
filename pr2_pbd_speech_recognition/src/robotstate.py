@@ -24,6 +24,7 @@ from pr2_pbd_msgs.msg import Command
 from pr2_pbd_msgs.msg import Side
 from pr2_pbd_msgs.msg import GripperState, GripperStateChange
 from pr2_pbd_msgs.msg import ArmMode, ArmModeChange
+from pr2_pbd_msgs.msg import ArmMove
 from pr2_pbd_msgs.msg import ExecutionStatus
 from pr2_pbd_msgs.srv import GetGripperStates, GetArmModes, GetExecutionStatus
 
@@ -140,6 +141,7 @@ class RobotState:
             self.gripper_state_change_cb)
         rospy.Subscriber('arm_mode_change', ArmModeChange,
             self.arm_mode_change_cb)
+        rospy.Subscriber('arm_move', ArmMove, self.arm_move_cb)
         rospy.Subscriber('execution_status', ExecutionStatus,
             self.execution_status_cb)
 
@@ -180,7 +182,7 @@ class RobotState:
             self.gripper_states[Side.RIGHT] = grips.right.state
         except rospy.ServiceException as exc:
             rospy.logwarn('get_gripper_states service could not process ' +
-                'request: ', exc)
+                'request: ' + str(exc))
 
         rospy.wait_for_service('get_arm_modes')
         arm_modes_srv = rospy.ServiceProxy('get_arm_modes', GetArmModes)
@@ -189,8 +191,8 @@ class RobotState:
             self.arm_modes[Side.LEFT] = modes.left.mode
             self.arm_modes[Side.RIGHT] = modes.right.mode
         except rospy.ServiceException as exc:
-            rospy.logwarn('get_arm_modes service could not process request: ',
-                exc)
+            rospy.logwarn('get_arm_modes service could not process request: ' +
+                str(exc))
 
         rospy.wait_for_service('get_execution_status')
         self.exec_status_srv = rospy.ServiceProxy('get_execution_status',
@@ -198,8 +200,8 @@ class RobotState:
         try:
             self.execution_status = self.exec_status_srv().status.status
         except rospy.ServiceException as exc:
-            rospy.logwarn('get_arm_modes service could not process request: ',
-                exc)
+            rospy.logwarn('get_arm_modes service could not process request: ' +
+                str(exc))
 
 
     ####################################################################
@@ -508,6 +510,22 @@ class RobotState:
         # Change saved state
         self.arm_modes[side_raw] = mode_raw
         print '[STATE] new arm modes:', self.arm_modes
+
+    def arm_move(self, armMove):
+        '''Callback for when robot's arm moves (above some threshold).
+
+        Args:
+            armMove (ArmMove [ArmMove.msg])
+        '''
+        now = time.time()
+        side_raw = armMove.side.side
+        move_raw = armMove.delta
+        if side_raw == Side.LEFT:
+            self.obj_dict['left-arm']['last-changed'] = now
+            print '[STATE] left-arm (moved) most recent'
+        else:
+            self.obj_dict['right-arm']['last-changed'] = now
+            print '[STATE] right-arm (mode) most recent'
 
     def execution_status_cb(self, executionStatus):
         '''Callback for when execution status changes.

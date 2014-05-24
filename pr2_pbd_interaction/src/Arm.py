@@ -23,6 +23,7 @@ from kinematics_msgs.srv import GetPositionIKRequest
 from geometry_msgs.msg import Quaternion, Point, Pose
 from pr2_pbd_msgs.msg import GripperState, ArmMode, Side
 from pr2_pbd_msgs.msg import GripperStateChange, ArmModeChange
+from pr2_pbd_msgs.msg import ArmMove
 from World import World
 
 
@@ -94,6 +95,7 @@ class Arm:
             GripperStateChange)
         self.arm_pub = rospy.Publisher('arm_mode_change',
             ArmModeChange)
+        self.arm_move_pub = rospy.Publisher('arm_move', ArmMove)
 
         filter_srv_name = '/trajectory_filter/filter_trajectory'
         rospy.wait_for_service(filter_srv_name)
@@ -416,6 +418,11 @@ class Arm:
         self.arm_movement = [reading] + self.arm_movement
         if (len(self.arm_movement) > self.movement_buffer_size):
             self.arm_movement = self.arm_movement[0:self.movement_buffer_size]
+        # NOTE(max): Adding optional reporting.
+        delta_threshold = 0.02
+        if reading > delta_threshold:
+            self.arm_move_pub.publish(ArmMove(Side(self.arm_index),
+                reading))
 
     def _is_arm_moved_while_holding(self):
         '''Checks if user is trying to move the arm while it is stiff'''
