@@ -511,7 +511,7 @@ class RobotState:
         self.arm_modes[side_raw] = mode_raw
         print '[STATE] new arm modes:', self.arm_modes
 
-    def arm_move(self, armMove):
+    def arm_move_cb(self, armMove):
         '''Callback for when robot's arm moves (above some threshold).
 
         Args:
@@ -525,7 +525,7 @@ class RobotState:
             print '[STATE] left-arm (moved) most recent'
         else:
             self.obj_dict['right-arm']['last-changed'] = now
-            print '[STATE] right-arm (mode) most recent'
+            print '[STATE] right-arm (moved) most recent'
 
     def execution_status_cb(self, executionStatus):
         '''Callback for when execution status changes.

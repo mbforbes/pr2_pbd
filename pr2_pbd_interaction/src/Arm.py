@@ -435,7 +435,7 @@ class Arm:
 
     def _is_arm_stable_while_released(self):
         '''Checks if the arm has been stable while being released'''
-        movement_threshold = 0.02
+        movement_threshold = 0.015
         time_threshold = rospy.Duration(5.0)
         is_arm_stable = (self.get_movement() < movement_threshold)
         if (not is_arm_stable or self.get_mode() == ArmMode.HOLD):
