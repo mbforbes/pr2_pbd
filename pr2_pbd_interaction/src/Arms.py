@@ -139,9 +139,23 @@ class Arms:
         self.status = new_status
         self.status_pub.publish(ExecutionStatus(new_status))
 
-    def solve_ik_for_action(self):
+    def solve_ik_for_action(self, iterations=[]):
         '''Computes joint positions for all end-effector poses
         in an action'''
+        # How much to tweak pose by when it's unreachable.
+        delta = 0.01 # units in meters, so 0.01 is 1cm (I think)
+        # How many tweaks we can do per pose before we just give up.
+        max_tweaks = 10
+        # Initialize iterations variable if not already initialized.
+        # It contains an entry for every step, and each entry is a list
+        # of two values (iterations for left and right arms,
+        # repsectively).
+        if len(iterations) == 0:
+            for step in range(self.action.n_frames()):
+                iterations.append([0,0])
+
+        # Scale tweaks by number of poses and L/R hands.
+        cutoff = max_tweaks * self.action.n_frames() * 2
 
         # Go over steps of the action
         for i in range(self.action.n_frames()):
@@ -150,17 +164,47 @@ class Arms:
             if (self.action.seq.seq[i].type == ActionStep.ARM_TARGET):
                 # Find frames that are relative and convert to absolute
 
-                r_arm, has_solution_r = Arms.solve_ik_for_arm(0,
-                                        self.action.seq.seq[i].armTarget.rArm,
-					self.z_offset)
-                l_arm, has_solution_l = Arms.solve_ik_for_arm(1,
-                                        self.action.seq.seq[i].armTarget.lArm,
-					self.z_offset)
+                r_arm, has_solution_r = Arms.solve_ik_for_arm(
+                    0,
+                    self.action.seq.seq[i].armTarget.rArm,
+                    self.z_offset)
+                l_arm, has_solution_l = Arms.solve_ik_for_arm(
+                    1,
+                    self.action.seq.seq[i].armTarget.lArm,
+                    self.z_offset)
 
                 self.action.seq.seq[i].armTarget.rArm = r_arm
                 self.action.seq.seq[i].armTarget.lArm = l_arm
+
+                # Check whether either doesn't have a solution.
                 if (not has_solution_r) or (not has_solution_l):
-                    return False
+                    # Try to tweak the left and/or right arm!
+                    # These arrays are just to avoid code duplication.
+                    solutions = [has_solution_l, has_solution_r]
+                    poses = [
+                        self.action.seq.seq[i].armTarget.lArm.ee_pose,
+                        self.action.seq.seq[i].armTarget.rArm.ee_pose
+                    ]
+
+                    # Check both arms, and if either lacks a solution,
+                    # nudge the pose by delta and try again.
+                    for arm in range(len(solutions)):
+                        if not solutions[arm]:
+                            # We might need to give up if we've already
+                            # tried max_tweaks times.
+                            if iterations[i][arm] >= max_tweaks:
+                                return False
+                            # Otherwise, we tweak it.
+                            oldPoint = poses[arm].position
+                            newPoint = Point(oldPoint.x - delta,
+                                oldPoint.y - delta,
+                                oldPoint.z - delta)
+                            poses[arm].position = newPoint
+                            iterations[i][arm] += 1
+                            rospy.loginfo('Iteration: ' + str(iterations))
+                            rospy.loginfo('No solution at: ' + str(oldPoint))
+                            rospy.loginfo('Trying at: ' + str(newPoint))
+                            return self.solve_ik_for_action(iterations)
 
             if (self.action.seq.seq[i].type == ActionStep.ARM_TRAJECTORY):
                 n_frames = len(self.action.seq.seq[i].armTrajectory.timing)
@@ -187,7 +231,7 @@ class Arms:
             target_pose = World.transform(arm_state.ee_pose,
                             arm_state.refFrameObject.name, 'base_link')
 
-	    target_pose.position.z = target_pose.position.z + z_offset
+            target_pose.position.z = target_pose.position.z + z_offset
 
             target_joints = Arms.arms[arm_index].get_ik_for_ee(target_pose,
                                             arm_state.joint_pose)
@@ -201,10 +245,10 @@ class Arms:
                 solution.joint_pose = target_joints
                 return solution, True
         elif (arm_state.refFrame == ArmState.ROBOT_BASE):
-	    #rospy.loginfo('solve_ik_for_arm: Arm ' + str(arm_index) + ' is absolute')
-	    pos = arm_state.ee_pose.position
-	    target_position = Point(pos.x, pos.y, pos.z + z_offset)
-	    target_pose = Pose(target_position, arm_state.ee_pose.orientation)
+    	    #rospy.loginfo('solve_ik_for_arm: Arm ' + str(arm_index) + ' is absolute')
+    	    pos = arm_state.ee_pose.position
+    	    target_position = Point(pos.x, pos.y, pos.z + z_offset)
+    	    target_pose = Pose(target_position, arm_state.ee_pose.orientation)
             target_joints = Arms.arms[arm_index].get_ik_for_ee(target_pose,
                                                     arm_state.joint_pose)
             if (target_joints == None):
@@ -267,7 +311,7 @@ class Arms:
             self.change_status(ExecutionStatus.CONDITION_ERROR)
         else:
             # Check that all parts of the action are reachable
-            if (not self.solve_ik_for_action()):
+            if (not self.solve_ik_for_action([])):
                 rospy.logwarn('Problems in finding IK solutions...')
                 self.change_status(ExecutionStatus.NO_IK)
             else:
