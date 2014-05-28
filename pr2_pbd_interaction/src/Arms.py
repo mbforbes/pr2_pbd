@@ -142,21 +142,6 @@ class Arms:
     def solve_ik_for_action(self, iterations=[]):
         '''Computes joint positions for all end-effector poses
         in an action'''
-        # How much to tweak pose by when it's unreachable.
-        delta = 0.01 # units in meters, so 0.01 is 1cm (I think)
-        # How many tweaks we can do per pose before we just give up.
-        max_tweaks = 10
-        # Initialize iterations variable if not already initialized.
-        # It contains an entry for every step, and each entry is a list
-        # of two values (iterations for left and right arms,
-        # repsectively).
-        if len(iterations) == 0:
-            for step in range(self.action.n_frames()):
-                iterations.append([0,0])
-
-        # Scale tweaks by number of poses and L/R hands.
-        cutoff = max_tweaks * self.action.n_frames() * 2
-
         # Go over steps of the action
         for i in range(self.action.n_frames()):
             # For each step check step type
@@ -175,36 +160,6 @@ class Arms:
 
                 self.action.seq.seq[i].armTarget.rArm = r_arm
                 self.action.seq.seq[i].armTarget.lArm = l_arm
-
-                # Check whether either doesn't have a solution.
-                if (not has_solution_r) or (not has_solution_l):
-                    # Try to tweak the left and/or right arm!
-                    # These arrays are just to avoid code duplication.
-                    solutions = [has_solution_l, has_solution_r]
-                    poses = [
-                        self.action.seq.seq[i].armTarget.lArm.ee_pose,
-                        self.action.seq.seq[i].armTarget.rArm.ee_pose
-                    ]
-
-                    # Check both arms, and if either lacks a solution,
-                    # nudge the pose by delta and try again.
-                    for arm in range(len(solutions)):
-                        if not solutions[arm]:
-                            # We might need to give up if we've already
-                            # tried max_tweaks times.
-                            if iterations[i][arm] >= max_tweaks:
-                                return False
-                            # Otherwise, we tweak it.
-                            oldPoint = poses[arm].position
-                            newPoint = Point(oldPoint.x - delta,
-                                oldPoint.y - delta,
-                                oldPoint.z - delta)
-                            poses[arm].position = newPoint
-                            iterations[i][arm] += 1
-                            rospy.loginfo('Iteration: ' + str(iterations))
-                            rospy.loginfo('No solution at: ' + str(oldPoint))
-                            rospy.loginfo('Trying at: ' + str(newPoint))
-                            return self.solve_ik_for_action(iterations)
 
             if (self.action.seq.seq[i].type == ActionStep.ARM_TRAJECTORY):
                 n_frames = len(self.action.seq.seq[i].armTrajectory.timing)
