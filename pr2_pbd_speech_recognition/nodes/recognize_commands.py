@@ -19,6 +19,19 @@ from pr2_pbd_msgs.msg import RecognizedSpeech
 NLP_SERVER = 'http://robomackerel.cs.washington.edu'
 NLP_PORT = 10001
 
+# This maps old (spoken) commands to new (system-used) ones.
+CMD_MAP = [
+    'release-right-arm': 'relax-right-arm',
+    'release-left-arm': 'relax-left-arm',
+    'hold-left-arm': 'freeze-left-arm',
+    'hold-right-arm': 'freeze-right-arm',
+    'clear-skill': 'delete-all-steps',
+    'create-new-skill': 'create-new-action',
+    'execute-skill': 'execute-action',
+    'next-skill': 'next-action',
+    'previous-skill': 'previous-action'
+]
+
 class CommandRecognizer:
     '''This class is responsible for receiving recognized speech,
     transforming it into a system command, and publishing that
@@ -99,9 +112,12 @@ class CommandRecognizer:
         recognizedStr = data.data
         recognizedCommand = Command.UNRECOGNIZED
 
-        # NOTE(max): Testing full pocketsphinx capabilities.
+        # NOTE(max): Debug.
         rospy.loginfo('Sphinx got: ' + recognizedStr)
 
+        # TODO(max): Use CMD_MAP to translate old commands to new ones.
+
+        # TODO(max): Make this better.
         for commandStr in self.allCommands:
             if (recognizedStr == commandStr):
                 recognizedCommand = commandStr

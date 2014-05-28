@@ -1,0 +1,17 @@
+test-microphone
+release-right-arm
+release-left-arm
+open-right-hand
+open-left-hand
+close-right-hand
+close-left-hand
+undo-last-command
+clear-skill
+delete-last-step
+hold-right-arm
+hold-left-arm
+create-new-skill
+execute-skill
+next-skill
+previous-skill
+save-pose

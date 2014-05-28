@@ -3,8 +3,8 @@
 	<!-- NOTE(max): Not using pocketsphinx for now; trying arbitrary text
 	   recognition using gspeech (Google's API). -->
 	<!-- 	<node name="recognizer" pkg="pocketsphinx" type="recognizer.py" output="screen">
-		<param name="lm" value="$(find pr2_pbd_speech_recognition)/data/full.lm"/>
-		<param name="dict" value="$(find pr2_pbd_speech_recognition)/data/full.dic"/>
+		<param name="lm" value="$(find pr2_pbd_speech_recognition)/data/orig_commands.lm"/>
+		<param name="dict" value="$(find pr2_pbd_speech_recognition)/data/orig_commands.dic"/>
 	</node>
 	-->
 
