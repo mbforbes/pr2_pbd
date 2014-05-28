@@ -20,7 +20,7 @@ NLP_SERVER = 'http://robomackerel.cs.washington.edu'
 NLP_PORT = 10001
 
 # This maps old (spoken) commands to new (system-used) ones.
-CMD_MAP = [
+CMD_MAP = {
     'release-right-arm': 'relax-right-arm',
     'release-left-arm': 'relax-left-arm',
     'hold-left-arm': 'freeze-left-arm',
@@ -30,7 +30,7 @@ CMD_MAP = [
     'execute-skill': 'execute-action',
     'next-skill': 'next-action',
     'previous-skill': 'previous-action'
-]
+}
 
 class CommandRecognizer:
     '''This class is responsible for receiving recognized speech,
