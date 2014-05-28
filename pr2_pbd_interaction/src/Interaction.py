@@ -234,14 +234,14 @@ class Interaction:
             self._undo_param = None
             return result
 
-    def _resume_all_steps(self):
+    def _resume_all_steps(self, undo_param=None):
         '''Resumes all steps after clearing'''
         self.session.undo_clear()
         self._undo_function = None
         self._undo_param = None
         return [RobotSpeech.ALL_POSES_RESUMED, GazeGoal.NOD]
 
-    def _resume_last_step(self):
+    def _resume_last_step(self, undo_param=None):
         '''Resumes last step after deleting'''
         self.session.resume_deleted_step()
         self._undo_function = None
