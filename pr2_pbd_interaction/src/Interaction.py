@@ -21,7 +21,7 @@ from pr2_pbd_interaction.msg import GripperAction, ArmTrajectory
 from pr2_pbd_interaction.msg import ExecutionStatus, GuiCommand
 from pr2_pbd_speech_recognition.msg import Command
 from pr2_social_gaze.msg import GazeGoal
-
+from geometry_msgs.msg import Pose, Point, Quaternion, Vector3
 
 class Interaction:
     '''Finite state machine for the human interaction'''
@@ -552,4 +552,18 @@ class Interaction:
     @staticmethod
     def empty_response(responses):
         '''Default response to speech commands'''
+        print ("HERE")
+        arm_index = 0 # right arm: 0, left arm: 1
+        rospy.loginfo('Elevating arm.')
+        arm_state = ArmState(0, Pose(
+                            Point(0.722373452614, -0.0157659750775,
+                                1.14839023874),
+                            Quaternion(-0.69987504269, -0.0289561889715,
+                                0.712701230833, -0.0373285320999)
+                        ),
+                        [0.20002106, -0.35347237, -3.04645402, -0.52702965,
+                            31.31729613, -1.41955357, 0.15604402],
+                        Object(0,'', Pose(Point(),Quaternion()), Vector3())
+                    )
+        self.arms.start_move_to_pose(arm_state, arm_index)
         return responses
