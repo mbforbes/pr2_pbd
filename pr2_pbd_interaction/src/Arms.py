@@ -181,18 +181,14 @@ class Arms:
         self.status = ExecutionStatus.EXECUTING
         solution, has_solution = Arms.solve_ik_for_arm(arm_index, arm_state)
 
-        if (has_solution):
-            if (arm_index == 0):
-                is_successful = self.move_to_joints(solution, None)
-            else:
-                is_successful = self.move_to_joints(None, solution)
-
-            if (is_successful):
-                self.status = ExecutionStatus.SUCCEEDED
-            else:
-                self.status = ExecutionStatus.OBSTRUCTED
+        if (arm_index == 0):
+            is_successful = self.move_to_joints(solution, None)
         else:
-            self.status = ExecutionStatus.NO_IK
+            is_successful = self.move_to_joints(None, solution)
+        if (is_successful):
+            self.status = ExecutionStatus.SUCCEEDED
+        else:
+            self.status = ExecutionStatus.OBSTRUCTED
 
     def execute_action(self):
         ''' Function to replay the demonstrated two-arm action

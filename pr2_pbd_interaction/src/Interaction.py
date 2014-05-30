@@ -339,6 +339,36 @@ class Interaction:
 
     def save_step(self, dummy=None):
         '''Saves current arm state as an action step'''
+        print ("HERE")
+        objs = self.world.get_frame_list()
+        # Settings
+        arm_index = 0 # right arm: 0, left arm: 1
+        # Open hand
+        self.open_hand(arm_index)
+        # Get location
+#        obj = objs[0]
+#        objname = obj.name
+        rospy.loginfo('Elevating arm.')
+        arm_state = ArmState(
+            0,
+            Pose(
+                Point(0.722373452614, -0.0157659750775,
+                    1.14839023874),
+                Quaternion(-0.69987504269, -0.0289561889715,
+                    0.712701230833, -0.0373285320999)
+            ),
+            [0.20002106, -0.35347237, -3.04645402, -0.52702965,
+                31.31729613, -1.41955357, 0.15604402],
+            Object(0,'', Pose(Point(),Quaternion()), Vector3())
+        )
+        self.arms.start_move_to_pose(arm_state, arm_index)
+#        rospy.loginfo('Moving arm to: ' + objname)
+#        arm_state = ArmState(0,
+#                    obj.pose,
+#                    [],
+#                    Object(0, '', Pose(), Vector3())
+#                )
+#        self.arms.start_move_to_pose(arm_state, arm_index)
         if (self.session.n_actions() > 0):
             if (Interaction._is_programming):
                 states = self._get_arm_states()
@@ -552,18 +582,4 @@ class Interaction:
     @staticmethod
     def empty_response(responses):
         '''Default response to speech commands'''
-        print ("HERE")
-        arm_index = 0 # right arm: 0, left arm: 1
-        rospy.loginfo('Elevating arm.')
-        arm_state = ArmState(0, Pose(
-                            Point(0.722373452614, -0.0157659750775,
-                                1.14839023874),
-                            Quaternion(-0.69987504269, -0.0289561889715,
-                                0.712701230833, -0.0373285320999)
-                        ),
-                        [0.20002106, -0.35347237, -3.04645402, -0.52702965,
-                            31.31729613, -1.41955357, 0.15604402],
-                        Object(0,'', Pose(Point(),Quaternion()), Vector3())
-                    )
-        self.arms.start_move_to_pose(arm_state, arm_index)
         return responses
