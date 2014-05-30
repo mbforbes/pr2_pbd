@@ -123,7 +123,7 @@ class CommandRecognizer:
             recognizedCommand = recognizedStr
 
         # Adding sleep to simulate delay in Google's speech API.
-        rospy.sleep(1.2)
+        # rospy.sleep(1.2)
 
         rospy.loginfo('Received command: ' + recognizedCommand)
         self.commandOutput.publish(Command(recognizedCommand))
