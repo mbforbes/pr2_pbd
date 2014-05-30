@@ -1,12 +1,10 @@
 <launch>
 
 	<!-- This launches pocketsphinx. -->
-	<!--
 	<node name="recognizer" pkg="pocketsphinx" type="recognizer.py" output="screen">
 		<param name="lm" value="$(find pr2_pbd_speech_recognition)/data/orig_commands.lm"/>
 		<param name="dict" value="$(find pr2_pbd_speech_recognition)/data/orig_commands.dic"/>
 	</node>
-	-->
 
 	<!-- This launches the Google speech recognizer API caller via a wrapper (gspeech) -->
 	<!--
@@ -14,7 +12,9 @@
 	-->
 
 	<!-- This launches the chrome Google speech recognizer via a wrapper (chrome) -->
+	<!--
 	<node name="chromeASR" pkg="pr2_pbd_speech_recognition" type="recognize_speech_chrome.py" output="screen"></node>
+	-->
 
 	<!-- This is our node to listen to recognized speech and process the
 	   results, either directly (default, w/ pocketsphinx), or sending

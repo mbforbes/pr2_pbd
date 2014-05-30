@@ -191,7 +191,7 @@ class Session:
     def undo_clear(self):
         '''Undo the effect of clear'''
         if (self.n_actions() > 0):
-            self.actions[self.current_action_index].undoClear()
+            self.actions[self.current_action_index].undo_clear()
         else:
             rospy.logwarn('No skills created yet.')
         self._update_experiment_state()

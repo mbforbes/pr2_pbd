@@ -108,24 +108,25 @@ class CommandRecognizer:
 
     def receiveSphinxData(self, data):
         '''Sphinx is trained only with the commands.'''
-        print data
         recognizedStr = data.data
         recognizedCommand = Command.UNRECOGNIZED
 
         # NOTE(max): Debug.
-        rospy.loginfo('Sphinx got: ' + recognizedStr)
+        # rospy.loginfo('Sphinx got: ' + recognizedStr)
 
-        # TODO(max): Use CMD_MAP to translate old commands to new ones.
+        #  Use CMD_MAP to translate old commands to new ones.
+        if recognizedStr in CMD_MAP.keys():
+            recognizedStr = CMD_MAP[recognizedStr]
 
-        # TODO(max): Make this better.
-        for commandStr in self.allCommands:
-            if (recognizedStr == commandStr):
-                recognizedCommand = commandStr
+        # If recognized string in set of all commands, use it.
+        if recognizedStr in self.allCommands:
+            recognizedCommand = recognizedStr
 
-        #rospy.loginfo('Received command:' + recognizedCommand)
-        command = Command()
-        command.command = recognizedCommand
-        self.commandOutput.publish(command)
+        # Adding sleep to simulate delay in Google's speech API.
+        rospy.sleep(1.2)
+
+        rospy.loginfo('Received command: ' + recognizedCommand)
+        self.commandOutput.publish(Command(recognizedCommand))
 
     def receiveGspeechData(self, recognizedSpeech):
         '''Gspeech should recognize arbitrary speech. We'll then send

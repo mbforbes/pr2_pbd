@@ -10,7 +10,7 @@
   <!-- This plays sounds. -->
   <node name="soundplay_node" pkg="sound_play" type="soundplay_node.py"/>
 
-  <!-- This adds speech recognition (google speech + semantic parsing) -->
-  <include file="$(find pr2_pbd_speech_recognition)/launch/command_recognition.launch"/>
+  <!-- This adds speech recognition (pocketsphinx) -->
+  <include file="$(find pr2_pbd_speech_recognition)/launch/cmd_rec_sphinx.launch"/>
 
 </launch>

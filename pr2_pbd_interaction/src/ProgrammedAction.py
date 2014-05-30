@@ -34,6 +34,8 @@ class ProgrammedAction:
         self.l_links = dict()
         self.lock = threading.Lock()
 
+        self._undo_cache = None
+
         if ProgrammedAction._marker_publisher == None:
             ProgrammedAction._marker_publisher = rospy.Publisher(
                     'visualization_marker_array', MarkerArray)
@@ -201,16 +203,31 @@ class ProgrammedAction:
         '''Clear the action'''
         self.reset_viz()
         self.lock.acquire()
+
+        # Cache for undo
+        self._undo_cache = (ActionStepSequence(self.seq.seq),
+            # TODO(max): No idea if this is copying correctly. Basically
+            # don't understand python references.
+            self.r_markers,
+            self.l_markers,
+            self.r_links,
+            self.l_links)
+
+        # Clear
         self.seq = ActionStepSequence()
         self.r_markers = []
         self.l_markers = []
         self.r_links = dict()
         self.l_links = dict()
+
         self.lock.release()
 
     def undo_clear(self):
         '''Undo effect of clear'''
-        self.seq = []
+        if self._undo_cache is not None:
+            self.seq, self.r_markers, self.l_markers, self.r_links, \
+                    self.l_links = self._undo_cache
+            self._undo_cache = None
 
     def _get_filename(self, ext='.bag'):
         '''Returns filename for the bag that holds the action'''
