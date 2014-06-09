@@ -577,6 +577,10 @@ class Interaction:
 
         
     def getBlock(self, i, color):
+        '''Makes the robot look for a table and objects'''
+        objs = self.world.get_frame_list()
+        arm_index = 0 
+
         # sideways position
 #Default Pose
 
@@ -592,22 +596,28 @@ class Interaction:
 #joint_pose: [-1.66652764  0.02079164 -1.18075147 -0.15008017  4.70036589 -0.12677397
 # -0.42011605]
 
-#        rospy.loginfo('Default Position')
-#        arm_state = ArmState(
-#            0,
-#            Pose(
-#                Point(-0.083964934891, -1.00611545184,
-#                    0.754503050059),
-#                Quaternion(0.737935404871, -0.673310184246,
-#                    -0.0442863423926, -0.0119772244547)
-#            ),
-#            [-1.66652764, 0.02079164, -1.18075147, -0.15008017, 4.70036589, -0.12677397, -0.42011605],
-#            Object(0,'', Pose(Point(),Quaternion()), Vector3())
-#        )
-#        self.arms.start_move_to_pose(arm_state, arm_index)
-        self.open_hand(0)
-        self.sayColor(color)
-        self.grabBlock(i)
+
+
+        pose_new = Pose(Point(-0.083964934891, -1.00611545184,
+                    0.754503050059),
+                Quaternion(0.737935404871, -0.673310184246,
+                    -0.0442863423926, -0.0119772244547))
+        ik_solution = self.ik_right.get_ik_for_ee(pose_new) 
+
+
+        rospy.loginfo('Default Position')
+
+        arm_state = ArmState(
+            0,
+            pose_new,
+            ik_solution,
+            Object(0,'', Pose(Point(),Quaternion()), Vector3())
+        )
+        self.arms.start_move_to_pose(arm_state, arm_index)
+                
+#        self.open_hand(arm_index)
+#        self.sayColor(color)
+#        self.grabBlock(i)
         
     def placeBlock(self, i, x, y):
         # Move above the required grid
@@ -694,19 +704,22 @@ class Interaction:
 #joint_pose: [-0.36589188 -0.04089563 -1.88060239 -0.15083799 -1.26160595 -1.58048485
 # -0.3088148 ]
 
-#        rospy.loginfo('Position 2.')
-#        arm_state = ArmState(
-#           0,
-#            Pose(
-#                Point(0.729687995221, -0.437537436015,
-#                    0.765807557296),
-#                Quaternion(-0.700998025188, -0.0308937799918,
-#                    0.711850579084, -0.0302670794436)
-#            ),
-#            [-0.36589188, -0.04089563, -1.88060239, -0.15083799, -1.26160595, -1.58048485, -0.3088148],
-#            Object(0,'', Pose(Point(),Quaternion()), Vector3())
-#        )
-#        self.arms.start_move_to_pose(arm_state, arm_index)
+        pose_new = Pose(Point(0.729687995221, -0.437537436015,
+                    0.765807557296),
+                Quaternion(-0.700998025188, -0.0308937799918,
+                    0.711850579084, -0.0302670794436))
+        ik_solution = self.ik_right.get_ik_for_ee(pose_new) 
+
+
+        rospy.loginfo('Position 2.')
+
+        arm_state = ArmState(
+            0,
+            pose_new,
+            ik_solution,
+            Object(0,'', Pose(Point(),Quaternion()), Vector3())
+        )
+        self.arms.start_move_to_pose(arm_state, arm_index)
 
 #POS3
 
@@ -737,33 +750,7 @@ class Interaction:
 #        )
 #        self.arms.start_move_to_pose(arm_state, arm_index)
 
-#POS4
 
-#  position: 
-#    x: 0.725304016651
-#    y: 0.067733625044
-#    z: 0.772047444606
-#  orientation: 
-#    x: -0.700782723519
-#    y: -0.0321300462759
-#    z: 0.711998018067
-#    w: -0.0304968328256
-#joint_pose: [ 0.23665961 -0.03363956 -1.6177423  -0.20996282 -1.50953665 -1.60760814
-#  0.35809484]
-
-#        rospy.loginfo('Position 4.')
-#        arm_state = ArmState(
-#            0,
-#            Pose(
-#                Point(0.725304016651, -0.067733625044,
-#                    1.772047444606),
-#                Quaternion(-0.69987504269, -0.0289561889715,
-#                    0.712701230833, -0.0373285320999)
-#            ),
-#            [0.23665961, -0.03363956, -1.6177423,  -0.20996282, -1.50953665, -1.60760814, 0.35809484],
-#            Object(0,'', Pose(Point(),Quaternion()), Vector3())
-#        )
-#        self.arms.start_move_to_pose(arm_state, arm_index)
 
 
         xMin = 0.725304016651
@@ -787,7 +774,7 @@ class Interaction:
 #        rospy.loginfo('ColorArray: ')
 #        rospy.loginfo(str(colorArray))
 
-#        for i in range (0, 81):
+#        for i in range (0, 1):
 #            self.getBlock(i, colorArray[i])
 #            self.placeBlock(i, xArray[i], yArray[i])
 
