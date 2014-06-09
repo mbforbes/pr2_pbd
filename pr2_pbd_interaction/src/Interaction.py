@@ -538,6 +538,104 @@ class Interaction:
 
         self.arms.status = ExecutionStatus.NOT_EXECUTING
 
+    def moveToPos(self, x, y, z):
+        arm_index = 0
+        pose_new = Pose(Point(x, y, z),
+                        Quaternion(-0.700782723519, -0.0321300462759,
+                             0.711998018067, -0.0304968328256))
+        ik_solution = self.ik_right.get_ik_for_ee(pose_new) 
+
+#        rospy.loginfo('Moving to')
+#        rospy.loginfo('X: ')
+#        rospy.loginfo(str(x))
+#        rospy.loginfo('Y: ')
+#        rospy.loginfo(str(y))
+#        rospy.loginfo('Z: ')
+#        rospy.loginfo(str(z))
+
+#        arm_state = ArmState(
+#            0,
+#            pose_new,
+#            ik_solution,
+#            Object(0,'', Pose(Point(),Quaternion()), Vector3())
+#        )
+#        self.arms.start_move_to_pose(arm_state, arm_index)
+
+
+    def sayColor(self, color):
+        raw_input ("Please give block of " + color + " color, and press enter afterwards")
+
+    def grabBlock(self, i):
+#        print "Grabbing block ", i, " now"
+        arm_index = 0
+        self.close_hand(arm_index)
+
+    def releaseBlock(self, i):
+#        print "Placing block ", i, " now"
+        arm_index = 0
+        self.open_hand(arm_index)
+
+        
+    def getBlock(self, i, color):
+        # sideways position
+#Default Pose
+
+#  position: 
+#    x: -0.083964934891
+#    y: -1.00611545184
+#    z: 0.754503050059
+#  orientation: 
+#    x: 0.737935404871
+#    y: -0.673310184246
+#    z: -0.0442863423926
+#    w: -0.0119772244547
+#joint_pose: [-1.66652764  0.02079164 -1.18075147 -0.15008017  4.70036589 -0.12677397
+# -0.42011605]
+
+#        rospy.loginfo('Default Position')
+#        arm_state = ArmState(
+#            0,
+#            Pose(
+#                Point(-0.083964934891, -1.00611545184,
+#                    0.754503050059),
+#                Quaternion(0.737935404871, -0.673310184246,
+#                    -0.0442863423926, -0.0119772244547)
+#            ),
+#            [-1.66652764, 0.02079164, -1.18075147, -0.15008017, 4.70036589, -0.12677397, -0.42011605],
+#            Object(0,'', Pose(Point(),Quaternion()), Vector3())
+#        )
+#        self.arms.start_move_to_pose(arm_state, arm_index)
+        self.open_hand(0)
+        self.sayColor(color)
+        self.grabBlock(i)
+        
+    def placeBlock(self, i, x, y):
+        # Move above the required grid
+        self.moveToPos(x, y, 0.75)
+        # Move closer to the table
+        self.moveToPos(x, y, 0.5)
+        # Release gripper
+        self.releaseBlock(i)
+        # Move up again
+        self.moveToPos(x, y, 0.75)    
+
+    def getCoords(self, xMin, yMin, matrix, xArray, yArray):
+#        xRange = xMax-xMin
+#        yRange = yMax- yMin
+#        rangeAvailable = min (xRange, yRange)
+        blockSize = 0.05
+        xStart = xMin
+        yStart = yMin
+        
+        for i in range (0, 9):
+            for j in range (0, 9):
+                matrix[i][j][0] = xStart - j*blockSize
+                matrix[i][j][1] = yStart - i*blockSize
+                
+                xArray[9*i+j] = xStart - j*blockSize
+                yArray[9*i+j] = yStart - i*blockSize
+
+
     def record_object_pose(self, dummy=None):
         '''Makes the robot look for a table and objects'''
         objs = self.world.get_frame_list()
@@ -571,22 +669,13 @@ class Interaction:
                              0.711998018067, -0.0304968328256))
         ik_solution = self.ik_right.get_ik_for_ee(pose_new) 
 
-        rospy.logwarn('')
-        rospy.logwarn('Joint Pose:')
-        rospy.logwarn(str(ik_solution))
-
 
         rospy.loginfo('Position 1.')
 
         arm_state = ArmState(
             0,
-            Pose(
-                Point(0.725304016651, 0.067733625044,
-                    0.772047444606),
-                Quaternion(-0.700782723519, -0.0321300462759,
-                    0.711998018067, -0.0304968328256)
-            ),
-            [0.23659336, -0.02729438, -1.55, -0.20994583, -1.57710341, -1.61551437, 0.35831203],
+            pose_new,
+            ik_solution,
             Object(0,'', Pose(Point(),Quaternion()), Vector3())
         )
         self.arms.start_move_to_pose(arm_state, arm_index)
@@ -677,103 +766,33 @@ class Interaction:
 #        self.arms.start_move_to_pose(arm_state, arm_index)
 
 
-
-#Default Pose
-
-#  position: 
-#    x: -0.083964934891
-#    y: -1.00611545184
-#    z: 0.754503050059
-#  orientation: 
-#    x: 0.737935404871
-#    y: -0.673310184246
-#    z: -0.0442863423926
-#    w: -0.0119772244547
-#joint_pose: [-1.66652764  0.02079164 -1.18075147 -0.15008017  4.70036589 -0.12677397
-# -0.42011605]
-
-#        rospy.loginfo('Default Position')
-#        arm_state = ArmState(
-#            0,
-#            Pose(
-#                Point(-0.083964934891, -1.00611545184,
-#                    0.754503050059),
-#                Quaternion(0.737935404871, -0.673310184246,
-#                    -0.0442863423926, -0.0119772244547)
-#            ),
-#            [-1.66652764, 0.02079164, -1.18075147, -0.15008017, 4.70036589, -0.12677397, -0.42011605],
-#            Object(0,'', Pose(Point(),Quaternion()), Vector3())
-#        )
-#        self.arms.start_move_to_pose(arm_state, arm_index)
-
-
-#        xMin = 1000
-#        xMax = 9000
-#        yMin = 0
-#        yMax = 9000
-#        xArray = [0 for x in xrange (81)]
-#        yArray = [0 for x in xrange (81)]
-#        matrix = [[[0 for x in xrange(2)] for y in xrange(9)] for z in xrange(9)] 
+        xMin = 0.725304016651
+        yMin = 0.067733625044
+        xArray = [0 for x in xrange (81)]
+        yArray = [0 for x in xrange (81)]
+        matrix = [[[0 for x in xrange(2)] for y in xrange(9)] for z in xrange(9)] 
         
-#        getCoords(xMin, xMax, yMin, yMax, matrix, xArray, yArray)
-#        colorArray = ["Black" for x in xrange (81)]
-        
-    #    print "Matrix: ", matrix
-    #    print "xArray: ", xArray
-    #    print "yArray: ", yArray
-    #    print "ColorArray: ", colorArray
-        
+        self.getCoords(xMin, yMin, matrix, xArray, yArray)
+        colorArray = ["Black" for x in xrange (81)]
+
+#        rospy.loginfo('Matrix: ')
+#        rospy.loginfo(str(matrix))
+
+#        rospy.loginfo('xArray: ')
+#        rospy.loginfo(str(xArray))
+
+#        rospy.loginfo('yArray: ')
+#        rospy.loginfo(str(yArray))
+
+#        rospy.loginfo('ColorArray: ')
+#        rospy.loginfo(str(colorArray))
 
 #        for i in range (0, 81):
-#            getBlock(i, colorArray[i])
-#            placeBlock(i, xArray[i], yArray[i])
+#            self.getBlock(i, colorArray[i])
+#            self.placeBlock(i, xArray[i], yArray[i])
 
         return [RobotSpeech.OBJECT_NOT_DETECTED, GazeGoal.SHAKE]
 
-
-    def moveToPos(self, x, y, z):
-        print "Moving to", x, y, z
-
-    def sayColor(self, color):
-        raw_input ("Please give block of " + color + " color, and press enter afterwards")
-
-    def grabBlock(self, i):
-        print "Grabbing block ", i, " now"
-
-    def releaseBlock(self, i):
-        print "Placing block ", i, " now"  
-        
-    def getBlock(self, i, color):
-        # sideways position
-        moveToPos(0, 0, 0)
-        sayColor(color)
-        grabBlock(i)
-        
-    def placeBlock(self, i, x, y):
-        # Move above the required grid
-        moveToPos(x, y, 100)
-        # Move closer to the table
-        moveToPos(x, y, 10)
-        # Release gripper
-        releaseBlock(i)
-        # Move up again
-        moveToPos(x, y, 100)    
-
-    def getCoords(self, xMin, xMax, yMin, yMax, matrix, xArray, yArray):
-        xRange = xMax-xMin
-        yRange = yMax- yMin
-        rangeAvailable = min (xRange, yRange)
-        blockSize = rangeAvailable/8
-        xStart = xMin
-        yStart = yMin
-        
-        for i in range (0, 9):
-            for j in range (0, 9):
-                matrix[i][j][0] = xStart + j*blockSize
-                matrix[i][j][1] = yStart + i*blockSize
-                
-                xArray[9*i+j] = xStart + j*blockSize
-                yArray[9*i+j] = yStart + i*blockSize
 
     def save_experiment_state(self):
         '''Saves session state'''
