@@ -23,6 +23,8 @@ from pr2_pbd_speech_recognition.msg import Command
 from pr2_social_gaze.msg import GazeGoal
 from geometry_msgs.msg import Pose, Point, Quaternion, Vector3
 
+from ik import IK
+
 class Interaction:
     '''Finite state machine for the human interaction'''
 
@@ -70,7 +72,8 @@ class Interaction:
                                             self.start_recording, None),
             Command.STOP_RECORDING_MOTION: Response(self.stop_recording, None)
             }
-
+        self.ik_left = IK("l")
+        self.ik_right = IK("r")
         rospy.loginfo('Interaction initialized.')
 
     def open_hand(self, arm_index):
@@ -339,36 +342,6 @@ class Interaction:
 
     def save_step(self, dummy=None):
         '''Saves current arm state as an action step'''
-        print ("HERE")
-        objs = self.world.get_frame_list()
-        # Settings
-        arm_index = 0 # right arm: 0, left arm: 1
-        # Open hand
-        self.open_hand(arm_index)
-        # Get location
-#        obj = objs[0]
-#        objname = obj.name
-        rospy.loginfo('Elevating arm.')
-        arm_state = ArmState(
-            0,
-            Pose(
-                Point(0.722373452614, -0.0157659750775,
-                    1.14839023874),
-                Quaternion(-0.69987504269, -0.0289561889715,
-                    0.712701230833, -0.0373285320999)
-            ),
-            [0.20002106, -0.35347237, -3.04645402, -0.52702965,
-                31.31729613, -1.41955357, 0.15604402],
-            Object(0,'', Pose(Point(),Quaternion()), Vector3())
-        )
-        self.arms.start_move_to_pose(arm_state, arm_index)
-#        rospy.loginfo('Moving arm to: ' + objname)
-#        arm_state = ArmState(0,
-#                    obj.pose,
-#                    [],
-#                    Object(0, '', Pose(), Vector3())
-#                )
-#        self.arms.start_move_to_pose(arm_state, arm_index)
         if (self.session.n_actions() > 0):
             if (Interaction._is_programming):
                 states = self._get_arm_states()
@@ -567,13 +540,240 @@ class Interaction:
 
     def record_object_pose(self, dummy=None):
         '''Makes the robot look for a table and objects'''
-        if (self.world.update_object_pose()):
-            if (self.session.n_actions() > 0):
-                self.session.get_current_action().update_objects(
-                                            self.world.get_frame_list())
-            return [RobotSpeech.START_STATE_RECORDED, GazeGoal.NOD]
-        else:
-            return [RobotSpeech.OBJECT_NOT_DETECTED, GazeGoal.SHAKE]
+        objs = self.world.get_frame_list()
+        # Settings
+        arm_index = 0 # right arm: 0, left arm: 1
+        # Open hand
+        self.open_hand(arm_index)
+
+# Original
+# Quaternion(-0.69987504269, -0.0289561889715, 0.712701230833, -0.0373285320999)),
+
+#POS1
+
+#  position: 
+#    x: 0.725304016651
+#    y: 0.067733625044
+#    z: 0.772047444606
+#  orientation: 
+#    x: -0.700782723519
+#    y: -0.0321300462759
+#    z: 0.711998018067
+#    w: -0.0304968328256
+#joint_pose: [ 0.23665961 -0.03363956 -1.6177423  -0.20996282 -1.50953665 -1.60760814
+#  0.35809484]
+# 1: [ 0.23659336 -0.02729438 -1.55       -0.20994583 -1.57710341 -1.61551437
+#  0.35831203]
+
+        pose_new = Pose(Point(0.725304016651, 0.067733625044,
+                             0.772047444606),
+                        Quaternion(-0.700782723519, -0.0321300462759,
+                             0.711998018067, -0.0304968328256))
+        ik_solution = self.ik_right.get_ik_for_ee(pose_new) 
+
+        rospy.logwarn('')
+        rospy.logwarn('Joint Pose:')
+        rospy.logwarn(str(ik_solution))
+
+
+        rospy.loginfo('Position 1.')
+
+        arm_state = ArmState(
+            0,
+            Pose(
+                Point(0.725304016651, 0.067733625044,
+                    0.772047444606),
+                Quaternion(-0.700782723519, -0.0321300462759,
+                    0.711998018067, -0.0304968328256)
+            ),
+            [0.23659336, -0.02729438, -1.55, -0.20994583, -1.57710341, -1.61551437, 0.35831203],
+            Object(0,'', Pose(Point(),Quaternion()), Vector3())
+        )
+        self.arms.start_move_to_pose(arm_state, arm_index)
+
+#POS2
+
+#  position: 
+#    x: 0.729687995221
+#    y: -0.437537436015
+#    z: 0.765807557296
+#  orientation: 
+#    x: -0.700998025188
+#    y: -0.0308937799918
+#    z: 0.711850579084
+#    w: -0.0302670794436
+#joint_pose: [-0.36589188 -0.04089563 -1.88060239 -0.15083799 -1.26160595 -1.58048485
+# -0.3088148 ]
+
+#        rospy.loginfo('Position 2.')
+#        arm_state = ArmState(
+#           0,
+#            Pose(
+#                Point(0.729687995221, -0.437537436015,
+#                    0.765807557296),
+#                Quaternion(-0.700998025188, -0.0308937799918,
+#                    0.711850579084, -0.0302670794436)
+#            ),
+#            [-0.36589188, -0.04089563, -1.88060239, -0.15083799, -1.26160595, -1.58048485, -0.3088148],
+#            Object(0,'', Pose(Point(),Quaternion()), Vector3())
+#        )
+#        self.arms.start_move_to_pose(arm_state, arm_index)
+
+#POS3
+
+#  position: 
+#    x: 0.767395151335
+#    y: -0.188000575716
+#    z: 0.79914341326
+#  orientation: 
+#    x: -2.08137043025e-07
+#    y: -0.124679586268
+#    z: -3.41342162025e-07
+#    w: 0.992197057427
+#joint_pose: [-0.12986223 -0.03705663 -1.54889209 -1.64781875 -1.51623231 -1.58902625
+#  1.43039164]
+
+
+#        rospy.loginfo('Position 3.')
+#        arm_state = ArmState(
+#            0,
+#            Pose(
+#                Point(0.767395151335, -0.188000575716,
+#                    0.79914341326),
+#                Quaternion(-2.08137043025e-07, -0.124679586268,
+#                   -3.41342162025e-07, 0.992197057427)
+#           ),
+#           [-0.12986223, -0.03705663, -1.54889209, -1.64781875, -1.51623231, -1.58902625,  1.43039164],
+#           Object(0,'', Pose(Point(),Quaternion()), Vector3())
+#        )
+#        self.arms.start_move_to_pose(arm_state, arm_index)
+
+#POS4
+
+#  position: 
+#    x: 0.725304016651
+#    y: 0.067733625044
+#    z: 0.772047444606
+#  orientation: 
+#    x: -0.700782723519
+#    y: -0.0321300462759
+#    z: 0.711998018067
+#    w: -0.0304968328256
+#joint_pose: [ 0.23665961 -0.03363956 -1.6177423  -0.20996282 -1.50953665 -1.60760814
+#  0.35809484]
+
+#        rospy.loginfo('Position 4.')
+#        arm_state = ArmState(
+#            0,
+#            Pose(
+#                Point(0.725304016651, -0.067733625044,
+#                    1.772047444606),
+#                Quaternion(-0.69987504269, -0.0289561889715,
+#                    0.712701230833, -0.0373285320999)
+#            ),
+#            [0.23665961, -0.03363956, -1.6177423,  -0.20996282, -1.50953665, -1.60760814, 0.35809484],
+#            Object(0,'', Pose(Point(),Quaternion()), Vector3())
+#        )
+#        self.arms.start_move_to_pose(arm_state, arm_index)
+
+
+
+#Default Pose
+
+#  position: 
+#    x: -0.083964934891
+#    y: -1.00611545184
+#    z: 0.754503050059
+#  orientation: 
+#    x: 0.737935404871
+#    y: -0.673310184246
+#    z: -0.0442863423926
+#    w: -0.0119772244547
+#joint_pose: [-1.66652764  0.02079164 -1.18075147 -0.15008017  4.70036589 -0.12677397
+# -0.42011605]
+
+#        rospy.loginfo('Default Position')
+#        arm_state = ArmState(
+#            0,
+#            Pose(
+#                Point(-0.083964934891, -1.00611545184,
+#                    0.754503050059),
+#                Quaternion(0.737935404871, -0.673310184246,
+#                    -0.0442863423926, -0.0119772244547)
+#            ),
+#            [-1.66652764, 0.02079164, -1.18075147, -0.15008017, 4.70036589, -0.12677397, -0.42011605],
+#            Object(0,'', Pose(Point(),Quaternion()), Vector3())
+#        )
+#        self.arms.start_move_to_pose(arm_state, arm_index)
+
+
+#        xMin = 1000
+#        xMax = 9000
+#        yMin = 0
+#        yMax = 9000
+#        xArray = [0 for x in xrange (81)]
+#        yArray = [0 for x in xrange (81)]
+#        matrix = [[[0 for x in xrange(2)] for y in xrange(9)] for z in xrange(9)] 
+        
+#        getCoords(xMin, xMax, yMin, yMax, matrix, xArray, yArray)
+#        colorArray = ["Black" for x in xrange (81)]
+        
+    #    print "Matrix: ", matrix
+    #    print "xArray: ", xArray
+    #    print "yArray: ", yArray
+    #    print "ColorArray: ", colorArray
+        
+
+#        for i in range (0, 81):
+#            getBlock(i, colorArray[i])
+#            placeBlock(i, xArray[i], yArray[i])
+
+        return [RobotSpeech.OBJECT_NOT_DETECTED, GazeGoal.SHAKE]
+
+
+    def moveToPos(self, x, y, z):
+        print "Moving to", x, y, z
+
+    def sayColor(self, color):
+        raw_input ("Please give block of " + color + " color, and press enter afterwards")
+
+    def grabBlock(self, i):
+        print "Grabbing block ", i, " now"
+
+    def releaseBlock(self, i):
+        print "Placing block ", i, " now"  
+        
+    def getBlock(self, i, color):
+        # sideways position
+        moveToPos(0, 0, 0)
+        sayColor(color)
+        grabBlock(i)
+        
+    def placeBlock(self, i, x, y):
+        # Move above the required grid
+        moveToPos(x, y, 100)
+        # Move closer to the table
+        moveToPos(x, y, 10)
+        # Release gripper
+        releaseBlock(i)
+        # Move up again
+        moveToPos(x, y, 100)    
+
+    def getCoords(self, xMin, xMax, yMin, yMax, matrix, xArray, yArray):
+        xRange = xMax-xMin
+        yRange = yMax- yMin
+        rangeAvailable = min (xRange, yRange)
+        blockSize = rangeAvailable/8
+        xStart = xMin
+        yStart = yMin
+        
+        for i in range (0, 9):
+            for j in range (0, 9):
+                matrix[i][j][0] = xStart + j*blockSize
+                matrix[i][j][1] = yStart + i*blockSize
+                
+                xArray[9*i+j] = xStart + j*blockSize
+                yArray[9*i+j] = yStart + i*blockSize
 
     def save_experiment_state(self):
         '''Saves session state'''
