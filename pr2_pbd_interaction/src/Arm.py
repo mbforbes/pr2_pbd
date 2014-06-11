@@ -236,7 +236,7 @@ class Arm:
         '''Returns the current arm mode (released/holding)'''
         return self.arm_mode
 
-    def _send_gripper_command(self, pos=0.08, eff=30.0, wait=False):
+    def _send_gripper_command(self, pos=0.035, eff=30.0, wait=False):
         '''Sets the position of the gripper'''
         command = Pr2GripperCommandGoal()
         command.command.position = pos
@@ -265,14 +265,14 @@ class Arm:
             joint_name = self.gripper_joint_name
         gripper_pos = self.get_joint_state([joint_name])
         if gripper_pos != []:
-            if gripper_pos[0] > 0.078:
+            if gripper_pos[0] > 0.033:
                 self.gripper_state = GripperState.OPEN
             else:
                 self.gripper_state = GripperState.CLOSED
         else:
             rospy.logwarn('Could not update the gripper state.')
 
-    def open_gripper(self, pos=0.08, eff=30.0, wait=False):
+    def open_gripper(self, pos=0.035, eff=30.0, wait=False):
         '''Opens gripper'''
         self._send_gripper_command(pos, eff, wait)
         self.gripper_state = GripperState.OPEN

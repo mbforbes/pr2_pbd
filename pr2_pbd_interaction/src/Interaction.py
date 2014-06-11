@@ -670,7 +670,8 @@ class Interaction:
 
 
     def sayColor(self, color):
-        raw_input ("Please give block of " + color + " color, and press enter afterwards")
+        rospy.logwarn ('\033[94mPlease give block of ' + color + ' color' + '\033[0m')
+#        RobotSpeech.say("Please give block of " + str(color) + " color")
 
     def grabBlock(self, i):
 #        print "Grabbing block ", i, " now"
@@ -724,7 +725,8 @@ class Interaction:
         self.arms.start_move_to_pose_no_threading(arm_state, arm_index)
         self.open_hand(arm_index)
         time.sleep(15) 
-#        self.sayColor(color)
+        self.sayColor(color)
+#        time.sleep(5) 
         self.grabBlock(i)
         
     def placeBlock(self, i, x, y):
@@ -771,8 +773,7 @@ class Interaction:
         self.getCoords(xMin, yMin, matrix, xArray, yArray)
         colorArray = ["Black" for x in xrange (81)]
 
-
-        for i in range (0, 81):
+        for i in range (0, 2):
             self.getBlock(i, colorArray[i])
             rospy.loginfo('BACK IN DEMO')
             self.placeBlock(i, xArray[i], yArray[i])
