@@ -238,12 +238,14 @@ class Arm:
 
     def _send_gripper_command(self, pos=0.08, eff=30.0, wait=False):
         '''Sets the position of the gripper'''
+        wait = True
         command = Pr2GripperCommandGoal()
         command.command.position = pos
         command.command.max_effort = eff
         self.gripper_client.send_goal(command)
+
         if wait:
-            self.gripper_client.wait_for_result(rospy.Duration(10.0))
+            res = self.gripper_client.wait_for_result(rospy.Duration(10.0))
 
     def is_gripper_moving(self):
         ''' Whether or not the gripper is in the process of opening/closing'''

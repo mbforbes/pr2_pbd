@@ -7,6 +7,7 @@ roslib.load_manifest('pr2_pbd_interaction')
 import rospy
 import time
 from visualization_msgs.msg import MarkerArray
+from time import sleep
 
 # Local stuff
 from World import World
@@ -651,21 +652,21 @@ class Interaction:
                              0.711998018067, -0.0304968328256))
         ik_solution = self.ik_right.get_ik_for_ee(pose_new) 
 
-#        rospy.loginfo('Moving to')
-#        rospy.loginfo('X: ')
-#        rospy.loginfo(str(x))
-#        rospy.loginfo('Y: ')
-#        rospy.loginfo(str(y))
-#        rospy.loginfo('Z: ')
-#        rospy.loginfo(str(z))
+        rospy.loginfo('Moving to')
+        rospy.loginfo('X: ')
+        rospy.loginfo(str(x))
+        rospy.loginfo('Y: ')
+        rospy.loginfo(str(y))
+        rospy.loginfo('Z: ')
+        rospy.loginfo(str(z))
 
-#        arm_state = ArmState(
-#            0,
-#            pose_new,
-#            ik_solution,
-#            Object(0,'', Pose(Point(),Quaternion()), Vector3())
-#        )
-#        self.arms.start_move_to_pose(arm_state, arm_index)
+        arm_state = ArmState(
+            0,
+            pose_new,
+            ik_solution,
+            Object(0,'', Pose(Point(),Quaternion()), Vector3())
+        )
+        self.arms.start_move_to_pose_no_threading(arm_state, arm_index)
 
 
     def sayColor(self, color):
@@ -675,32 +676,33 @@ class Interaction:
 #        print "Grabbing block ", i, " now"
         arm_index = 0
         self.close_hand(arm_index)
+        time.sleep(15) 
 
     def releaseBlock(self, i):
 #        print "Placing block ", i, " now"
         arm_index = 0
         self.open_hand(arm_index)
+        time.sleep(15) 
 
-        
     def getBlock(self, i, color):
         '''Makes the robot look for a table and objects'''
         objs = self.world.get_frame_list()
         arm_index = 0 
 
         # sideways position
-#Default Pose
+        #Default Pose
 
-#  position: 
-#    x: -0.083964934891
-#    y: -1.00611545184
-#    z: 0.754503050059
-#  orientation: 
-#    x: 0.737935404871
-#    y: -0.673310184246
-#    z: -0.0442863423926
-#    w: -0.0119772244547
-#joint_pose: [-1.66652764  0.02079164 -1.18075147 -0.15008017  4.70036589 -0.12677397
-# -0.42011605]
+        #  position: 
+        #    x: -0.083964934891
+        #    y: -1.00611545184
+        #    z: 0.754503050059
+        #  orientation: 
+        #    x: 0.737935404871
+        #    y: -0.673310184246
+        #    z: -0.0442863423926
+        #    w: -0.0119772244547
+        #joint_pose: [-1.66652764  0.02079164 -1.18075147 -0.15008017  4.70036589 -0.12677397
+        # -0.42011605]
 
 
 
@@ -720,26 +722,28 @@ class Interaction:
             Object(0,'', Pose(Point(),Quaternion()), Vector3())
         )
         self.arms.start_move_to_pose_no_threading(arm_state, arm_index)
-                
         self.open_hand(arm_index)
-        self.sayColor(color)
-#        self.grabBlock(i)
+        time.sleep(15) 
+#        self.sayColor(color)
+        self.grabBlock(i)
         
     def placeBlock(self, i, x, y):
         # Move above the required grid
-        self.moveToPos(x, y, 0.75)
+        self.moveToPos(x, y, 0.80)
+        rospy.loginfo('Moving right above')
         # Move closer to the table
-        self.moveToPos(x, y, 0.5)
+        self.moveToPos(x, y, 0.75)
+        rospy.loginfo('Moving block number' + str(i))
         # Release gripper
         self.releaseBlock(i)
         # Move up again
-        self.moveToPos(x, y, 0.75)    
+        self.moveToPos(x, y, 0.80)    
 
     def getCoords(self, xMin, yMin, matrix, xArray, yArray):
 #        xRange = xMax-xMin
 #        yRange = yMax- yMin
 #        rangeAvailable = min (xRange, yRange)
-        blockSize = 0.05
+        blockSize = 0.025
         xStart = xMin
         yStart = yMin
         
@@ -757,7 +761,6 @@ class Interaction:
         objs = self.world.get_frame_list()
         # Settings
         arm_index = 0 # right arm: 0, left arm: 1
-        # Open hand
 
         xMin = 0.725304016651
         yMin = 0.067733625044
@@ -769,9 +772,10 @@ class Interaction:
         colorArray = ["Black" for x in xrange (81)]
 
 
-        for i in range (0, 1):
+        for i in range (0, 2):
             self.getBlock(i, colorArray[i])
-#            self.placeBlock(i, xArray[i], yArray[i])
+            rospy.loginfo('BACK IN DEMO')
+            self.placeBlock(i, xArray[i], yArray[i])
 
         return [RobotSpeech.OBJECT_NOT_DETECTED, GazeGoal.SHAKE]
 

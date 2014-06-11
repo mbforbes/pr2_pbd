@@ -182,9 +182,7 @@ class Arms:
         solution, has_solution = Arms.solve_ik_for_arm(arm_index, arm_state)
 
         if (arm_index == 0):
-            rospy.loginfo('Before')
             is_successful = self.move_to_joints(solution, None)
-            rospy.loginfo('After')
         else:
             is_successful = self.move_to_joints(None, solution)
         if (is_successful):
