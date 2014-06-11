@@ -772,7 +772,7 @@ class Interaction:
         colorArray = ["Black" for x in xrange (81)]
 
 
-        for i in range (0, 2):
+        for i in range (0, 81):
             self.getBlock(i, colorArray[i])
             rospy.loginfo('BACK IN DEMO')
             self.placeBlock(i, xArray[i], yArray[i])
