@@ -745,7 +745,7 @@ class Interaction:
 #        xRange = xMax-xMin
 #        yRange = yMax- yMin
 #        rangeAvailable = min (xRange, yRange)
-        blockSize = 0.025
+        blockSize = 0.035
         xStart = xMin
         yStart = yMin
         
@@ -773,7 +773,7 @@ class Interaction:
         self.getCoords(xMin, yMin, matrix, xArray, yArray)
         colorArray = ["Black" for x in xrange (81)]
 
-        for i in range (0, 81):
+        for i in range (0, 10):
             self.getBlock(i, colorArray[i])
             rospy.loginfo('BACK IN DEMO')
             self.placeBlock(i, xArray[i], yArray[i])
