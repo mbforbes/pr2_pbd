@@ -790,7 +790,7 @@ class Interaction:
         for i in range (0, 81):
             colorArray[i] = i%4
 
-        for i in range (0, 10):
+        for i in range (0, 81):
             self.getBlock(i, colorArray[i])
             self.placeBlock(i, xArray[i], yArray[i])
 
