@@ -670,8 +670,22 @@ class Interaction:
 
 
     def sayColor(self, color):
-        rospy.logwarn ('\033[94mPlease give block of ' + color + ' color' + '\033[0m')
-#        RobotSpeech.say("Please give block of " + str(color) + " color")
+        if (color == 0):
+            rospy.logwarn ('\033[94mPlease give block of RED color' + '\033[0m')
+            Response.say(RobotSpeech.ASK_RED_BLOCK)
+            Response.perform_gaze_action(GazeGoal.NOD) 
+        elif (color == 1):
+            rospy.logwarn ('\033[94mPlease give block of BLUE color' + '\033[0m')
+            Response.say(RobotSpeech.ASK_BLUE_BLOCK)
+            Response.perform_gaze_action(GazeGoal.NOD) 
+        elif (color == 2):
+            rospy.logwarn ('\033[94mPlease give block of GREEN color' + '\033[0m')
+            Response.say(RobotSpeech.ASK_GREEN_BLOCK)
+            Response.perform_gaze_action(GazeGoal.NOD) 
+        else:
+            rospy.logwarn ('\033[94mPlease give block of YELLOW color' + '\033[0m')
+            Response.say(RobotSpeech.ASK_YELLOW_BLOCK)
+            Response.perform_gaze_action(GazeGoal.NOD) 
 
     def grabBlock(self, i):
 #        print "Grabbing block ", i, " now"
@@ -726,7 +740,7 @@ class Interaction:
         self.open_hand(arm_index)
         time.sleep(15) 
         self.sayColor(color)
-#        time.sleep(5) 
+        time.sleep(10) 
         self.grabBlock(i)
         
     def placeBlock(self, i, x, y):
@@ -771,11 +785,13 @@ class Interaction:
         matrix = [[[0 for x in xrange(2)] for y in xrange(9)] for z in xrange(9)] 
         
         self.getCoords(xMin, yMin, matrix, xArray, yArray)
-        colorArray = ["Black" for x in xrange (81)]
+        colorArray = [0 for x in xrange (81)]
+
+        for i in range (0, 81):
+            colorArray[i] = i%4
 
         for i in range (0, 10):
             self.getBlock(i, colorArray[i])
-            rospy.loginfo('BACK IN DEMO')
             self.placeBlock(i, xArray[i], yArray[i])
 
         return [RobotSpeech.OBJECT_NOT_DETECTED, GazeGoal.SHAKE]
