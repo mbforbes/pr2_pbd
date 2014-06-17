@@ -548,103 +548,6 @@ class Interaction:
         # Open hand
         self.open_hand(arm_index)
 
-# Original
-# Quaternion(-0.69987504269, -0.0289561889715, 0.712701230833, -0.0373285320999)),
-
-#POS1
-
-#  position: 
-#    x: 0.725304016651
-#    y: 0.067733625044
-#    z: 0.772047444606
-#  orientation: 
-#    x: -0.700782723519
-#    y: -0.0321300462759
-#    z: 0.711998018067
-#    w: -0.0304968328256
-#joint_pose: [ 0.23665961 -0.03363956 -1.6177423  -0.20996282 -1.50953665 -1.60760814
-#  0.35809484]
-# 1: [ 0.23659336 -0.02729438 -1.55       -0.20994583 -1.57710341 -1.61551437
-#  0.35831203]
-
-#        pose_new = Pose(Point(0.725304016651, 0.067733625044,
-#                             0.772047444606),
-#                        Quaternion(-0.700782723519, -0.0321300462759,
-#                             0.711998018067, -0.0304968328256))
-#        ik_solution = self.ik_right.get_ik_for_ee(pose_new) 
-
-
-#        rospy.loginfo('Position 1.')
-
-#        arm_state = ArmState(
-#            0,
-#            pose_new,
-#            ik_solution,
-#            Object(0,'', Pose(Point(),Quaternion()), Vector3())
-#        )
-#        self.arms.start_move_to_pose_no_threading(arm_state, arm_index)
-
-#POS2
-
-#  position: 
-#    x: 0.729687995221
-#    y: -0.437537436015
-#    z: 0.765807557296
-#  orientation: 
-#    x: -0.700998025188
-#    y: -0.0308937799918
-#    z: 0.711850579084
-#    w: -0.0302670794436
-#joint_pose: [-0.36589188 -0.04089563 -1.88060239 -0.15083799 -1.26160595 -1.58048485
-# -0.3088148 ]
-
-#        pose_new = Pose(Point(0.729687995221, -0.437537436015,
-#                    0.765807557296),
-#                Quaternion(-0.700998025188, -0.0308937799918,
-#                    0.711850579084, -0.0302670794436))
-#        ik_solution = self.ik_right.get_ik_for_ee(pose_new) 
-#
-#
-#        rospy.loginfo('Position 2.')
-
-#        arm_state = ArmState(
-#            0,
-#            pose_new,
-#            ik_solution,
-#            Object(0,'', Pose(Point(),Quaternion()), Vector3())
-#        )
-#        self.arms.start_move_to_pose_no_threading(arm_state, arm_index)
-
-#POS3
-
-#  position: 
-#    x: 0.767395151335
-#    y: -0.188000575716
-#    z: 0.79914341326
-#  orientation: 
-#    x: -2.08137043025e-07
-#    y: -0.124679586268
-#    z: -3.41342162025e-07
-#    w: 0.992197057427
-#joint_pose: [-0.12986223 -0.03705663 -1.54889209 -1.64781875 -1.51623231 -1.58902625
-#  1.43039164]
-
-
-#        rospy.loginfo('Position 3.')
-#        arm_state = ArmState(
-#            0,
-#            Pose(
-#                Point(0.767395151335, -0.188000575716,
-#                    0.79914341326),
-#                Quaternion(-2.08137043025e-07, -0.124679586268,
-#                   -3.41342162025e-07, 0.992197057427)
-#           ),
-#           [-0.12986223, -0.03705663, -1.54889209, -1.64781875, -1.51623231, -1.58902625,  1.43039164],
-#           Object(0,'', Pose(Point(),Quaternion()), Vector3())
-#        )
-#        self.arms.start_move_to_pose(arm_state, arm_index)
-
-
     def moveToPos(self, x, y, z):
         arm_index = 0
         pose_new = Pose(Point(x, y, z),
@@ -688,39 +591,21 @@ class Interaction:
             Response.perform_gaze_action(GazeGoal.NOD) 
 
     def grabBlock(self, i):
-#        print "Grabbing block ", i, " now"
+        rospy.loginfo('Grabbing block')
         arm_index = 0
         self.close_hand(arm_index)
-        time.sleep(15) 
+#        time.sleep(15) 
 
     def releaseBlock(self, i):
-#        print "Placing block ", i, " now"
         arm_index = 0
         self.open_hand(arm_index)
-        time.sleep(15) 
+        time.sleep(5) 
 
     def getBlock(self, i, color):
-        '''Makes the robot look for a table and objects'''
         objs = self.world.get_frame_list()
         arm_index = 0 
 
         # sideways position
-        #Default Pose
-
-        #  position: 
-        #    x: -0.083964934891
-        #    y: -1.00611545184
-        #    z: 0.754503050059
-        #  orientation: 
-        #    x: 0.737935404871
-        #    y: -0.673310184246
-        #    z: -0.0442863423926
-        #    w: -0.0119772244547
-        #joint_pose: [-1.66652764  0.02079164 -1.18075147 -0.15008017  4.70036589 -0.12677397
-        # -0.42011605]
-
-
-
         pose_new = Pose(Point(-0.083964934891, -1.00611545184,
                     0.754503050059),
                 Quaternion(0.737935404871, -0.673310184246,
@@ -738,17 +623,18 @@ class Interaction:
         )
         self.arms.start_move_to_pose_no_threading(arm_state, arm_index)
         self.open_hand(arm_index)
-        time.sleep(15) 
+#        time.sleep(15) 
         self.sayColor(color)
-        time.sleep(10) 
+        time.sleep(5) 
         self.grabBlock(i)
         
     def placeBlock(self, i, x, y):
+        rospy.loginfo('Placing block')
         # Move above the required grid
         self.moveToPos(x, y, 0.80)
         rospy.loginfo('Moving right above')
         # Move closer to the table
-        self.moveToPos(x, y, 0.75)
+        self.moveToPos(x, y, 0.70)
         rospy.loginfo('Moving block number' + str(i))
         # Release gripper
         self.releaseBlock(i)
@@ -756,41 +642,39 @@ class Interaction:
         self.moveToPos(x, y, 0.80)    
 
     def getCoords(self, xMin, yMin, matrix, xArray, yArray):
-#        xRange = xMax-xMin
-#        yRange = yMax- yMin
-#        rangeAvailable = min (xRange, yRange)
-        blockSize = 0.035
+        blockSize = 0.05
         xStart = xMin
         yStart = yMin
         
-        for i in range (0, 9):
-            for j in range (0, 9):
+        for i in range (0, 8):
+            for j in range (0, 8):
                 matrix[i][j][0] = xStart - j*blockSize
                 matrix[i][j][1] = yStart - i*blockSize
                 
-                xArray[9*i+j] = xStart - j*blockSize
-                yArray[9*i+j] = yStart - i*blockSize
+                xArray[8*i+j] = xStart - j*blockSize
+                yArray[8*i+j] = yStart - i*blockSize
 
 
     def demo(self, dummy=None):
         '''Makes the robot look for a table and objects'''
+        rospy.loginfo('In demo')    
         objs = self.world.get_frame_list()
         # Settings
         arm_index = 0 # right arm: 0, left arm: 1
 
-        xMin = 0.725304016651
-        yMin = 0.067733625044
-        xArray = [0 for x in xrange (81)]
-        yArray = [0 for x in xrange (81)]
-        matrix = [[[0 for x in xrange(2)] for y in xrange(9)] for z in xrange(9)] 
+        xMin = 0.753043424322
+        yMin = -0.0521526380418
+        xArray = [0 for x in xrange (64)]
+        yArray = [0 for x in xrange (64)]
+        matrix = [[[0 for x in xrange(2)] for y in xrange(8)] for z in xrange(8)] 
         
         self.getCoords(xMin, yMin, matrix, xArray, yArray)
-        colorArray = [0 for x in xrange (81)]
+        colorArray = [0 for x in xrange (64)]
 
-        for i in range (0, 81):
+        for i in range (0, 64):
             colorArray[i] = i%4
 
-        for i in range (0, 81):
+        for i in range (0, 64):
             self.getBlock(i, colorArray[i])
             self.placeBlock(i, xArray[i], yArray[i])
 
