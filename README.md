@@ -11,7 +11,7 @@ I'll try to keep the branch descriptions up to date below in this readme, but mo
 
 I'll try even harder to keep the branch descriptions up to date in the README.md file of each branch. Check there as the authority for documentation.
 
-Branches are listed alphabetically below by project.
+Branches are listed alphabetically below by project. At the bottom are the 'default' branches (that came with the fork).
 
 # Projects
 
@@ -144,3 +144,26 @@ When doing success testing, the goal is to match the 'real world' object as clos
 
 For more info on success testing (score functions, prerequisites) see the desktop version of this branch, `success-testing`.
 
+
+# Defaults
+
+### branch: groovy-devel
+#### Purpose
+This branch contains the 'main' PbD code, off of which others fork and build. It's in "development." As far as I know, this is never built / realeased into binaries.
+
+#### Description
+All project-agnostic improvements and bugfixes should go here.
+
+### branch: groovy
+#### Purpose
+As far as I know, this branch is the release that is built into (debian) binaries for ROS distribution with apt-get.
+
+### Description
+I think that this branch is only for marking release points in groovy-devel. I could be wrong, though.
+
+### branch: pr2_pbd_speech_recognition
+#### Purpose
+As far as I know, this branch is a legacy branch that marks a point on the groovy-devel line that is pre-groovy (i.e. before the branch marked 'groovy'), and serves no purpose.
+
+### Description
+Just a legacy checkpoint, looks like.
