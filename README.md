@@ -17,6 +17,14 @@ Branches are listed alphabetically below by project. At the bottom are the 'defa
 
 ## PbD + NLP
 
+### branch: hands-free
+#### Purpose
+Language-only PbD.
+
+#### Description
+WIP.
+
+
 ### branch: nlplite
 #### Purpose
 Less constrained language &rarr; PbD commands.
@@ -24,6 +32,13 @@ Less constrained language &rarr; PbD commands.
 #### Description
 Joint work with the UW SPF folks (Yoav + Kenton).
 
+
+### branch: test-grasping
+#### Purpose
+This branch is for trying out the automatic grasping capabilities built into the PR2 Object Manipulation stack (pr2_interactive_manipulation).
+
+#### Description
+I'm testing out the built-in functionality by trying to run demos and then using API calls.
 
 
 
