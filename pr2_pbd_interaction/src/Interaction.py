@@ -529,7 +529,9 @@ class Interaction:
     def _end_execution(self):
         '''Responses for when the action execution ends'''
         if (self.arms.status == ExecutionStatus.SUCCEEDED):
-            Response.say(RobotSpeech.EXECUTION_ENDED)
+            # NOTE(max): Disabling robot speech here just in case it's
+            # overlapping what we want to say.
+            #Response.say(RobotSpeech.EXECUTION_ENDED)
             Response.perform_gaze_action(GazeGoal.NOD)
         elif (self.arms.status == ExecutionStatus.PREEMPTED):
             Response.say(RobotSpeech.EXECUTION_PREEMPTED)

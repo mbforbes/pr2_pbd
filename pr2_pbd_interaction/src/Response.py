@@ -88,7 +88,10 @@ class Response:
     @staticmethod
     def say(speech_resp):
         ''' Triggers a speech action'''
-        Response._robot_speech.say(speech_resp)
+        # NOTE(max): Disabling robot speech here just in case it's
+        # overlapping what we want to say.
+        #Response._robot_speech.say(speech_resp)
+        pass
 
     @staticmethod
     def respond_with_sound(speech_resp):
@@ -102,7 +105,10 @@ class Response:
         elif (RobotSpeech.START_EXECUTION in speech_resp):
             Response.play_sound(RobotSound.STARTING_EXECUTION)
         elif (speech_resp == RobotSpeech.EXECUTION_ENDED):
-            Response.play_sound(RobotSound.EXECUTION_ENDED)
+            # NOTE(max): Disabling robot speech here just in case it's
+            # overlapping what we want to say.
+            #Response.play_sound(RobotSound.EXECUTION_ENDED)
+            pass
         elif (speech_resp == RobotSpeech.STARTED_RECORDING_MOTION):
             Response.play_sound(RobotSound.START_TRAJECTORY)
         elif (RobotSpeech.SKILL_CREATED in speech_resp):
