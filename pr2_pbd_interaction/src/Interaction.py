@@ -4,7 +4,7 @@ import roslib
 roslib.load_manifest('pr2_pbd_interaction')
 
 # Generic libraries
-import rospy
+nimport rospy
 import time
 from visualization_msgs.msg import MarkerArray
 from time import sleep
@@ -23,8 +23,6 @@ from pr2_pbd_interaction.msg import ExecutionStatus, GuiCommand
 from pr2_pbd_speech_recognition.msg import Command
 from pr2_social_gaze.msg import GazeGoal
 from geometry_msgs.msg import Pose, Point, Quaternion, Vector3
-
-from ik import IK
 
 class Interaction:
     '''Finite state machine for the human interaction'''
@@ -74,8 +72,6 @@ class Interaction:
             Command.STOP_RECORDING_MOTION: Response(self.stop_recording, None),
             Command.DEMO: Response(self.demo, None),
             }
-        self.ik_left = IK("l")
-        self.ik_right = IK("r")
         rospy.loginfo('Interaction initialized.')
 
     def open_hand(self, arm_index):
@@ -548,138 +544,12 @@ class Interaction:
         # Open hand
         self.open_hand(arm_index)
 
-    def moveToPos(self, x, y, z):
-        arm_index = 0
-        pose_new = Pose(Point(x, y, z),
-                        Quaternion(-0.700782723519, -0.0321300462759,
-                             0.711998018067, -0.0304968328256))
-        ik_solution = self.ik_right.get_ik_for_ee(pose_new) 
-
-        rospy.loginfo('Moving to')
-        rospy.loginfo('X: ')
-        rospy.loginfo(str(x))
-        rospy.loginfo('Y: ')
-        rospy.loginfo(str(y))
-        rospy.loginfo('Z: ')
-        rospy.loginfo(str(z))
-
-        arm_state = ArmState(
-            0,
-            pose_new,
-            ik_solution,
-            Object(0,'', Pose(Point(),Quaternion()), Vector3())
-        )
-        self.arms.start_move_to_pose_no_threading(arm_state, arm_index)
-
-
-    def sayColor(self, color):
-        if (color == 0):
-            rospy.logwarn ('\033[94mPlease give block of RED color' + '\033[0m')
-            Response.say(RobotSpeech.ASK_RED_BLOCK)
-            Response.perform_gaze_action(GazeGoal.NOD) 
-        elif (color == 1):
-            rospy.logwarn ('\033[94mPlease give block of BLUE color' + '\033[0m')
-            Response.say(RobotSpeech.ASK_BLUE_BLOCK)
-            Response.perform_gaze_action(GazeGoal.NOD) 
-        elif (color == 2):
-            rospy.logwarn ('\033[94mPlease give block of GREEN color' + '\033[0m')
-            Response.say(RobotSpeech.ASK_GREEN_BLOCK)
-            Response.perform_gaze_action(GazeGoal.NOD) 
-        else:
-            rospy.logwarn ('\033[94mPlease give block of YELLOW color' + '\033[0m')
-            Response.say(RobotSpeech.ASK_YELLOW_BLOCK)
-            Response.perform_gaze_action(GazeGoal.NOD) 
-
-    def grabBlock(self, i):
-        rospy.loginfo('Grabbing block')
-        arm_index = 0
-        self.close_hand(arm_index)
-#        time.sleep(15) 
-
-    def releaseBlock(self, i):
-        arm_index = 0
-        self.open_hand(arm_index)
-        time.sleep(5) 
-
-    def getBlock(self, i, color):
-        objs = self.world.get_frame_list()
-        arm_index = 0 
-
-        # sideways position
-        pose_new = Pose(Point(-0.083964934891, -1.00611545184,
-                    0.754503050059),
-                Quaternion(0.737935404871, -0.673310184246,
-                    -0.0442863423926, -0.0119772244547))
-        ik_solution = self.ik_right.get_ik_for_ee(pose_new) 
-
-
-        rospy.loginfo('Default Position')
-
-        arm_state = ArmState(
-            0,
-            pose_new,
-            ik_solution,
-            Object(0,'', Pose(Point(),Quaternion()), Vector3())
-        )
-        self.arms.start_move_to_pose_no_threading(arm_state, arm_index)
-        self.open_hand(arm_index)
-#        time.sleep(15) 
-        self.sayColor(color)
-        time.sleep(5) 
-        self.grabBlock(i)
-        
-    def placeBlock(self, i, x, y):
-        rospy.loginfo('Placing block')
-        # Move above the required grid
-        self.moveToPos(x, y, 0.80)
-        rospy.loginfo('Moving right above')
-        # Move closer to the table
-        self.moveToPos(x, y, 0.70)
-        rospy.loginfo('Moving block number' + str(i))
-        # Release gripper
-        self.releaseBlock(i)
-        # Move up again
-        self.moveToPos(x, y, 0.80)    
-
-    def getCoords(self, xMin, yMin, matrix, xArray, yArray):
-        blockSize = 0.05
-        xStart = xMin
-        yStart = yMin
-        
-        for i in range (0, 8):
-            for j in range (0, 8):
-                matrix[i][j][0] = xStart - j*blockSize
-                matrix[i][j][1] = yStart - i*blockSize
-                
-                xArray[8*i+j] = xStart - j*blockSize
-                yArray[8*i+j] = yStart - i*blockSize
-
-
     def demo(self, dummy=None):
-        '''Makes the robot look for a table and objects'''
-        rospy.loginfo('In demo')    
-        objs = self.world.get_frame_list()
-        # Settings
-        arm_index = 0 # right arm: 0, left arm: 1
+        '''Makes the robot look for a table and objects.'''
+        self.demo = Demo(self.arms)
+        self.demo.start()
 
-        xMin = 0.753043424322
-        yMin = -0.0521526380418
-        xArray = [0 for x in xrange (64)]
-        yArray = [0 for x in xrange (64)]
-        matrix = [[[0 for x in xrange(2)] for y in xrange(8)] for z in xrange(8)] 
-        
-        self.getCoords(xMin, yMin, matrix, xArray, yArray)
-        colorArray = [0 for x in xrange (64)]
-
-        for i in range (0, 64):
-            colorArray[i] = i%4
-
-        for i in range (0, 64):
-            self.getBlock(i, colorArray[i])
-            self.placeBlock(i, xArray[i], yArray[i])
-
-        return [RobotSpeech.OBJECT_NOT_DETECTED, GazeGoal.SHAKE]
-
+        return [RobotSpeech.EXECUTION_ENDED, GazeGoal.NOD]
 
     def save_experiment_state(self):
         '''Saves session state'''
