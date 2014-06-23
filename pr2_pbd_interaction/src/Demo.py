@@ -104,10 +104,10 @@ class Demo:
         self.yBlocksize = self.rawBlocksize + self.yPadding
 
         # "Above" z position
-        self.zAbove = 0.8
+        self.zAbove = 1.2
 
         # "At block" z position
-        self.zBlock = 0.7
+        self.zBlock = 1.0
 
 
         # Robot settings
