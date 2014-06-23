@@ -64,11 +64,13 @@ class Response:
         speech_resp, gaze_resp = self.function_to_call(self.function_param)
         # Speech response
         if (speech_resp != None):
-            Response.say(speech_resp)
-            Response.respond_with_sound(speech_resp)
+          # NOTE(max): Turning off speech responses for now.
+          pass
+          # Response.say(speech_resp)
+          # Response.respond_with_sound(speech_resp)
         # Gaze response
         if (gaze_resp != None):
-            Response.perform_gaze_action(gaze_resp)
+          Response.perform_gaze_action(gaze_resp)
 
     @staticmethod
     def perform_gaze_action(gaze_action):
@@ -138,6 +140,6 @@ class Response:
             Response._sound_client.playWave(os.path.join(Response._sounds_dir,
                                               requested_sound + '.wav'))
         else:
-            Response._sound_client.playWave(os.path.join(Response._sounds_dir, 
+            Response._sound_client.playWave(os.path.join(Response._sounds_dir,
                                                          'OTHER.wav'))
 

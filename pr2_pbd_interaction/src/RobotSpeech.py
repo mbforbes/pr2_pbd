@@ -76,6 +76,7 @@ class RobotSpeech:
     def say(self, text, is_using_sounds=False):
         ''' Send a TTS command'''
         if (not is_using_sounds):
+            rospy.loginfo("Robot said: " + text)
             self.soundhandle.say(text)
             # self.speech_publisher.publish(SoundRequest(
             # command=SoundRequest.SAY, arg=text))
