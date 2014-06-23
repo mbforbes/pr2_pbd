@@ -21,6 +21,8 @@ string EDIT_ACTION = edit-action
 string SAVE_POSE = save-pose
 string START_RECORDING_MOTION = start-recording-motion
 string STOP_RECORDING_MOTION = stop-recording-motion
-string DEMO = demo
+string DEMO_START = demo-start
+string DEMO_PAUSE = demo-pause
+string DEMO_RESTART = demo-restart
 string UNRECOGNIZED = unrecognized
 string command

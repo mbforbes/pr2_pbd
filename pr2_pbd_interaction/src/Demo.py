@@ -12,10 +12,9 @@ import rospy
 from geometry_msgs.msg import Pose, Point, Quaternion, Vector3
 
 # Builtins
-from time import sleep
+import time
 
 # Local
-from Arms import Arms
 from ik import IK
 from pr2_pbd_interaction.msg import ArmState, GripperState, Object
 
@@ -124,13 +123,13 @@ class Demo:
         self.pose_side = Pose(
             Point(-0.083964934891, -1.00611545184, 0.754503050059),
             Quaternion(0.737935404871, -0.673310184246, -0.0442863423926,
-                -0.0119772244547)
+                    -0.0119772244547)
         )
 
         # Quaternions (orientations) for the gripper.
         # This orientation is
         self.quat_straight = Quaternion(-0.700782723519, -0.0321300462759,
-            0.711998018067, -0.0304968328256)
+                0.711998018067, -0.0304968328256)
 
         # Dummy object used when one needed
         self.dummy_obj = Object(0,'', Pose(Point(),Quaternion()), Vector3())
@@ -164,7 +163,7 @@ class Demo:
         # locations. It can have empty blocks. However, it's only
         # required to explicitly note colored blocks.
         self.colors = {}
-        colors[(4,4)] = Block.RED
+        self.colors[(4,4)] = Block.RED
 
 
         # "True" instance variables
@@ -191,9 +190,9 @@ class Demo:
                 x = self.xMax - row * self.xBlocksize
                 y = self.yMax - col * self.yBlocksize
                 z = self.zBlock
-                color = (self.colors[(i,j)] if self.colors.has_key((i,j)) else
-                    Block.EMPTY)
-                self.grid[(i,j)] = Block(x, y, z, color)
+                color = (self.colors[(row,col)] if
+                        self.colors.has_key((row,col)) else Block.EMPTY)
+                self.grid[(row,col)] = Block(x, y, z, color)
 
 
         # Control variables
@@ -245,14 +244,14 @@ class Demo:
         self.nextY.'''
         rospy.loginfo('Running demo.')
         self.running = True
-        while(self.running and not self.complete):
+        while self.running and not self.complete:
             # Do empty check
             if self.grid[(self.nextX, self.nextY)].color != Block.EMPTY:
                 # Block is colored; place it.
                 colorstr = Block.COLOR_STRS[
-                    grid[(self.nextX, self.nextY)].color]
+                        self.grid[(self.nextX, self.nextY)].color]
                 rospy.loginfo('Placing ' + colorstr + ' block at (' +
-                    str(self.nextX) + ', ' + str(self.nextY) + ').')
+                        str(self.nextX) + ', ' + str(self.nextY) + ').')
                 self.getBlock()
                 self.placeBlock()
 
@@ -280,7 +279,7 @@ class Demo:
 
     def sayColor(self):
         '''Says the block color of the block in (nextX, nextY).'''
-        color = grid[(slef.nextX, self.nextY)].color
+        color = self.grid[(self.nextX, self.nextY)].color
         sayStr = Block.COLOR_STRS[color] + ' block'
         rospy.loginfo('Robot wants ' + sayStr)
         # TODO(max): Have robot actually say this.
@@ -309,7 +308,8 @@ class Demo:
         self.arms.start_move_to_pose_no_threading(arm_state, self.arm_index)
 
         # Open gripper
-        self.arms.set_gripper_state(self.arm_index, GripperState.OPEN)
+        self.arms.set_gripper_state(self.arm_index, GripperState.OPEN,
+                wait=False)
 
         # Request block
         self.sayColor()
@@ -318,8 +318,8 @@ class Demo:
         self.waitForBlock()
 
         # Close gripper
-        self.arms.set_gripper_state(self.arm_index, GripperState.CLOSED)
-
+        self.arms.set_gripper_state(self.arm_index, GripperState.CLOSED,
+                wait=True)
 
     def moveToPosition(self, x, y, z):
         '''Moves the robot arm to a predefined position.
@@ -351,11 +351,12 @@ class Demo:
         self.moveToPosition(block.x, block.y, block.z)
 
         # Open the gripper to release the block
-        self.arms.set_gripper_state(self.arm_index, GripperState.OPEN)
+        self.arms.set_gripper_state(self.arm_index, GripperState.OPEN,
+                wait=True)
 
         # Wait a bit to let the block settle
         # TODO(max): Investigate this so we can hopefully speed up.
-        time.sleep(self.block_settle_time)
+        #time.sleep(self.block_settle_time)
 
         # Move the arm back up to the "above" position.
         self.moveToPosition(block.x, block.y, self.zAbove)

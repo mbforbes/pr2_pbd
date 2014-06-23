@@ -4,7 +4,7 @@ import roslib
 roslib.load_manifest('pr2_pbd_interaction')
 
 # Generic libraries
-nimport rospy
+import rospy
 import time
 from visualization_msgs.msg import MarkerArray
 from time import sleep
@@ -17,6 +17,7 @@ from Session import Session
 from Response import Response
 from Arms import Arms
 from Arm import ArmMode
+from Demo import Demo
 from pr2_pbd_interaction.msg import ArmState, GripperState
 from pr2_pbd_interaction.msg import ActionStep, ArmTarget, Object
 from pr2_pbd_interaction.msg import GripperAction, ArmTrajectory
@@ -71,7 +72,9 @@ class Interaction:
             Command.START_RECORDING_MOTION: Response(
                                             self.start_recording, None),
             Command.STOP_RECORDING_MOTION: Response(self.stop_recording, None),
-            Command.DEMO: Response(self.start_new_demo, None),
+            Command.DEMO_START: Response(self.start_new_demo, None),
+            Command.DEMO_PAUSE: Response(self.pause_current_demo, None),
+            Command.DEMO_RESTART: Response(self.reset_current_demo, None),
             }
         rospy.loginfo('Interaction initialized.')
 
@@ -560,8 +563,8 @@ class Interaction:
         '''Begins a new demo (2D object building task).'''
         # This creates a new demo and starts it in a new thread.
         self.demo = Demo(self.arms)
-        self.demo_thread = threading.Thread(group=None, target=demo.run,
-            name='demo_thread')
+        self.demo_thread = threading.Thread(group=None, target=self.demo.run,
+                name='demo_thread')
         self.demo_thread.start()
 
         return [RobotSpeech.START_EXECUTION, GazeGoal.NOD]

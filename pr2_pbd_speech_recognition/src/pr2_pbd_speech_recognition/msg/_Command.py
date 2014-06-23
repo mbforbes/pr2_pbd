@@ -6,7 +6,7 @@ import struct
 
 
 class Command(genpy.Message):
-  _md5sum = "79d30efaaf384acc2c6f104ee30122c6"
+  _md5sum = "ae3ca1bdc9ed6ba8b8a0a9f41b6af7a6"
   _type = "pr2_pbd_speech_recognition/Command"
   _has_header = False #flag to mark the presence of a Header object
   _full_text = """string TEST_MICROPHONE = test-microphone
@@ -32,7 +32,9 @@ string EDIT_ACTION = edit-action
 string SAVE_POSE = save-pose
 string START_RECORDING_MOTION = start-recording-motion
 string STOP_RECORDING_MOTION = stop-recording-motion
-string DEMO = demo
+string DEMO_START = demo-start
+string DEMO_PAUSE = demo-pause
+string DEMO_RESTART = demo-restart
 string UNRECOGNIZED = unrecognized
 string command
 
@@ -61,7 +63,9 @@ string command
   SAVE_POSE = 'save-pose'
   START_RECORDING_MOTION = 'start-recording-motion'
   STOP_RECORDING_MOTION = 'stop-recording-motion'
-  DEMO = 'demo'
+  DEMO_START = 'demo-start'
+  DEMO_PAUSE = 'demo-pause'
+  DEMO_RESTART = 'demo-restart'
   UNRECOGNIZED = 'unrecognized'
 
   __slots__ = ['command']

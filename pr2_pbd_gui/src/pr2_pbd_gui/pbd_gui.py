@@ -26,7 +26,7 @@ class ClickableLabel(QtGui.QLabel):
         QtGui.QLabel.__init__(self, parent)
         self.index = index
         self.clickCallback = clickCallback
-    
+
     def mousePressEvent(self, event):
         self.emit(QtCore.SIGNAL('clicked()'), "Label pressed")
         self.clickCallback(self.index)
@@ -49,10 +49,10 @@ class ActionIcon(QtGui.QGridLayout):
         self.updateView()
         self.addWidget(self.icon, 0, 0, QtCore.Qt.AlignCenter)
         self.addWidget(self.text, 1, 0, QtCore.Qt.AlignCenter)
-    
+
     def getName(self):
         return 'Action' + str(self.index + 1)
-    
+
     def updateView(self):
         if self.selected:
             pixmap = QtGui.QPixmap(self.selectedIconPath)
@@ -69,16 +69,16 @@ class PbDGUI(Plugin):
         super(PbDGUI, self).__init__(context)
         self.setObjectName('PbDGUI')
         self._widget = QWidget()
-        
+
         self.speech_cmd_publisher = rospy.Publisher('recognized_command', Command)
         self.gui_cmd_publisher = rospy.Publisher('gui_command', GuiCommand)
-        
+
         rospy.Subscriber('experiment_state', ExperimentState, self.exp_state_cb)
         rospy.Subscriber('robotsound', SoundRequest, self.robotSoundReceived)
-        
+
         QtGui.QToolTip.setFont(QtGui.QFont('SansSerif', 10))
         self.exp_state_sig.connect(self.update_state)
-        
+
         self.commands = dict()
         self.commands[Command.CREATE_NEW_ACTION] = 'New action'
         self.commands[Command.TEST_MICROPHONE] = 'Test microphone'
@@ -99,7 +99,9 @@ class PbDGUI(Plugin):
         self.commands[Command.DELETE_ALL_STEPS] = 'Delete all'
         self.commands[Command.DELETE_LAST_STEP] = 'Delete last'
         self.commands[Command.RECORD_OBJECT_POSE] = 'Record object poses'
-        self.commands[Command.DEMO] = 'Demo'
+        self.commands[Command.DEMO_START] = 'Demo: Play'
+        self.commands[Command.DEMO_PAUSE] = 'Demo: Pause'
+        self.commands[Command.DEMO_RESTART] = 'Demo: Reset'
 
         self.currentAction = -1
         self.currentStep = -1
@@ -115,13 +117,13 @@ class PbDGUI(Plugin):
         actionBoxLayout = QtGui.QHBoxLayout()
         actionBoxLayout.addLayout(self.actionGrid)
         actionBox.setLayout(actionBoxLayout)
-        
+
         actionButtonGrid = QtGui.QHBoxLayout()
         actionButtonGrid.addWidget(self.create_button(
                                         Command.CREATE_NEW_ACTION))
         self.stepsBox = QGroupBox('No actions created yet', self._widget)
         self.stepsGrid = QtGui.QGridLayout()
-        
+
         self.l_model = QtGui.QStandardItemModel(self)
         self.l_view = self._create_table_view(self.l_model,
                                               self.l_row_clicked_cb)
@@ -132,13 +134,13 @@ class PbDGUI(Plugin):
         self.stepsGrid.addItem(QtGui.QSpacerItem(280, 10), 0, 0, 2, 3)
         self.stepsGrid.addItem(QtGui.QSpacerItem(10, 10), 0, 1, 2, 3)
         self.stepsGrid.addItem(QtGui.QSpacerItem(280, 10), 0, 2, 2, 3)
-        
+
         self.stepsGrid.addWidget(QtGui.QLabel('Left Arm'), 0, 0)
         self.stepsGrid.addWidget(QtGui.QLabel('Right Arm'), 0, 2)
 
         self.stepsGrid.addWidget(self.l_view, 1, 0)
         self.stepsGrid.addWidget(self.r_view, 1, 2)
-        
+
         stepsBoxLayout = QtGui.QHBoxLayout()
         stepsBoxLayout.addLayout(self.stepsGrid)
         self.stepsBox.setLayout(stepsBoxLayout)
@@ -154,7 +156,7 @@ class PbDGUI(Plugin):
         misc_grid.addWidget(self.create_button(Command.TEST_MICROPHONE))
         misc_grid.addWidget(self.create_button(Command.RECORD_OBJECT_POSE))
         misc_grid.addStretch(1)
-        
+
         misc_grid2 = QtGui.QHBoxLayout()
         misc_grid2.addWidget(self.create_button(Command.RELAX_RIGHT_ARM))
         misc_grid2.addWidget(self.create_button(Command.RELAX_LEFT_ARM))
@@ -168,14 +170,16 @@ class PbDGUI(Plugin):
         misc_grid3.addWidget(self.create_button(Command.CLOSE_RIGHT_HAND))
         misc_grid3.addWidget(self.create_button(Command.CLOSE_LEFT_HAND))
         misc_grid3.addStretch(1)
-        
+
         misc_grid4 = QtGui.QHBoxLayout()
         misc_grid4.addWidget(self.create_button(Command.PREV_ACTION))
         misc_grid4.addWidget(self.create_button(Command.NEXT_ACTION))
         misc_grid4.addStretch(1)
 
         misc_grid5 = QtGui.QHBoxLayout()
-        misc_grid5.addWidget(self.create_button(Command.DEMO))
+        misc_grid5.addWidget(self.create_button(Command.DEMO_START))
+        misc_grid5.addWidget(self.create_button(Command.DEMO_PAUSE))
+        misc_grid5.addWidget(self.create_button(Command.DEMO_RESTART))
         misc_grid5.addStretch(1)
 
         speechGroupBox = QGroupBox('Robot Speech', self._widget)
@@ -190,10 +194,10 @@ class PbDGUI(Plugin):
 
         allWidgetsBox.addWidget(actionBox)
         allWidgetsBox.addLayout(actionButtonGrid)
-        
+
         allWidgetsBox.addWidget(self.stepsBox)
         allWidgetsBox.addLayout(stepsButtonGrid)
-        
+
         allWidgetsBox.addItem(QtGui.QSpacerItem(100, 20))
         allWidgetsBox.addLayout(misc_grid)
         allWidgetsBox.addItem(QtGui.QSpacerItem(100, 20))
@@ -207,7 +211,7 @@ class PbDGUI(Plugin):
 
         allWidgetsBox.addWidget(speechGroupBox)
         allWidgetsBox.addStretch(1)
-        
+
         # Fix layout and add main widget to the user interface
         QtGui.QApplication.setStyle(QtGui.QStyleFactory.create('plastique'))
         vAllBox = QtGui.QVBoxLayout()
@@ -229,7 +233,7 @@ class PbDGUI(Plugin):
 
         response = exp_state_srv()
         self.update_state(response.state)
-        
+
     def _create_table_view(self, model, row_click_cb):
         proxy = QtGui.QSortFilterProxyModel(self)
         proxy.setSourceModel(model)
@@ -241,11 +245,11 @@ class PbDGUI(Plugin):
         view.setSortingEnabled(False)
         view.setCornerButtonEnabled(False)
         return view
-    
+
     def get_uid(self, arm_index, index):
         '''Returns a unique id of the marker'''
         return (2 * (index + 1) + arm_index)
-    
+
     def get_arm_and_index(self, uid):
         '''Returns a unique id of the marker'''
         arm_index = uid % 2
@@ -265,7 +269,7 @@ class PbDGUI(Plugin):
 
     def update_state(self, state):
         qWarning('Received new state')
-        
+
         n_actions = len(self.actionIcons.keys())
         if n_actions < state.n_actions:
             for i in range(n_actions, state.n_actions):
@@ -285,14 +289,14 @@ class PbDGUI(Plugin):
                                                       n_to_remove)
             self.l_model.invisibleRootItem().removeRows(state.n_steps,
                                                       n_to_remove)
-        
+
         ## TODO: DEAL with the following arrays!!!
         state.r_gripper_states
         state.l_gripper_states
         state.r_ref_frames
         state.l_ref_frames
         state.objects
-            
+
         if (self.currentStep != state.i_current_step):
             if (self.n_steps() > 0):
                 self.currentStep = state.i_current_step
@@ -308,16 +312,16 @@ class PbDGUI(Plugin):
             actionIndex = self.currentAction
         stepIndex = self.n_steps(actionIndex)
         r_step = [QtGui.QStandardItem('Step' + str(stepIndex + 1)),
-                    QtGui.QStandardItem('Go to pose'), 
+                    QtGui.QStandardItem('Go to pose'),
                     QtGui.QStandardItem('Absolute')]
         l_step = [QtGui.QStandardItem('Step' + str(stepIndex + 1)),
-                    QtGui.QStandardItem('Go to pose'), 
+                    QtGui.QStandardItem('Go to pose'),
                     QtGui.QStandardItem('Absolute')]
         self.r_model.invisibleRootItem().appendRow(r_step)
         self.l_model.invisibleRootItem().appendRow(l_step)
         self.update_table_view()
         self.currentStep = stepIndex
-        
+
     def update_table_view(self):
         self.l_view.setColumnWidth(0, 50)
         self.l_view.setColumnWidth(1, 100)
@@ -325,10 +329,10 @@ class PbDGUI(Plugin):
         self.r_view.setColumnWidth(0, 50)
         self.r_view.setColumnWidth(1, 100)
         self.r_view.setColumnWidth(2, 70)
-        
+
     def n_steps(self, actionIndex=None):
         return self.l_model.invisibleRootItem().rowCount()
-        
+
     def delete_all_steps(self, actionIndex=None):
         if actionIndex is None:
             actionIndex = self.currentAction
@@ -347,7 +351,7 @@ class PbDGUI(Plugin):
              self.actionIcons[key].selected = False
              self.actionIcons[key].updateView()
         actIcon = ActionIcon(self._widget, actionIndex, self.action_pressed)
-        self.actionGrid.addLayout(actIcon, int(actionIndex/nColumns), 
+        self.actionGrid.addLayout(actIcon, int(actionIndex/nColumns),
                                   actionIndex%nColumns)
         self.actionIcons[actionIndex] = actIcon
 
@@ -368,7 +372,7 @@ class PbDGUI(Plugin):
         if isPublish:
             gui_cmd = GuiCommand(GuiCommand.SWITCH_TO_ACTION, (actionIndex+1))
             self.gui_cmd_publisher.publish(gui_cmd)
-        
+
     def command_cb(self):
         clickedButtonName = self._widget.sender().text()
         for key in self.commands.keys():
@@ -377,16 +381,16 @@ class PbDGUI(Plugin):
                 command = Command()
                 command.command = key
                 self.speech_cmd_publisher.publish(command)
-        
+
     def robotSoundReceived(self, soundReq):
         if (soundReq.command == SoundRequest.SAY):
             qWarning('Robot said: ' + soundReq.arg)
             self.speechLabel.setText('Robot sound: ' + soundReq.arg)
-    
+
     def exp_state_cb(self, state):
         qWarning('Received new experiment state.')
         self.exp_state_sig.emit(state)
-        
+
     def shutdown_plugin(self):
         # TODO unregister all publishers here
         self.speech_cmd_publisher.unregister()
