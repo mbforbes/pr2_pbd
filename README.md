@@ -160,6 +160,18 @@ When doing success testing, the goal is to match the 'real world' object as clos
 For more info on success testing (score functions, prerequisites) see the desktop version of this branch, `success-testing`.
 
 
+## ICRA 2014
+
+## branch: priya
+### Purpose
+Code to run a demo of Mike's ICRA 2014 paper on the PR2 (instead of Gambit).
+
+### Description
+This runs a loop where the robot asks for colored blocks in an 8 x 8 grid and sets them down on a plane in front of it. It is based off of [Priya Rao's code](https://github.com/priyarao27/pr2_pbd/) (she did the majority of the work). Implementation notes are [here](https://github.com/mbforbes/pr2_pbd/wiki/Press-Release:-Plans).
+
+This code is a demo for the press release for the ICRA 2014 work, which actually doesn't run PbD at all, but rather Mike's crowdsourcing framework. However, we had to switch the demo from running on the Gambit to the PR2 because the Gambit is out of commission, and the PbD framework provided an easy code foundation on which to do this.
+
+
 # Defaults
 
 ### branch: groovy-devel
