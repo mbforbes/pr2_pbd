@@ -99,7 +99,8 @@ class PbDGUI(Plugin):
         self.commands[Command.DELETE_ALL_STEPS] = 'Delete all'
         self.commands[Command.DELETE_LAST_STEP] = 'Delete last'
         self.commands[Command.RECORD_OBJECT_POSE] = 'Record object poses'
-        
+        self.commands[Command.DEMO] = 'Demo'
+
         self.currentAction = -1
         self.currentStep = -1
 
@@ -173,6 +174,10 @@ class PbDGUI(Plugin):
         misc_grid4.addWidget(self.create_button(Command.NEXT_ACTION))
         misc_grid4.addStretch(1)
 
+        misc_grid5 = QtGui.QHBoxLayout()
+        misc_grid5.addWidget(self.create_button(Command.DEMO))
+        misc_grid5.addStretch(1)
+
         speechGroupBox = QGroupBox('Robot Speech', self._widget)
         speechGroupBox.setObjectName('RobotSpeechGroup')
         speechBox = QtGui.QHBoxLayout()
@@ -197,7 +202,9 @@ class PbDGUI(Plugin):
         allWidgetsBox.addItem(QtGui.QSpacerItem(100, 20))
         allWidgetsBox.addLayout(misc_grid4)
         allWidgetsBox.addItem(QtGui.QSpacerItem(100, 20))
-        
+        allWidgetsBox.addLayout(misc_grid5)
+        allWidgetsBox.addItem(QtGui.QSpacerItem(100, 20))
+
         allWidgetsBox.addWidget(speechGroupBox)
         allWidgetsBox.addStretch(1)
         

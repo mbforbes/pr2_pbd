@@ -61,6 +61,10 @@ class RobotSpeech:
     STOPPED_RECORDING_MOTION = 'Stopped recording motion.'
     MOTION_NOT_RECORDING = 'Not currently recording motion.'
     STOPPING_EXECUTION = 'Execution stopped.'
+    ASK_RED_BLOCK = 'Please give block of red color.'
+    ASK_BLUE_BLOCK = 'Please give block of blue color.'
+    ASK_GREEN_BLOCK = 'Please give block of green color.'
+    ASK_YELLOW_BLOCK = 'Please give block of yellow color.'
 
     def __init__(self):
         self.speech_publisher = rospy.Publisher('robotsound', SoundRequest)

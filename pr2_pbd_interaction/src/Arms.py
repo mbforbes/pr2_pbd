@@ -181,18 +181,19 @@ class Arms:
         self.status = ExecutionStatus.EXECUTING
         solution, has_solution = Arms.solve_ik_for_arm(arm_index, arm_state)
 
-        if (has_solution):
-            if (arm_index == 0):
-                is_successful = self.move_to_joints(solution, None)
-            else:
-                is_successful = self.move_to_joints(None, solution)
-
-            if (is_successful):
-                self.status = ExecutionStatus.SUCCEEDED
-            else:
-                self.status = ExecutionStatus.OBSTRUCTED
+        if (arm_index == 0):
+            is_successful = self.move_to_joints(solution, None)
         else:
-            self.status = ExecutionStatus.NO_IK
+            is_successful = self.move_to_joints(None, solution)
+        if (is_successful):
+            self.status = ExecutionStatus.SUCCEEDED
+        else:
+            self.status = ExecutionStatus.OBSTRUCTED
+
+    def start_move_to_pose_no_threading(self, arm_state, arm_index):
+        '''Creates a thread for moving to a target pose'''
+        self.preempt = False
+        self.move_to_pose(arm_state, arm_index,)
 
     def execute_action(self):
         ''' Function to replay the demonstrated two-arm action
@@ -262,6 +263,25 @@ class Arms:
         # If arm target action
         if (action_step.type == ActionStep.ARM_TARGET):
             rospy.loginfo('Will perform arm target action step.')
+
+            # NOTE(max) Vomiting (for fun).
+
+            r_state = action_step.armTarget.rArm
+
+            rospy.logwarn('')
+
+            rospy.logwarn('r_state:')
+
+            rospy.logwarn(str(r_state))
+
+            rospy.logwarn(str(r_state.ee_pose))
+
+            rospy.logwarn(str(r_state.joint_pose))
+
+            rospy.logwarn(str(r_state.refFrameObject))
+
+            rospy.logwarn('')
+
 
             if (not self.move_to_joints(action_step.armTarget.rArm,
                                         action_step.armTarget.lArm)):
