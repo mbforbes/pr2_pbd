@@ -233,14 +233,26 @@ class Demo:
                 # We are at the end of the grid. Move nothing.
                 return False
 
-    def start(self):
+    def stop(self):
+        '''This doesn't stop the running of the demo directly; it sets a
+        flag such that the run method will pause after finishing the
+        block it's currently working on (either checking for emptyness
+        or actually placing).'''
+        self.running = False
+
+    def run(self):
         '''This starts the demo running at the current self.nextX and
         self.nextY.'''
+        rospy.loginfo('Running demo.')
         self.running = True
         while(self.running and not self.complete):
             # Do empty check
             if self.grid[(self.nextX, self.nextY)].color != Block.EMPTY:
                 # Block is colored; place it.
+                colorstr = Block.COLOR_STRS[
+                    grid[(self.nextX, self.nextY)].color]
+                rospy.loginfo('Placing ' + colorstr + ' block at (' +
+                    str(self.nextX) + ', ' + str(self.nextY) + ').')
                 self.getBlock()
                 self.placeBlock()
 
@@ -248,16 +260,23 @@ class Demo:
             if not self.next_block():
                 # If there was no next block, we mark the demo as
                 # complete and stop running.
+                rospy.loginfo('Demo complete.')
                 self.complete = True
                 self.running = False
 
     def reset(self):
         '''This resets the next block marker to the first block (which
         is (0,0)) and sets it as not completed. It does not start or
-        stop the demo.'''
-        self.nextX = 0
-        self.nextY = 0
-        self.complete = False
+        stop the demo. The demo must be stopped for this to work.'''
+        if self.running:
+            # Bad! Demo must be stopped.
+            rospy.logwarn('Demo must be stopped to reset.')
+        else:
+            # Demo is stopped; reset.
+            rospy.loginfo('Resetting demo.')
+            self.nextX = 0
+            self.nextY = 0
+            self.complete = False
 
     def sayColor(self):
         '''Says the block color of the block in (nextX, nextY).'''

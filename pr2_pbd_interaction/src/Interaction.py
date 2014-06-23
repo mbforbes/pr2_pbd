@@ -8,6 +8,7 @@ nimport rospy
 import time
 from visualization_msgs.msg import MarkerArray
 from time import sleep
+import threading
 
 # Local stuff
 from World import World
@@ -70,7 +71,7 @@ class Interaction:
             Command.START_RECORDING_MOTION: Response(
                                             self.start_recording, None),
             Command.STOP_RECORDING_MOTION: Response(self.stop_recording, None),
-            Command.DEMO: Response(self.demo, None),
+            Command.DEMO: Response(self.start_new_demo, None),
             }
         rospy.loginfo('Interaction initialized.')
 
@@ -544,13 +545,6 @@ class Interaction:
         # Open hand
         self.open_hand(arm_index)
 
-    def demo(self, dummy=None):
-        '''Makes the robot look for a table and objects.'''
-        self.demo = Demo(self.arms)
-        self.demo.start()
-
-        return [RobotSpeech.EXECUTION_ENDED, GazeGoal.NOD]
-
     def save_experiment_state(self):
         '''Saves session state'''
         self.session.save_current_action()
@@ -559,3 +553,27 @@ class Interaction:
     def empty_response(responses):
         '''Default response to speech commands'''
         return responses
+
+    # BLOCK BUILDING DEMO CODE!
+    # ==================================================================
+    def start_new_demo(self, dummy=None):
+        '''Begins a new demo (2D object building task).'''
+        # This creates a new demo and starts it in a new thread.
+        self.demo = Demo(self.arms)
+        self.demo_thread = threading.Thread(group=None, target=demo.run,
+            name='demo_thread')
+        self.demo_thread.start()
+
+        return [RobotSpeech.START_EXECUTION, GazeGoal.NOD]
+
+    def pause_current_demo(self, dummy=None):
+        '''Pauses any demo that's running.'''
+        # TODO(max): Need to do this differently because of threading?
+        self.demo.stop()
+
+    def reset_current_demo(self, dummy=None):
+        '''Resets the demo that's (hopefully) paused.'''
+        # TODO(max): Need to do this differently because of threading?
+        self.demo.reset()
+
+
