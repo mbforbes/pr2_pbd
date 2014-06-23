@@ -17,6 +17,7 @@ import time
 # Local
 from ik import IK
 from pr2_pbd_interaction.msg import ArmState, GripperState, Object
+from RobotSpeech import RobotSpeech
 
 class Block:
     '''A Block is an instance of a block (or lack thereof). It contains:
@@ -75,6 +76,7 @@ class Demo:
         # Save vars
         # --------------------------------------------------------------
         self.arms = arms
+        self.robotSpeech = RobotSpeech()
 
 
         # Location settings
@@ -282,7 +284,7 @@ class Demo:
         color = self.grid[(self.nextX, self.nextY)].color
         sayStr = Block.COLOR_STRS[color] + ' block'
         rospy.loginfo('Robot wants ' + sayStr)
-        # TODO(max): Have robot actually say this.
+        self.robotSpeech.say(sayStr)
 
     def waitForBlock(self):
         '''Waits for user to put a block in the gripper.

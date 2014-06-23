@@ -3,6 +3,7 @@ import roslib
 roslib.load_manifest('pr2_pbd_interaction')
 import rospy
 from sound_play.msg import SoundRequest
+from sound_play.libsoundplay import SoundClient
 from visualization_msgs.msg import Marker
 from geometry_msgs.msg import Quaternion, Pose, Point, Vector3
 from std_msgs.msg import Header, ColorRGBA
@@ -67,14 +68,17 @@ class RobotSpeech:
     ASK_YELLOW_BLOCK = 'Please give block of yellow color.'
 
     def __init__(self):
+        self.soundhandle = SoundClient()
+
         self.speech_publisher = rospy.Publisher('robotsound', SoundRequest)
         self.marker_publisher = rospy.Publisher('visualization_marker', Marker)
 
     def say(self, text, is_using_sounds=False):
         ''' Send a TTS command'''
         if (not is_using_sounds):
-            self.speech_publisher.publish(SoundRequest(
-                                        command=SoundRequest.SAY, arg=text))
+            self.soundhandle.say(text)
+            # self.speech_publisher.publish(SoundRequest(
+            # command=SoundRequest.SAY, arg=text))
         self.say_in_rviz(text)
 
     def say_in_rviz(self, text):
