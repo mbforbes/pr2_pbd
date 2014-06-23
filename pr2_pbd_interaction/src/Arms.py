@@ -173,11 +173,12 @@ class Arms:
                     args=(arm_state, arm_index,),
                     name='move_to_arm_state_thread')
         thread.start()
+        rospy.loginfo('Started thread to move arm ' + str(arm_index))
 
     def move_to_pose(self, arm_state, arm_index):
         '''The thread function that makes the arm move to
         a target end-effector pose'''
-        rospy.loginfo('Started thread to move arm ' + str(arm_index))
+        rospy.loginfo('Moving arm ' + str(arm_index))
         self.status = ExecutionStatus.EXECUTING
         solution, has_solution = Arms.solve_ik_for_arm(arm_index, arm_state)
 
