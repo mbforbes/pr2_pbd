@@ -103,8 +103,8 @@ class Demo:
 
         # How much padding to give between blocks. Priya gave 1.5 cm
         # (0.015).
-        self.xPadding = 0.015
-        self.yPadding = 0.015
+        self.xPadding = 0.017
+        self.yPadding = 0.017
 
         # Final blocksize to use
         self.xBlocksize = self.rawBlocksize + self.xPadding

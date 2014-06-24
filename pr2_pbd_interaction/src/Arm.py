@@ -272,7 +272,7 @@ class Arm:
         else:
             rospy.logwarn('Could not update the gripper state.')
 
-    def open_gripper(self, pos=0.05, eff=30.0, wait=False):
+    def open_gripper(self, pos=0.04, eff=30.0, wait=False):
         '''Opens gripper'''
         self._send_gripper_command(pos, eff, wait)
         self.gripper_state = GripperState.OPEN
