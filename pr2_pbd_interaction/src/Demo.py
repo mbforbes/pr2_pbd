@@ -205,37 +205,37 @@ class Demo:
         # blocks:
         # 4,8 GREEN
         # 6,8 GREEN
-        # self.colors[(2,3)] = Block.RED
-        # self.colors[(2,4)] = Block.GREEN
-        # self.colors[(2,5)] = Block.RED
-        # self.colors[(3,2)] = Block.YELLOW
-        # self.colors[(3,3)] = Block.RED
-        # self.colors[(3,4)] = Block.GREEN
-        # self.colors[(3,5)] = Block.RED
-        # self.colors[(3,6)] = Block.YELLOW
-        # self.colors[(4,0)] = Block.GREEN
-        # self.colors[(4,1)] = Block.GREEN
-        # self.colors[(4,2)] = Block.GREEN
-        # self.colors[(4,3)] = Block.YELLOW
-        # self.colors[(4,4)] = Block.YELLOW
-        # self.colors[(4,5)] = Block.YELLOW
-        # self.colors[(4,6)] = Block.GREEN
-        # self.colors[(4,7)] = Block.GREEN
-        # self.colors[(5,2)] = Block.YELLOW
-        # self.colors[(5,3)] = Block.YELLOW
-        # self.colors[(5,4)] = Block.YELLOW
-        # self.colors[(5,5)] = Block.YELLOW
-        # self.colors[(5,6)] = Block.YELLOW
-        # self.colors[(6,0)] = Block.GREEN
-        # self.colors[(6,1)] = Block.GREEN
-        # self.colors[(6,2)] = Block.GREEN
-        # self.colors[(6,3)] = Block.YELLOW
-        # self.colors[(6,4)] = Block.YELLOW
-        # self.colors[(6,5)] = Block.YELLOW
-        # self.colors[(6,6)] = Block.GREEN
-        # self.colors[(6,7)] = Block.GREEN
-        # self.colors[(7,2)] = Block.YELLOW
-        # self.colors[(7,6)] = Block.YELLOW
+        self.colors[(2,3)] = Block.RED
+        self.colors[(2,4)] = Block.GREEN
+        self.colors[(2,5)] = Block.RED
+        self.colors[(3,2)] = Block.YELLOW
+        self.colors[(3,3)] = Block.RED
+        self.colors[(3,4)] = Block.GREEN
+        self.colors[(3,5)] = Block.RED
+        self.colors[(3,6)] = Block.YELLOW
+        self.colors[(4,0)] = Block.GREEN
+        self.colors[(4,1)] = Block.GREEN
+        self.colors[(4,2)] = Block.GREEN
+        self.colors[(4,3)] = Block.YELLOW
+        self.colors[(4,4)] = Block.YELLOW
+        self.colors[(4,5)] = Block.YELLOW
+        self.colors[(4,6)] = Block.GREEN
+        self.colors[(4,7)] = Block.GREEN
+        self.colors[(5,2)] = Block.YELLOW
+        self.colors[(5,3)] = Block.YELLOW
+        self.colors[(5,4)] = Block.YELLOW
+        self.colors[(5,5)] = Block.YELLOW
+        self.colors[(5,6)] = Block.YELLOW
+        self.colors[(6,0)] = Block.GREEN
+        self.colors[(6,1)] = Block.GREEN
+        self.colors[(6,2)] = Block.GREEN
+        self.colors[(6,3)] = Block.YELLOW
+        self.colors[(6,4)] = Block.YELLOW
+        self.colors[(6,5)] = Block.YELLOW
+        self.colors[(6,6)] = Block.GREEN
+        self.colors[(6,7)] = Block.GREEN
+        self.colors[(7,2)] = Block.YELLOW
+        self.colors[(7,6)] = Block.YELLOW
 
         # Turtle from video 3 (best combined)
         # NOTE(max): This is shifted down by one to help with building
@@ -261,22 +261,22 @@ class Demo:
         # self.colors[(6,4)] = Block.GREEN
 
         # turtle from video 4 (worst combined)
-        self.colors[(2,4)] = Block.RED
-        self.colors[(2,5)] = Block.YELLOW
-        self.colors[(3,4)] = Block.GREEN
-        self.colors[(3,5)] = Block.YELLOW
-        self.colors[(3,6)] = Block.YELLOW
-        self.colors[(4,2)] = Block.GREEN
-        self.colors[(4,3)] = Block.GREEN
-        self.colors[(4,4)] = Block.GREEN
-        self.colors[(4,5)] = Block.YELLOW
-        self.colors[(4,6)] = Block.YELLOW
-        self.colors[(5,4)] = Block.GREEN
-        self.colors[(5,5)] = Block.YELLOW
-        self.colors[(5,6)] = Block.YELLOW
-        self.colors[(6,4)] = Block.GREEN
-        self.colors[(6,5)] = Block.YELLOW
-        self.colors[(7,4)] = Block.GREEN
+        # self.colors[(2,4)] = Block.RED
+        # self.colors[(2,5)] = Block.YELLOW
+        # self.colors[(3,4)] = Block.GREEN
+        # self.colors[(3,5)] = Block.YELLOW
+        # self.colors[(3,6)] = Block.YELLOW
+        # self.colors[(4,2)] = Block.GREEN
+        # self.colors[(4,3)] = Block.GREEN
+        # self.colors[(4,4)] = Block.GREEN
+        # self.colors[(4,5)] = Block.YELLOW
+        # self.colors[(4,6)] = Block.YELLOW
+        # self.colors[(5,4)] = Block.GREEN
+        # self.colors[(5,5)] = Block.YELLOW
+        # self.colors[(5,6)] = Block.YELLOW
+        # self.colors[(6,4)] = Block.GREEN
+        # self.colors[(6,5)] = Block.YELLOW
+        # self.colors[(7,4)] = Block.GREEN
 
         # "True" instance variables
         # --------------------------------------------------------------
