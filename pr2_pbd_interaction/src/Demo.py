@@ -15,7 +15,6 @@ from geometry_msgs.msg import Pose, Point, Quaternion, Vector3
 import time
 
 # Local
-from ik import IK
 from pr2_pbd_interaction.msg import ArmState, GripperState, Object
 from RobotSpeech import RobotSpeech
 from Arms import Arms
@@ -128,8 +127,6 @@ class Demo:
         # trivially switched as this would change the x, y (and likely
         # z) measurements.
         self.arm_index = 0
-        self.iks = [IK("r"), IK("l")]
-        self.ik = self.iks[self.arm_index] # we use this one
 
         # Pre-set positions
         # This is a pose to the side of the the robot, where it's
@@ -339,7 +336,11 @@ class Demo:
         if ik_solution is not None:
             arm_joints = [None, None]
             arm_joints[self.arm_index] = ik_solution
-            self.arms.move_to_joints(arm_joints[0], arm_joints[1])
+            success = self.arms.move_to_joints(arm_joints[0], arm_joints[1])
+            if not success:
+                p = target_pose.position
+                rospy.logerr('Move to (' + str(p.x) + ', ' + str(p.y) +
+                        ', ' + str(p.z) + ') was obstructed!')
         else:
             # Extract pose's position's x,y,z for better error
             # reporting.
@@ -385,37 +386,28 @@ class Demo:
         self.moveToPosition(block.x, block.y, self.zAbove)
 
     def get_ik(self, target_pose):
-        '''Tries both IK solvers to get IK solutions. If at least one
-        works, it uses that solution. If both fail, it prints an
-        error.
+        '''Tries the IK solver to get an IK solution.
 
         Arguments:
          - target_pose (Pose): The target ee pose.
 
         Returns:
-         - ik_solution ([float] | None). Either a list of 7 floats
-                specifying the 7 joint angles for the arm (we use
-                self.arm_index), or None of no solution was found.
+         - arm_state | None: Either the arm state, including, the solved
+                 joint angles, or None if no solution was found.
         '''
-        # First: try MoveIt!
-        ik_solution = self.ik.get_ik_for_ee(target_pose)
-        if ik_solution is not None:
+        arm_state = ArmState(
+            ArmState.ROBOT_BASE,
+            target_pose,
+            # "default" (all 0s) seed is actually pretty good for us
+            # as that is the arm straight out.
+            [0., 0., 0., 0., 0., 0., 0.],
+            self.dummy_obj
+        )
+        ik_solution, has_solution = Arms.solve_ik_for_arm(self.arm_index,
+                arm_state)
+        if has_solution:
+            # Hooray! MoveIt! failed but PbD IK solver succeeded.
             return ik_solution
         else:
-            # MoveIt! failed; try whatever PbD uses.
-            arm_state = ArmState(
-                ArmState.ROBOT_BASE,
-                target_pose,
-                # "default" (all 0s) seed is actually pretty good for us
-                # as that is the arm straight out.
-                [0., 0., 0., 0., 0., 0., 0.],
-                self.dummy_obj
-            )
-            ik_solution, has_solution = Arms.solve_ik_for_arm(self.arm_index,
-                    arm_state)
-            if has_solution:
-                # Hooray! MoveIt! failed but PbD IK solver succeeded.
-                return ik_solution
-            else:
-                rospy.logerr('Both IK solvers found no solution.')
-                return None
+            rospy.logerr('IK solver found no solution.')
+            return None

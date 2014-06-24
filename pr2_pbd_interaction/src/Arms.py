@@ -119,7 +119,11 @@ class Arms:
 
     @staticmethod
     def solve_ik_for_arm(arm_index, arm_state, z_offset=0):
-        '''Finds an  IK solution for a particular arm pose'''
+        '''Finds an  IK solution for a particular arm pose.
+
+        Returns:
+        - (arm_state, Boolean)
+        '''
         # We need to find IK only if the frame is relative to an object
         if (arm_state.refFrame == ArmState.OBJECT):
 	    #rospy.loginfo('solve_ik_for_arm: Arm ' + str(arm_index) + ' is relative')
@@ -127,7 +131,7 @@ class Arms:
             target_pose = World.transform(arm_state.ee_pose,
                             arm_state.refFrameObject.name, 'base_link')
 
-	    target_pose.position.z = target_pose.position.z + z_offset
+            target_pose.position.z = target_pose.position.z + z_offset
 
             target_joints = Arms.arms[arm_index].get_ik_for_ee(target_pose,
                                             arm_state.joint_pose)
@@ -141,10 +145,10 @@ class Arms:
                 solution.joint_pose = target_joints
                 return solution, True
         elif (arm_state.refFrame == ArmState.ROBOT_BASE):
-	    #rospy.loginfo('solve_ik_for_arm: Arm ' + str(arm_index) + ' is absolute')
-	    pos = arm_state.ee_pose.position
-	    target_position = Point(pos.x, pos.y, pos.z + z_offset)
-	    target_pose = Pose(target_position, arm_state.ee_pose.orientation)
+    	    #rospy.loginfo('solve_ik_for_arm: Arm ' + str(arm_index) + ' is absolute')
+            pos = arm_state.ee_pose.position
+            target_position = Point(pos.x, pos.y, pos.z + z_offset)
+            target_pose = Pose(target_position, arm_state.ee_pose.orientation)
             target_joints = Arms.arms[arm_index].get_ik_for_ee(target_pose,
                                                     arm_state.joint_pose)
             if (target_joints == None):
@@ -181,18 +185,20 @@ class Arms:
         rospy.loginfo('Moving arm ' + str(arm_index))
         self.status = ExecutionStatus.EXECUTING
         solution, has_solution = Arms.solve_ik_for_arm(arm_index, arm_state)
+        if has_solution:
+            if (arm_index == 0):
+                is_successful = self.move_to_joints(solution, None)
+            else:
+                is_successful = self.move_to_joints(None, solution)
+            if (is_successful):
+                self.status = ExecutionStatus.SUCCEEDED
+            else:
+                self.status = ExecutionStatus.OBSTRUCTED
+        else:
 
-        if (arm_index == 0):
-            is_successful = self.move_to_joints(solution, None)
-        else:
-            is_successful = self.move_to_joints(None, solution)
-        if (is_successful):
-            self.status = ExecutionStatus.SUCCEEDED
-        else:
-            self.status = ExecutionStatus.OBSTRUCTED
 
     def start_move_to_pose_no_threading(self, arm_state, arm_index):
-        '''Creates a thread for moving to a target pose'''
+        '''Moves to a target pose without creating a new thread.'''
         self.preempt = False
         self.move_to_pose(arm_state, arm_index,)
 
@@ -269,10 +275,10 @@ class Arms:
             r_state = action_step.armTarget.rArm
             rospy.logwarn('')
             rospy.logwarn('r_state:')
-            rospy.logwarn(str(r_state))
+            # rospy.logwarn(str(r_state))
             rospy.logwarn(str(r_state.ee_pose))
             rospy.logwarn(str(r_state.joint_pose))
-            rospy.logwarn(str(r_state.refFrameObject))
+            # rospy.logwarn(str(r_state.refFrameObject))
             rospy.logwarn('')
 
             if (not self.move_to_joints(action_step.armTarget.rArm,
