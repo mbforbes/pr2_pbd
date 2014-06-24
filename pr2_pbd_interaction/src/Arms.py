@@ -185,6 +185,7 @@ class Arms:
         rospy.loginfo('Moving arm ' + str(arm_index))
         self.status = ExecutionStatus.EXECUTING
         solution, has_solution = Arms.solve_ik_for_arm(arm_index, arm_state)
+
         if has_solution:
             if (arm_index == 0):
                 is_successful = self.move_to_joints(solution, None)
@@ -195,12 +196,7 @@ class Arms:
             else:
                 self.status = ExecutionStatus.OBSTRUCTED
         else:
-
-
-    def start_move_to_pose_no_threading(self, arm_state, arm_index):
-        '''Moves to a target pose without creating a new thread.'''
-        self.preempt = False
-        self.move_to_pose(arm_state, arm_index,)
+            self.status = ExecutionStatus.NO_IK
 
     def execute_action(self):
         ''' Function to replay the demonstrated two-arm action
