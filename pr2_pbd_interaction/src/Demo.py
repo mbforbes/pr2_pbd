@@ -18,6 +18,7 @@ import time
 from ik import IK
 from pr2_pbd_interaction.msg import ArmState, GripperState, Object
 from RobotSpeech import RobotSpeech
+from Arms import Arms
 
 class Block:
     '''A Block is an instance of a block (or lack thereof). It contains:
@@ -312,14 +313,7 @@ class Demo:
         TODO(max): Should the opening here be partial or all the way?'''
         # Move arm to the side
         rospy.loginfo('Moving arm to side to get block.')
-        ik_solution = self.ik.get_ik_for_ee(self.pose_side)
-        arm_state = ArmState(
-            ArmState.ROBOT_BASE,
-            self.pose_side,
-            ik_solution,
-            self.dummy_obj
-        )
-        self.arms.start_move_to_pose_no_threading(arm_state, self.arm_index)
+        self.moveToPose(self.pose_side)
 
         # Open gripper
         self.arms.set_gripper_state(self.arm_index, GripperState.OPEN,
@@ -335,8 +329,27 @@ class Demo:
         self.arms.set_gripper_state(self.arm_index, GripperState.CLOSED,
                 wait=True)
 
+    def moveToPose(self, target_pose):
+        '''Moves the robot arm to a predefined pose.
+
+        Arguments:
+         - target_pose (Pose): Pose to move to, relative to robot base.
+         '''
+        ik_solution = self.get_ik(target_pose)
+        if ik_solution is not None:
+            arm_joints = [None, None]
+            arm_joints[self.arm_index] = ik_solution
+            self.arms.move_to_joints(arm_joints[0], arm_joints[1])
+        else:
+            # Extract pose's position's x,y,z for better error
+            # reporting.
+            p = target_pose.position
+            rospy.logerr('Could not move to (' + str(p.x) + ', ' + str(p.y) +
+                    ', ' + str(p.z) + ')!')
+
     def moveToPosition(self, x, y, z):
-        '''Moves the robot arm to a predefined position.
+        '''Moves the robot arm to a predefined position, using the
+        default arm orientation (self.quat_straight).
 
         Arguments:
          - x (float): Point in robot space (m), relative to robot base.
@@ -344,14 +357,7 @@ class Demo:
          - z (float): Point in robot space (m), relative to robot base.
          '''
         target_pose = Pose(Point(x, y, z), self.quat_straight)
-        ik_solution = self.ik.get_ik_for_ee(target_pose)
-        arm_state = ArmState(
-            ArmState.ROBOT_BASE,
-            target_pose,
-            ik_solution,
-            self.dummy_obj
-        )
-        self.arms.start_move_to_pose_no_threading(arm_state, self.arm_index)
+        self.moveToPose(target_pose)
 
     def placeBlock(self):
         '''After the robot has a block, this will place the block on the
@@ -377,3 +383,39 @@ class Demo:
         # Move the arm back up to the "above" position.
         rospy.loginfo('Moving arm above (again).')
         self.moveToPosition(block.x, block.y, self.zAbove)
+
+    def get_ik(self, target_pose):
+        '''Tries both IK solvers to get IK solutions. If at least one
+        works, it uses that solution. If both fail, it prints an
+        error.
+
+        Arguments:
+         - target_pose (Pose): The target ee pose.
+
+        Returns:
+         - ik_solution ([float] | None). Either a list of 7 floats
+                specifying the 7 joint angles for the arm (we use
+                self.arm_index), or None of no solution was found.
+        '''
+        # First: try MoveIt!
+        ik_solution = self.ik.get_ik_for_ee(target_pose)
+        if ik_solution is not None:
+            return ik_solution
+        else:
+            # MoveIt! failed; try whatever PbD uses.
+            arm_state = ArmState(
+                ArmState.ROBOT_BASE,
+                target_pose,
+                # "default" (all 0s) seed is actually pretty good for us
+                # as that is the arm straight out.
+                [0., 0., 0., 0., 0., 0., 0.],
+                self.dummy_obj
+            )
+            ik_solution, has_solution = Arms.solve_ik_for_arm(self.arm_index,
+                    arm_state)
+            if has_solution:
+                # Hooray! MoveIt! failed but PbD IK solver succeeded.
+                return ik_solution
+            else:
+                rospy.logerr('Both IK solvers found no solution.')
+                return None
