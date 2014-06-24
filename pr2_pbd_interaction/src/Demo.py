@@ -132,10 +132,21 @@ class Demo:
         # This is a pose to the side of the the robot, where it's
         # reaching for a block.
         self.pose_side = Pose(
-            Point(-0.083964934891, -1.00611545184, 0.754503050059),
-            Quaternion(0.737935404871, -0.673310184246, -0.0442863423926,
-                    -0.0119772244547)
+            Point(0.431058744587, -0.619199050153, 0.967104246181),
+            Quaternion(
+                0.998904413668,
+                0.0279232263886,
+                -0.0041013455725,
+                -0.0373288728402
+            )
         )
+        # This is Priya's original side pose.
+        # self.pose_side = Pose(
+        #     Point(-0.083964934891, -1.00611545184, 0.754503050059),
+        #     Quaternion(0.737935404871, -0.673310184246, -0.0442863423926,
+        #             -0.0119772244547)
+        # )
+
 
         # Quaternions (orientations) for the gripper.
         # This orientation is
