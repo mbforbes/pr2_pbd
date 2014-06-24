@@ -240,43 +240,43 @@ class Demo:
         # Turtle from video 3 (best combined)
         # NOTE(max): This is shifted down by one to help with building
         # (the red block was being placed badly). All rows are += 1.
-        self.colors[(2,3)] = Block.YELLOW
-        self.colors[(2,6)] = Block.GREEN
-        self.colors[(2,7)] = Block.RED
-        self.colors[(3,2)] = Block.YELLOW
-        self.colors[(3,3)] = Block.YELLOW
-        self.colors[(3,4)] = Block.YELLOW
-        self.colors[(3,6)] = Block.GREEN
-        self.colors[(3,7)] = Block.GREEN
-        self.colors[(4,0)] = Block.GREEN
-        self.colors[(4,1)] = Block.YELLOW
-        self.colors[(4,2)] = Block.YELLOW
-        self.colors[(4,3)] = Block.YELLOW
-        self.colors[(4,4)] = Block.YELLOW
-        self.colors[(4,5)] = Block.YELLOW
-        self.colors[(4,6)] = Block.GREEN
-        self.colors[(5,2)] = Block.GREEN
-        self.colors[(5,4)] = Block.GREEN
-        self.colors[(6,2)] = Block.GREEN
-        self.colors[(6,4)] = Block.GREEN
+        # self.colors[(2,3)] = Block.YELLOW
+        # self.colors[(2,6)] = Block.GREEN
+        # self.colors[(2,7)] = Block.RED
+        # self.colors[(3,2)] = Block.YELLOW
+        # self.colors[(3,3)] = Block.YELLOW
+        # self.colors[(3,4)] = Block.YELLOW
+        # self.colors[(3,6)] = Block.GREEN
+        # self.colors[(3,7)] = Block.GREEN
+        # self.colors[(4,0)] = Block.GREEN
+        # self.colors[(4,1)] = Block.YELLOW
+        # self.colors[(4,2)] = Block.YELLOW
+        # self.colors[(4,3)] = Block.YELLOW
+        # self.colors[(4,4)] = Block.YELLOW
+        # self.colors[(4,5)] = Block.YELLOW
+        # self.colors[(4,6)] = Block.GREEN
+        # self.colors[(5,2)] = Block.GREEN
+        # self.colors[(5,4)] = Block.GREEN
+        # self.colors[(6,2)] = Block.GREEN
+        # self.colors[(6,4)] = Block.GREEN
 
         # turtle from video 4 (worst combined)
-        # self.colors[(2,4)] = Block.RED
-        # self.colors[(2,5)] = Block.YELLOW
-        # self.colors[(3,4)] = Block.GREEN
-        # self.colors[(3,5)] = Block.YELLOW
-        # self.colors[(3,6)] = Block.YELLOW
-        # self.colors[(4,2)] = Block.GREEN
-        # self.colors[(4,3)] = Block.GREEN
-        # self.colors[(4,4)] = Block.GREEN
-        # self.colors[(4,5)] = Block.YELLOW
-        # self.colors[(4,6)] = Block.YELLOW
-        # self.colors[(5,4)] = Block.GREEN
-        # self.colors[(5,5)] = Block.YELLOW
-        # self.colors[(5,6)] = Block.YELLOW
-        # self.colors[(6,4)] = Block.GREEN
-        # self.colors[(6,5)] = Block.YELLOW
-        # self.colors[(7,4)] = Block.GREEN
+        self.colors[(2,4)] = Block.RED
+        self.colors[(2,5)] = Block.YELLOW
+        self.colors[(3,4)] = Block.GREEN
+        self.colors[(3,5)] = Block.YELLOW
+        self.colors[(3,6)] = Block.YELLOW
+        self.colors[(4,2)] = Block.GREEN
+        self.colors[(4,3)] = Block.GREEN
+        self.colors[(4,4)] = Block.GREEN
+        self.colors[(4,5)] = Block.YELLOW
+        self.colors[(4,6)] = Block.YELLOW
+        self.colors[(5,4)] = Block.GREEN
+        self.colors[(5,5)] = Block.YELLOW
+        self.colors[(5,6)] = Block.YELLOW
+        self.colors[(6,4)] = Block.GREEN
+        self.colors[(6,5)] = Block.YELLOW
+        self.colors[(7,4)] = Block.GREEN
 
         # "True" instance variables
         # --------------------------------------------------------------
