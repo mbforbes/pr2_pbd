@@ -266,23 +266,14 @@ class Arms:
             rospy.loginfo('Will perform arm target action step.')
 
             # NOTE(max) Vomiting (for fun).
-
             r_state = action_step.armTarget.rArm
-
             rospy.logwarn('')
-
             rospy.logwarn('r_state:')
-
             rospy.logwarn(str(r_state))
-
             rospy.logwarn(str(r_state.ee_pose))
-
             rospy.logwarn(str(r_state.joint_pose))
-
             rospy.logwarn(str(r_state.refFrameObject))
-
             rospy.logwarn('')
-
 
             if (not self.move_to_joints(action_step.armTarget.rArm,
                                         action_step.armTarget.lArm)):
