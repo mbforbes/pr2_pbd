@@ -103,8 +103,8 @@ class Demo:
 
         # How much padding to give between blocks. Priya gave 1.5 cm
         # (0.015).
-        self.xPadding = 0.010
-        self.yPadding = 0.010
+        self.xPadding = 0.015
+        self.yPadding = 0.015
 
         # Final blocksize to use
         self.xBlocksize = self.rawBlocksize + self.xPadding
@@ -113,7 +113,9 @@ class Demo:
         # "At block" z position. Originally 0.7.
         self.zBlock = 0.816985346079 # The biggest I saw in measuring.
 
-        # "Above" z position. Originally 0.8. I'm adding 5cm (0.05).
+        # "Above" z position. Originally 0.8. I'm adding some amount to
+        # the block position. It appears + 5cm (0.05) is about as low as
+        # you can go without running into other blocks.
         self.zAbove = self.zBlock + 0.05
 
 
