@@ -147,7 +147,6 @@ class Demo:
         #             -0.0119772244547)
         # )
 
-
         # Quaternions (orientations) for the gripper.
         # This orientation is
         self.quat_straight = Quaternion(-0.700782723519, -0.0321300462759,
@@ -186,7 +185,15 @@ class Demo:
         # required to explicitly note colored blocks.
         self.colors = {}
         self.colors[(4,4)] = Block.RED
-
+        self.colors[(3,4)] = Block.RED
+        self.colors[(2,4)] = Block.RED
+        self.colors[(1,4)] = Block.RED
+        self.colors[(0,4)] = Block.BLUE
+        self.colors[(1,5)] = Block.BLUE
+        self.colors[(1,3)] = Block.BLUE
+        self.colors[(5,4)] = Block.GREEN
+        self.colors[(5,3)] = Block.GREEN
+        self.colors[(5,5)] = Block.GREEN
 
         # "True" instance variables
         # --------------------------------------------------------------
