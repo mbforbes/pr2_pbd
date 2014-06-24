@@ -1,1 +1,4 @@
 *.pyc
+*.bag
+# in .mybag, I save them as text
+*.mybag

@@ -155,9 +155,10 @@ class World:
                     if (object_pose != None):
                         rospy.logwarn('Adding the recognized object ' +
                                       'with most confident model.')
-                        self._add_new_object(object_pose,
-                            Vector3(0.2, 0.2, 0.2), True,
-                            object_list.meshes[i])
+                        self._add_new_object(object_pose, # pose
+                            Vector3(0.2, 0.2, 0.2), # dimensions
+                            True, # is_recognized
+                            object_list.meshes[i]) # mesh
                 else:
                     rospy.logwarn('... this is not a recognition result, ' +
                                   'it is probably just segmentation.')
@@ -165,11 +166,13 @@ class World:
                     bbox = self._bb_service(cluster)
                     cluster_pose = bbox.pose.pose
                     if (cluster_pose != None):
-                        rospy.loginfo('Adding unrecognized object with pose:' +
-                            World.pose_to_string(cluster_pose) + '\n' +
-                            'In ref frame' + str(bbox.pose.header.frame_id))
-                        self._add_new_object(cluster_pose, bbox.box_dims,
-                                             False)
+                        rospy.loginfo('Adding unrecognized object with\n' +
+                            '- pose: ' + World.pose_to_string(cluster_pose) +
+                            '- dimensions: ' + str(bbox.box_dims) + 
+                            '- in ref frame: ' + str(bbox.pose.header.frame_id))
+                        self._add_new_object(cluster_pose, # pose
+                            bbox.box_dims, # dimensions
+                            False) # is_recognized
         else:
             rospy.logwarn('... but the list was empty.')
         self._lock.release()
@@ -290,7 +293,7 @@ class World:
             for i in range(len(World.objects)):
                 if (World.pose_distance(World.objects[i].object.pose, pose)
                         < dist_threshold):
-                    rospy.loginfo('Previously detected object at the same' +
+                    rospy.loginfo('Previously detected object at the same ' +
                                   'location, will not add this object.')
                     return False
 
@@ -511,9 +514,9 @@ class World:
     @staticmethod
     def pose_to_string(pose):
         '''For printing a pose to stdout'''
-        return ('Position: ' + str(pose.position.x) + ", " +
+        return ('\t - position: ' + str(pose.position.x) + ", " +
                 str(pose.position.y) + ', ' + str(pose.position.z) + '\n' +
-                'Orientation: ' + str(pose.orientation.x) + ", " +
+                '\t - orientation: ' + str(pose.orientation.x) + ", " +
                 str(pose.orientation.y) + ', ' + str(pose.orientation.z) +
                 ', ' + str(pose.orientation.w) + '\n')
 
