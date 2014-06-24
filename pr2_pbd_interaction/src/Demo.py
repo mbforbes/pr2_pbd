@@ -119,8 +119,9 @@ class Demo:
 
         # Robot settings
         # --------------------------------------------------------------
-        # NOTE(max): Robot height, measured on dashboard by torso
-        # elevation joint, should be 0.1
+        # NOTE(max): Robot height, measured on PR2 dashboard > joints by
+        # torso_lift_joint Position, should be as close to 0.1 as
+        # possible.
 
         # right arm: 0, left arm: 1. Note that the arm cannot be
         # trivially switched as this would change the x, y (and likely
@@ -259,12 +260,12 @@ class Demo:
         while self.running and not self.complete:
             # Do empty check
             if self.grid[(self.nextX, self.nextY)].color != Block.EMPTY:
-                # Block is colored; place it.
+                # Block is colored; get and place it.
+                self.getBlock()
                 colorstr = Block.COLOR_STRS[
                         self.grid[(self.nextX, self.nextY)].color]
                 rospy.loginfo('Placing ' + colorstr + ' block at (' +
                         str(self.nextX) + ', ' + str(self.nextY) + ').')
-                self.getBlock()
                 self.placeBlock()
 
             # Regardless of colored or empty, move to next.
@@ -310,6 +311,7 @@ class Demo:
 
         TODO(max): Should the opening here be partial or all the way?'''
         # Move arm to the side
+        rospy.loginfo('Moving arm to side to get block.')
         ik_solution = self.ik.get_ik_for_ee(self.pose_side)
         arm_state = ArmState(
             ArmState.ROBOT_BASE,
@@ -357,9 +359,11 @@ class Demo:
         block = self.grid[(self.nextX, self.nextY)]
 
         # Move above the block's intended position
+        rospy.loginfo('Moving arm above.')
         self.moveToPosition(block.x, block.y, self.zAbove)
 
         # Move to the block's intended position
+        rospy.loginfo('Moving arm down.')
         self.moveToPosition(block.x, block.y, block.z)
 
         # Open the gripper to release the block
@@ -371,4 +375,5 @@ class Demo:
         #time.sleep(self.block_settle_time)
 
         # Move the arm back up to the "above" position.
+        rospy.loginfo('Moving arm above (again).')
         self.moveToPosition(block.x, block.y, self.zAbove)
