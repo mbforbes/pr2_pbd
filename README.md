@@ -5,6 +5,7 @@ This means there are lots of branches, and it can be hard to tell what is what.
 
 Git's branching system doesn't support branch descriptions, and branch names need to be concise, so the this `README.md` file in the root of the repository will contain information about the branch it's in.
 
+
 This branch (`groovy-devel`) should just be a mirror of the groovy-devel branch of the main PbD code ([PR2/pr2_pbd:groovy-devel](https://github.com/PR2/pr2_pbd)). I will list below information about all of the branches that branch off of this (that is, the projects that are based off of the groovy PbD code).
 
 I'll try to keep the branch descriptions up to date below in this readme, but most of the documentation will likely be from the main documentation effort I did on May 14, 2014.
@@ -57,6 +58,24 @@ Vladimir did a near complete rewrite of the PbD code, and took the opportunity t
 * YAML action representation
 * Richer action representation (action reference, trajectories)
 * Various other library migrations because of catkin and/or Hydro, usually to a newer and better library
+
+
+
+## PbD++
+
+### branch: profile
+#### Purpose
+See what's used (and what's not) in PbD, as well as what's slowing us down (if anything).
+
+#### Description
+There is a lot of code in PbD that is
+- legacy (deprecated and unsupported)
+- undocumented
+- confusing (variable names imply incorrect object types)
+- unorganized (public / private / static / class functions mixed around)
+- slow (marker movement w/ IK calls)
+
+I think profiling is the first step just to see what can be cleaned up and perhaps get a vauge handle to what's taking the most time.
 
 
 
