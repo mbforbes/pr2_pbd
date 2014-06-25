@@ -13,15 +13,16 @@ class Session:
     '''This class holds and maintains experimental data'''
 
     def __init__(self, object_list, is_debug=False):
-        self._is_reload = rospy.get_param('/pr2_pbd_interaction/isReload')
+        # NOTE(max): Removing ROS-specific parameters for profiling.
+        self._is_reload = False #rospy.get_param('/pr2_pbd_interaction/isReload')
 
         self._exp_number = None
         self._selected_step = 0
         self._object_list = object_list
 
         if (is_debug):
-            self._exp_number = rospy.get_param(
-                                '/pr2_pbd_interaction/experimentNumber')
+            # NOTE(max): Removing ROS-specific parameters for profiling.
+            self._exp_number = 3 # rospy.get_param('/pr2_pbd_interaction/experimentNumber')
             self._data_dir = self._get_data_dir(self._exp_number)
             if (not os.path.exists(self._data_dir)):
                 os.makedirs(self._data_dir)
@@ -130,8 +131,11 @@ class Session:
     @staticmethod
     def _get_data_dir(exp_number):
         '''Returns the directory where action information is saved'''
-        return (rospy.get_param('/pr2_pbd_interaction/dataRoot') +
-                    '/data/experiment' + str(exp_number) + '/')
+        # NOTE(max): Removing ROS-specific parameters for profiling.
+        # return (rospy.get_param('/pr2_pbd_interaction/dataRoot') +
+                    # '/data/experiment' + str(exp_number) + '/')
+        return (os.path.expanduser('~') + '/data/experiment' + str(exp_number)
+                + '/')
 
     def save_session_state(self, is_save_actions=True):
         '''Saves the session state onto hard drive'''
