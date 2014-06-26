@@ -1,0 +1,951 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta http-equiv="content-type" content="text/html;charset=utf-8">
+  <title>Interaction.py</title>
+  <link rel="stylesheet" href="pycco.css">
+</head>
+<body>
+<div id="background"></div>
+<div id='container'>
+  <div class='section'>
+    <div class='docs'><h1>Interaction.py</h1></div>
+  </div>
+  <div class='clearall'>
+  <div class='section' id='section-0'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-0'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre><span class="sd">&#39;&#39;&#39;Main interaction loop&#39;&#39;&#39;</span>
+
+<span class="kn">import</span> <span class="nn">roslib</span>
+<span class="n">roslib</span><span class="o">.</span><span class="n">load_manifest</span><span class="p">(</span><span class="s">&#39;pr2_pbd_interaction&#39;</span><span class="p">)</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-1'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-1'>#</a>
+      </div>
+      <p>Generic libraries</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre><span class="kn">import</span> <span class="nn">rospy</span>
+<span class="kn">import</span> <span class="nn">time</span>
+<span class="kn">from</span> <span class="nn">visualization_msgs.msg</span> <span class="kn">import</span> <span class="n">MarkerArray</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-2'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-2'>#</a>
+      </div>
+      <p>Local stuff</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre><span class="kn">from</span> <span class="nn">World</span> <span class="kn">import</span> <span class="n">World</span>
+<span class="kn">from</span> <span class="nn">RobotSpeech</span> <span class="kn">import</span> <span class="n">RobotSpeech</span>
+<span class="kn">from</span> <span class="nn">Session</span> <span class="kn">import</span> <span class="n">Session</span>
+<span class="kn">from</span> <span class="nn">Response</span> <span class="kn">import</span> <span class="n">Response</span>
+<span class="kn">from</span> <span class="nn">Arms</span> <span class="kn">import</span> <span class="n">Arms</span>
+<span class="kn">from</span> <span class="nn">Arm</span> <span class="kn">import</span> <span class="n">ArmMode</span>
+<span class="kn">from</span> <span class="nn">pr2_pbd_interaction.msg</span> <span class="kn">import</span> <span class="n">ArmState</span><span class="p">,</span> <span class="n">GripperState</span>
+<span class="kn">from</span> <span class="nn">pr2_pbd_interaction.msg</span> <span class="kn">import</span> <span class="n">ActionStep</span><span class="p">,</span> <span class="n">ArmTarget</span><span class="p">,</span> <span class="n">Object</span>
+<span class="kn">from</span> <span class="nn">pr2_pbd_interaction.msg</span> <span class="kn">import</span> <span class="n">GripperAction</span><span class="p">,</span> <span class="n">ArmTrajectory</span>
+<span class="kn">from</span> <span class="nn">pr2_pbd_interaction.msg</span> <span class="kn">import</span> <span class="n">ExecutionStatus</span><span class="p">,</span> <span class="n">GuiCommand</span>
+<span class="kn">from</span> <span class="nn">pr2_pbd_speech_recognition.msg</span> <span class="kn">import</span> <span class="n">Command</span>
+<span class="kn">from</span> <span class="nn">pr2_social_gaze.msg</span> <span class="kn">import</span> <span class="n">GazeGoal</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-3'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-3'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre><span class="k">class</span> <span class="nc">Interaction</span><span class="p">:</span>
+    <span class="sd">&#39;&#39;&#39;Finite state machine for the human interaction&#39;&#39;&#39;</span>
+
+    <span class="n">_is_programming</span> <span class="o">=</span> <span class="bp">True</span>
+    <span class="n">_is_recording_motion</span> <span class="o">=</span> <span class="bp">False</span>
+    <span class="n">_arm_trajectory</span> <span class="o">=</span> <span class="bp">None</span>
+    <span class="n">_trajectory_start_time</span> <span class="o">=</span> <span class="bp">None</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-4'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-4'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">arms</span> <span class="o">=</span> <span class="n">Arms</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">world</span> <span class="o">=</span> <span class="n">World</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">session</span> <span class="o">=</span> <span class="n">Session</span><span class="p">(</span><span class="n">object_list</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">world</span><span class="o">.</span><span class="n">get_frame_list</span><span class="p">(),</span>
+                               <span class="n">is_debug</span><span class="o">=</span><span class="bp">True</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_viz_publisher</span> <span class="o">=</span> <span class="n">rospy</span><span class="o">.</span><span class="n">Publisher</span><span class="p">(</span><span class="s">&#39;visualization_marker_array&#39;</span><span class="p">,</span>
+                                              <span class="n">MarkerArray</span><span class="p">)</span>
+
+        <span class="n">rospy</span><span class="o">.</span><span class="n">Subscriber</span><span class="p">(</span><span class="s">&#39;recognized_command&#39;</span><span class="p">,</span> <span class="n">Command</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">speech_command_cb</span><span class="p">)</span>
+        <span class="n">rospy</span><span class="o">.</span><span class="n">Subscriber</span><span class="p">(</span><span class="s">&#39;gui_command&#39;</span><span class="p">,</span> <span class="n">GuiCommand</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">gui_command_cb</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_undo_function</span> <span class="o">=</span> <span class="bp">None</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">responses</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="n">Command</span><span class="o">.</span><span class="n">TEST_MICROPHONE</span><span class="p">:</span> <span class="n">Response</span><span class="p">(</span><span class="n">Interaction</span><span class="o">.</span><span class="n">empty_response</span><span class="p">,</span>
+                                <span class="p">[</span><span class="n">RobotSpeech</span><span class="o">.</span><span class="n">TEST_RESPONSE</span><span class="p">,</span> <span class="n">GazeGoal</span><span class="o">.</span><span class="n">NOD</span><span class="p">]),</span>
+            <span class="n">Command</span><span class="o">.</span><span class="n">RELAX_RIGHT_ARM</span><span class="p">:</span> <span class="n">Response</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">relax_arm</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span>
+            <span class="n">Command</span><span class="o">.</span><span class="n">RELAX_LEFT_ARM</span><span class="p">:</span> <span class="n">Response</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">relax_arm</span><span class="p">,</span> <span class="mi">1</span><span class="p">),</span>
+            <span class="n">Command</span><span class="o">.</span><span class="n">OPEN_RIGHT_HAND</span><span class="p">:</span> <span class="n">Response</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">open_hand</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span>
+            <span class="n">Command</span><span class="o">.</span><span class="n">OPEN_LEFT_HAND</span><span class="p">:</span> <span class="n">Response</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">open_hand</span><span class="p">,</span> <span class="mi">1</span><span class="p">),</span>
+            <span class="n">Command</span><span class="o">.</span><span class="n">CLOSE_RIGHT_HAND</span><span class="p">:</span> <span class="n">Response</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">close_hand</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span>
+            <span class="n">Command</span><span class="o">.</span><span class="n">CLOSE_LEFT_HAND</span><span class="p">:</span> <span class="n">Response</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">close_hand</span><span class="p">,</span> <span class="mi">1</span><span class="p">),</span>
+            <span class="n">Command</span><span class="o">.</span><span class="n">STOP_EXECUTION</span><span class="p">:</span> <span class="n">Response</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">stop_execution</span><span class="p">,</span> <span class="bp">None</span><span class="p">),</span>
+            <span class="n">Command</span><span class="o">.</span><span class="n">UNDO</span><span class="p">:</span> <span class="n">Response</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">undo</span><span class="p">,</span> <span class="bp">None</span><span class="p">),</span>
+            <span class="n">Command</span><span class="o">.</span><span class="n">DELETE_ALL_STEPS</span><span class="p">:</span> <span class="n">Response</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">delete_all_steps</span><span class="p">,</span> <span class="bp">None</span><span class="p">),</span>
+            <span class="n">Command</span><span class="o">.</span><span class="n">DELETE_LAST_STEP</span><span class="p">:</span> <span class="n">Response</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">delete_last_step</span><span class="p">,</span> <span class="bp">None</span><span class="p">),</span>
+            <span class="n">Command</span><span class="o">.</span><span class="n">FREEZE_RIGHT_ARM</span><span class="p">:</span> <span class="n">Response</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">freeze_arm</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span>
+            <span class="n">Command</span><span class="o">.</span><span class="n">FREEZE_LEFT_ARM</span><span class="p">:</span> <span class="n">Response</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">freeze_arm</span><span class="p">,</span> <span class="mi">1</span><span class="p">),</span>
+            <span class="n">Command</span><span class="o">.</span><span class="n">CREATE_NEW_ACTION</span><span class="p">:</span> <span class="n">Response</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">create_action</span><span class="p">,</span> <span class="bp">None</span><span class="p">),</span>
+            <span class="n">Command</span><span class="o">.</span><span class="n">EXECUTE_ACTION</span><span class="p">:</span> <span class="n">Response</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">execute_action</span><span class="p">,</span> <span class="bp">None</span><span class="p">),</span>
+            <span class="n">Command</span><span class="o">.</span><span class="n">NEXT_ACTION</span><span class="p">:</span> <span class="n">Response</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">next_action</span><span class="p">,</span> <span class="bp">None</span><span class="p">),</span>
+            <span class="n">Command</span><span class="o">.</span><span class="n">PREV_ACTION</span><span class="p">:</span> <span class="n">Response</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">previous_action</span><span class="p">,</span> <span class="bp">None</span><span class="p">),</span>
+            <span class="n">Command</span><span class="o">.</span><span class="n">SAVE_POSE</span><span class="p">:</span> <span class="n">Response</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">save_step</span><span class="p">,</span> <span class="bp">None</span><span class="p">),</span>
+            <span class="n">Command</span><span class="o">.</span><span class="n">RECORD_OBJECT_POSE</span><span class="p">:</span> <span class="n">Response</span><span class="p">(</span>
+                                            <span class="bp">self</span><span class="o">.</span><span class="n">record_object_pose</span><span class="p">,</span> <span class="bp">None</span><span class="p">),</span>
+            <span class="n">Command</span><span class="o">.</span><span class="n">START_RECORDING_MOTION</span><span class="p">:</span> <span class="n">Response</span><span class="p">(</span>
+                                            <span class="bp">self</span><span class="o">.</span><span class="n">start_recording</span><span class="p">,</span> <span class="bp">None</span><span class="p">),</span>
+            <span class="n">Command</span><span class="o">.</span><span class="n">STOP_RECORDING_MOTION</span><span class="p">:</span> <span class="n">Response</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">stop_recording</span><span class="p">,</span> <span class="bp">None</span><span class="p">)</span>
+            <span class="p">}</span>
+
+        <span class="n">rospy</span><span class="o">.</span><span class="n">loginfo</span><span class="p">(</span><span class="s">&#39;Interaction initialized.&#39;</span><span class="p">)</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-5'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-5'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="k">def</span> <span class="nf">open_hand</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">arm_index</span><span class="p">):</span>
+        <span class="sd">&#39;&#39;&#39;Opens gripper on the indicated side&#39;&#39;&#39;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">arms</span><span class="o">.</span><span class="n">set_gripper_state</span><span class="p">(</span><span class="n">arm_index</span><span class="p">,</span> <span class="n">GripperState</span><span class="o">.</span><span class="n">OPEN</span><span class="p">):</span>
+            <span class="n">speech_response</span> <span class="o">=</span> <span class="n">Response</span><span class="o">.</span><span class="n">open_responses</span><span class="p">[</span><span class="n">arm_index</span><span class="p">]</span>
+            <span class="k">if</span> <span class="p">(</span><span class="n">Interaction</span><span class="o">.</span><span class="n">_is_programming</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">session</span><span class="o">.</span><span class="n">n_actions</span><span class="p">()</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">):</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">save_gripper_step</span><span class="p">(</span><span class="n">arm_index</span><span class="p">,</span> <span class="n">GripperState</span><span class="o">.</span><span class="n">OPEN</span><span class="p">)</span>
+                <span class="n">speech_response</span> <span class="o">=</span> <span class="p">(</span><span class="n">speech_response</span> <span class="o">+</span> <span class="s">&#39; &#39;</span> <span class="o">+</span>
+                                   <span class="n">RobotSpeech</span><span class="o">.</span><span class="n">STEP_RECORDED</span><span class="p">)</span>
+            <span class="k">return</span> <span class="p">[</span><span class="n">speech_response</span><span class="p">,</span> <span class="n">Response</span><span class="o">.</span><span class="n">glance_actions</span><span class="p">[</span><span class="n">arm_index</span><span class="p">]]</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">return</span> <span class="p">[</span><span class="n">Response</span><span class="o">.</span><span class="n">already_open_responses</span><span class="p">[</span><span class="n">arm_index</span><span class="p">],</span>
+                    <span class="n">Response</span><span class="o">.</span><span class="n">glance_actions</span><span class="p">[</span><span class="n">arm_index</span><span class="p">]]</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-6'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-6'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="k">def</span> <span class="nf">close_hand</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">arm_index</span><span class="p">):</span>
+        <span class="sd">&#39;&#39;&#39;Closes gripper on the indicated side&#39;&#39;&#39;</span>
+        <span class="k">if</span> <span class="n">Arms</span><span class="o">.</span><span class="n">set_gripper_state</span><span class="p">(</span><span class="n">arm_index</span><span class="p">,</span> <span class="n">GripperState</span><span class="o">.</span><span class="n">CLOSED</span><span class="p">):</span>
+            <span class="n">speech_response</span> <span class="o">=</span> <span class="n">Response</span><span class="o">.</span><span class="n">close_responses</span><span class="p">[</span><span class="n">arm_index</span><span class="p">]</span>
+            <span class="k">if</span> <span class="p">(</span><span class="n">Interaction</span><span class="o">.</span><span class="n">_is_programming</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">session</span><span class="o">.</span><span class="n">n_actions</span><span class="p">()</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">):</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">save_gripper_step</span><span class="p">(</span><span class="n">arm_index</span><span class="p">,</span> <span class="n">GripperState</span><span class="o">.</span><span class="n">CLOSED</span><span class="p">)</span>
+                <span class="n">speech_response</span> <span class="o">=</span> <span class="p">(</span><span class="n">speech_response</span> <span class="o">+</span> <span class="s">&#39; &#39;</span> <span class="o">+</span>
+                                   <span class="n">RobotSpeech</span><span class="o">.</span><span class="n">STEP_RECORDED</span><span class="p">)</span>
+            <span class="k">return</span> <span class="p">[</span><span class="n">speech_response</span><span class="p">,</span> <span class="n">Response</span><span class="o">.</span><span class="n">glance_actions</span><span class="p">[</span><span class="n">arm_index</span><span class="p">]]</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">return</span> <span class="p">[</span><span class="n">Response</span><span class="o">.</span><span class="n">already_closed_responses</span><span class="p">[</span><span class="n">arm_index</span><span class="p">],</span>
+                    <span class="n">Response</span><span class="o">.</span><span class="n">glance_actions</span><span class="p">[</span><span class="n">arm_index</span><span class="p">]]</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-7'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-7'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="k">def</span> <span class="nf">relax_arm</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">arm_index</span><span class="p">):</span>
+        <span class="sd">&#39;&#39;&#39;Relaxes arm on the indicated side&#39;&#39;&#39;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">arms</span><span class="o">.</span><span class="n">set_arm_mode</span><span class="p">(</span><span class="n">arm_index</span><span class="p">,</span> <span class="n">ArmMode</span><span class="o">.</span><span class="n">RELEASE</span><span class="p">):</span>
+            <span class="k">return</span> <span class="p">[</span><span class="n">Response</span><span class="o">.</span><span class="n">release_responses</span><span class="p">[</span><span class="n">arm_index</span><span class="p">],</span>
+                    <span class="n">Response</span><span class="o">.</span><span class="n">glance_actions</span><span class="p">[</span><span class="n">arm_index</span><span class="p">]]</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">return</span> <span class="p">[</span><span class="n">Response</span><span class="o">.</span><span class="n">already_released_responses</span><span class="p">[</span><span class="n">arm_index</span><span class="p">],</span>
+                    <span class="n">Response</span><span class="o">.</span><span class="n">glance_actions</span><span class="p">[</span><span class="n">arm_index</span><span class="p">]]</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-8'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-8'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="k">def</span> <span class="nf">freeze_arm</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">arm_index</span><span class="p">):</span>
+        <span class="sd">&#39;&#39;&#39;Stiffens arm on the indicated side&#39;&#39;&#39;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">arms</span><span class="o">.</span><span class="n">set_arm_mode</span><span class="p">(</span><span class="n">arm_index</span><span class="p">,</span> <span class="n">ArmMode</span><span class="o">.</span><span class="n">HOLD</span><span class="p">):</span>
+            <span class="k">return</span> <span class="p">[</span><span class="n">Response</span><span class="o">.</span><span class="n">hold_responses</span><span class="p">[</span><span class="n">arm_index</span><span class="p">],</span>
+                    <span class="n">Response</span><span class="o">.</span><span class="n">glance_actions</span><span class="p">[</span><span class="n">arm_index</span><span class="p">]]</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">return</span> <span class="p">[</span><span class="n">Response</span><span class="o">.</span><span class="n">already_holding_responses</span><span class="p">[</span><span class="n">arm_index</span><span class="p">],</span>
+                    <span class="n">Response</span><span class="o">.</span><span class="n">glance_actions</span><span class="p">[</span><span class="n">arm_index</span><span class="p">]]</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-9'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-9'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="k">def</span> <span class="nf">edit_action</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">dummy</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
+        <span class="sd">&#39;&#39;&#39;Goes back to edit mode&#39;&#39;&#39;</span>
+        <span class="k">if</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">session</span><span class="o">.</span><span class="n">n_actions</span><span class="p">()</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">):</span>
+            <span class="k">if</span> <span class="p">(</span><span class="n">Interaction</span><span class="o">.</span><span class="n">_is_programming</span><span class="p">):</span>
+                <span class="k">return</span> <span class="p">[</span><span class="n">RobotSpeech</span><span class="o">.</span><span class="n">ALREADY_EDITING</span><span class="p">,</span> <span class="n">GazeGoal</span><span class="o">.</span><span class="n">SHAKE</span><span class="p">]</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">Interaction</span><span class="o">.</span><span class="n">_is_programming</span> <span class="o">=</span> <span class="bp">True</span>
+                <span class="k">return</span> <span class="p">[</span><span class="n">RobotSpeech</span><span class="o">.</span><span class="n">SWITCH_TO_EDIT_MODE</span><span class="p">,</span> <span class="n">GazeGoal</span><span class="o">.</span><span class="n">NOD</span><span class="p">]</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">return</span> <span class="p">[</span><span class="n">RobotSpeech</span><span class="o">.</span><span class="n">ERROR_NO_SKILLS</span><span class="p">,</span> <span class="n">GazeGoal</span><span class="o">.</span><span class="n">SHAKE</span><span class="p">]</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-10'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-10'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="k">def</span> <span class="nf">save_action</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">dummy</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
+        <span class="sd">&#39;&#39;&#39;Goes out of edit mode&#39;&#39;&#39;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">session</span><span class="o">.</span><span class="n">save_current_action</span><span class="p">()</span>
+        <span class="n">Interaction</span><span class="o">.</span><span class="n">_is_programming</span> <span class="o">=</span> <span class="bp">False</span>
+        <span class="k">return</span> <span class="p">[</span><span class="n">RobotSpeech</span><span class="o">.</span><span class="n">ACTION_SAVED</span> <span class="o">+</span> <span class="s">&#39; &#39;</span> <span class="o">+</span>
+                <span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">session</span><span class="o">.</span><span class="n">current_action_index</span><span class="p">),</span> <span class="n">GazeGoal</span><span class="o">.</span><span class="n">NOD</span><span class="p">]</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-11'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-11'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="k">def</span> <span class="nf">create_action</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">dummy</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
+        <span class="sd">&#39;&#39;&#39;Creates a new empty action&#39;&#39;&#39;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">world</span><span class="o">.</span><span class="n">clear_all_objects</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">session</span><span class="o">.</span><span class="n">new_action</span><span class="p">()</span>
+        <span class="n">Interaction</span><span class="o">.</span><span class="n">_is_programming</span> <span class="o">=</span> <span class="bp">True</span>
+        <span class="k">return</span> <span class="p">[</span><span class="n">RobotSpeech</span><span class="o">.</span><span class="n">SKILL_CREATED</span> <span class="o">+</span> <span class="s">&#39; &#39;</span> <span class="o">+</span>
+                <span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">session</span><span class="o">.</span><span class="n">current_action_index</span><span class="p">),</span> <span class="n">GazeGoal</span><span class="o">.</span><span class="n">NOD</span><span class="p">]</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-12'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-12'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="k">def</span> <span class="nf">next_action</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">dummy</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
+        <span class="sd">&#39;&#39;&#39;Switches to next action&#39;&#39;&#39;</span>
+        <span class="k">if</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">session</span><span class="o">.</span><span class="n">n_actions</span><span class="p">()</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">):</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">session</span><span class="o">.</span><span class="n">next_action</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">world</span><span class="o">.</span><span class="n">get_frame_list</span><span class="p">()):</span>
+                <span class="k">return</span> <span class="p">[</span><span class="n">RobotSpeech</span><span class="o">.</span><span class="n">SWITCH_SKILL</span> <span class="o">+</span> <span class="s">&#39; &#39;</span> <span class="o">+</span>
+                        <span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">session</span><span class="o">.</span><span class="n">current_action_index</span><span class="p">),</span> <span class="n">GazeGoal</span><span class="o">.</span><span class="n">NOD</span><span class="p">]</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">return</span> <span class="p">[</span><span class="n">RobotSpeech</span><span class="o">.</span><span class="n">ERROR_NEXT_SKILL</span> <span class="o">+</span> <span class="s">&#39; &#39;</span> <span class="o">+</span>
+                        <span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">session</span><span class="o">.</span><span class="n">current_action_index</span><span class="p">),</span> <span class="n">GazeGoal</span><span class="o">.</span><span class="n">SHAKE</span><span class="p">]</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">return</span> <span class="p">[</span><span class="n">RobotSpeech</span><span class="o">.</span><span class="n">ERROR_NO_SKILLS</span><span class="p">,</span> <span class="n">GazeGoal</span><span class="o">.</span><span class="n">SHAKE</span><span class="p">]</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-13'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-13'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="k">def</span> <span class="nf">previous_action</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">dummy</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
+        <span class="sd">&#39;&#39;&#39;Switches to previous action&#39;&#39;&#39;</span>
+        <span class="k">if</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">session</span><span class="o">.</span><span class="n">n_actions</span><span class="p">()</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">):</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">session</span><span class="o">.</span><span class="n">previous_action</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">world</span><span class="o">.</span><span class="n">get_frame_list</span><span class="p">()):</span>
+                <span class="k">return</span> <span class="p">[</span><span class="n">RobotSpeech</span><span class="o">.</span><span class="n">SWITCH_SKILL</span> <span class="o">+</span> <span class="s">&#39; &#39;</span> <span class="o">+</span>
+                        <span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">session</span><span class="o">.</span><span class="n">current_action_index</span><span class="p">),</span> <span class="n">GazeGoal</span><span class="o">.</span><span class="n">NOD</span><span class="p">]</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">return</span> <span class="p">[</span><span class="n">RobotSpeech</span><span class="o">.</span><span class="n">ERROR_PREV_SKILL</span> <span class="o">+</span> <span class="s">&#39; &#39;</span> <span class="o">+</span>
+                        <span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">session</span><span class="o">.</span><span class="n">current_action_index</span><span class="p">),</span> <span class="n">GazeGoal</span><span class="o">.</span><span class="n">SHAKE</span><span class="p">]</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">return</span> <span class="p">[</span><span class="n">RobotSpeech</span><span class="o">.</span><span class="n">ERROR_NO_SKILLS</span><span class="p">,</span> <span class="n">GazeGoal</span><span class="o">.</span><span class="n">SHAKE</span><span class="p">]</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-14'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-14'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="k">def</span> <span class="nf">delete_last_step</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">dummy</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
+        <span class="sd">&#39;&#39;&#39;Deletes last step of the current action&#39;&#39;&#39;</span>
+        <span class="k">if</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">session</span><span class="o">.</span><span class="n">n_actions</span><span class="p">()</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">):</span>
+            <span class="k">if</span> <span class="p">(</span><span class="n">Interaction</span><span class="o">.</span><span class="n">_is_programming</span><span class="p">):</span>
+                <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">session</span><span class="o">.</span><span class="n">n_frames</span><span class="p">()</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">session</span><span class="o">.</span><span class="n">delete_last_step</span><span class="p">()</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">_undo_function</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_resume_last_step</span>
+                    <span class="k">return</span> <span class="p">[</span><span class="n">RobotSpeech</span><span class="o">.</span><span class="n">LAST_POSE_DELETED</span><span class="p">,</span> <span class="n">GazeGoal</span><span class="o">.</span><span class="n">NOD</span><span class="p">]</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="k">return</span> <span class="p">[</span><span class="n">RobotSpeech</span><span class="o">.</span><span class="n">SKILL_EMPTY</span><span class="p">,</span> <span class="n">GazeGoal</span><span class="o">.</span><span class="n">SHAKE</span><span class="p">]</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">return</span> <span class="p">[</span><span class="s">&#39;Action &#39;</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">session</span><span class="o">.</span><span class="n">current_action_index</span><span class="p">)</span> <span class="o">+</span>
+                        <span class="n">RobotSpeech</span><span class="o">.</span><span class="n">ERROR_NOT_IN_EDIT</span><span class="p">,</span> <span class="n">GazeGoal</span><span class="o">.</span><span class="n">SHAKE</span><span class="p">]</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">return</span> <span class="p">[</span><span class="n">RobotSpeech</span><span class="o">.</span><span class="n">ERROR_NO_SKILLS</span><span class="p">,</span> <span class="n">GazeGoal</span><span class="o">.</span><span class="n">SHAKE</span><span class="p">]</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-15'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-15'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="k">def</span> <span class="nf">delete_all_steps</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">dummy</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
+        <span class="sd">&#39;&#39;&#39;Deletes all steps in the current action&#39;&#39;&#39;</span>
+        <span class="k">if</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">session</span><span class="o">.</span><span class="n">n_actions</span><span class="p">()</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">):</span>
+            <span class="k">if</span> <span class="p">(</span><span class="n">Interaction</span><span class="o">.</span><span class="n">_is_programming</span><span class="p">):</span>
+                <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">session</span><span class="o">.</span><span class="n">n_frames</span><span class="p">()</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">session</span><span class="o">.</span><span class="n">clear_current_action</span><span class="p">()</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">_undo_function</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_resume_all_steps</span>
+                    <span class="k">return</span> <span class="p">[</span><span class="n">RobotSpeech</span><span class="o">.</span><span class="n">SKILL_CLEARED</span><span class="p">,</span> <span class="n">GazeGoal</span><span class="o">.</span><span class="n">NOD</span><span class="p">]</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="k">return</span> <span class="p">[</span><span class="n">RobotSpeech</span><span class="o">.</span><span class="n">SKILL_EMPTY</span><span class="p">,</span> <span class="bp">None</span><span class="p">]</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">return</span> <span class="p">[</span><span class="s">&#39;Action &#39;</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">session</span><span class="o">.</span><span class="n">current_action_index</span><span class="p">)</span> <span class="o">+</span>
+                        <span class="n">RobotSpeech</span><span class="o">.</span><span class="n">ERROR_NOT_IN_EDIT</span><span class="p">,</span> <span class="n">GazeGoal</span><span class="o">.</span><span class="n">SHAKE</span><span class="p">]</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">return</span> <span class="p">[</span><span class="n">RobotSpeech</span><span class="o">.</span><span class="n">ERROR_NO_SKILLS</span><span class="p">,</span> <span class="n">GazeGoal</span><span class="o">.</span><span class="n">SHAKE</span><span class="p">]</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-16'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-16'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="k">def</span> <span class="nf">undo</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">dummy</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
+        <span class="sd">&#39;&#39;&#39;Undoes the effect of the previous command&#39;&#39;&#39;</span>
+        <span class="k">if</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_undo_function</span> <span class="o">==</span> <span class="bp">None</span><span class="p">):</span>
+            <span class="k">return</span> <span class="p">[</span><span class="n">RobotSpeech</span><span class="o">.</span><span class="n">ERROR_NOTHING_TO_UNDO</span><span class="p">,</span> <span class="n">GazeGoal</span><span class="o">.</span><span class="n">SHAKE</span><span class="p">]</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_undo_function</span><span class="p">()</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-17'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-17'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="k">def</span> <span class="nf">_resume_all_steps</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&#39;&#39;&#39;Resumes all steps after clearing&#39;&#39;&#39;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">session</span><span class="o">.</span><span class="n">undo_clear</span><span class="p">()</span>
+        <span class="k">return</span> <span class="p">[</span><span class="n">RobotSpeech</span><span class="o">.</span><span class="n">ALL_POSES_RESUMED</span><span class="p">,</span> <span class="n">GazeGoal</span><span class="o">.</span><span class="n">NOD</span><span class="p">]</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-18'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-18'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="k">def</span> <span class="nf">_resume_last_step</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&#39;&#39;&#39;Resumes last step after deleting&#39;&#39;&#39;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">session</span><span class="o">.</span><span class="n">resume_deleted_step</span><span class="p">()</span>
+        <span class="k">return</span> <span class="p">[</span><span class="n">RobotSpeech</span><span class="o">.</span><span class="n">POSE_RESUMED</span><span class="p">,</span> <span class="n">GazeGoal</span><span class="o">.</span><span class="n">NOD</span><span class="p">]</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-19'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-19'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="k">def</span> <span class="nf">stop_execution</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">dummy</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
+        <span class="sd">&#39;&#39;&#39;Stops ongoing execution&#39;&#39;&#39;</span>
+        <span class="k">if</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">arms</span><span class="o">.</span><span class="n">is_executing</span><span class="p">()):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">arms</span><span class="o">.</span><span class="n">stop_execution</span><span class="p">()</span>
+            <span class="k">return</span> <span class="p">[</span><span class="n">RobotSpeech</span><span class="o">.</span><span class="n">STOPPING_EXECUTION</span><span class="p">,</span> <span class="n">GazeGoal</span><span class="o">.</span><span class="n">NOD</span><span class="p">]</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">return</span> <span class="p">[</span><span class="n">RobotSpeech</span><span class="o">.</span><span class="n">ERROR_NO_EXECUTION</span><span class="p">,</span> <span class="n">GazeGoal</span><span class="o">.</span><span class="n">SHAKE</span><span class="p">]</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-20'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-20'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="k">def</span> <span class="nf">save_gripper_step</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">arm_index</span><span class="p">,</span> <span class="n">gripper_state</span><span class="p">):</span>
+        <span class="sd">&#39;&#39;&#39;Saves an action step that involves a gripper state change&#39;&#39;&#39;</span>
+        <span class="k">if</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">session</span><span class="o">.</span><span class="n">n_actions</span><span class="p">()</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">):</span>
+            <span class="k">if</span> <span class="p">(</span><span class="n">Interaction</span><span class="o">.</span><span class="n">_is_programming</span><span class="p">):</span>
+                <span class="n">states</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_arm_states</span><span class="p">()</span>
+                <span class="n">step</span> <span class="o">=</span> <span class="n">ActionStep</span><span class="p">()</span>
+                <span class="n">step</span><span class="o">.</span><span class="n">type</span> <span class="o">=</span> <span class="n">ActionStep</span><span class="o">.</span><span class="n">ARM_TARGET</span>
+                <span class="n">step</span><span class="o">.</span><span class="n">armTarget</span> <span class="o">=</span> <span class="n">ArmTarget</span><span class="p">(</span><span class="n">states</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">states</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="mf">0.2</span><span class="p">,</span> <span class="mf">0.2</span><span class="p">)</span>
+                <span class="n">actions</span> <span class="o">=</span> <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">arms</span><span class="o">.</span><span class="n">get_gripper_state</span><span class="p">(</span><span class="mi">0</span><span class="p">),</span>
+                           <span class="bp">self</span><span class="o">.</span><span class="n">arms</span><span class="o">.</span><span class="n">get_gripper_state</span><span class="p">(</span><span class="mi">1</span><span class="p">)]</span>
+                <span class="n">actions</span><span class="p">[</span><span class="n">arm_index</span><span class="p">]</span> <span class="o">=</span> <span class="n">gripper_state</span>
+                <span class="n">step</span><span class="o">.</span><span class="n">gripperAction</span> <span class="o">=</span> <span class="n">GripperAction</span><span class="p">(</span><span class="n">actions</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">actions</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">session</span><span class="o">.</span><span class="n">add_step_to_action</span><span class="p">(</span><span class="n">step</span><span class="p">,</span>
+                                                <span class="bp">self</span><span class="o">.</span><span class="n">world</span><span class="o">.</span><span class="n">get_frame_list</span><span class="p">())</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-21'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-21'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="k">def</span> <span class="nf">start_recording</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">dummy</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
+        <span class="sd">&#39;&#39;&#39;Starts recording continuous motion&#39;&#39;&#39;</span>
+        <span class="k">if</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">session</span><span class="o">.</span><span class="n">n_actions</span><span class="p">()</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">):</span>
+            <span class="k">if</span> <span class="p">(</span><span class="n">Interaction</span><span class="o">.</span><span class="n">_is_programming</span><span class="p">):</span>
+                <span class="k">if</span> <span class="p">(</span><span class="ow">not</span> <span class="n">Interaction</span><span class="o">.</span><span class="n">_is_recording_motion</span><span class="p">):</span>
+                    <span class="n">Interaction</span><span class="o">.</span><span class="n">_is_recording_motion</span> <span class="o">=</span> <span class="bp">True</span>
+                    <span class="n">Interaction</span><span class="o">.</span><span class="n">_arm_trajectory</span> <span class="o">=</span> <span class="n">ArmTrajectory</span><span class="p">()</span>
+                    <span class="n">Interaction</span><span class="o">.</span><span class="n">_trajectory_start_time</span> <span class="o">=</span> <span class="n">rospy</span><span class="o">.</span><span class="n">Time</span><span class="o">.</span><span class="n">now</span><span class="p">()</span>
+                    <span class="k">return</span> <span class="p">[</span><span class="n">RobotSpeech</span><span class="o">.</span><span class="n">STARTED_RECORDING_MOTION</span><span class="p">,</span>
+                            <span class="n">GazeGoal</span><span class="o">.</span><span class="n">NOD</span><span class="p">]</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="k">return</span> <span class="p">[</span><span class="n">RobotSpeech</span><span class="o">.</span><span class="n">ALREADY_RECORDING_MOTION</span><span class="p">,</span>
+                            <span class="n">GazeGoal</span><span class="o">.</span><span class="n">SHAKE</span><span class="p">]</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">return</span> <span class="p">[</span><span class="s">&#39;Action &#39;</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">session</span><span class="o">.</span><span class="n">current_action_index</span><span class="p">)</span> <span class="o">+</span>
+                        <span class="n">RobotSpeech</span><span class="o">.</span><span class="n">ERROR_NOT_IN_EDIT</span><span class="p">,</span> <span class="n">GazeGoal</span><span class="o">.</span><span class="n">SHAKE</span><span class="p">]</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">return</span> <span class="p">[</span><span class="n">RobotSpeech</span><span class="o">.</span><span class="n">ERROR_NO_SKILLS</span><span class="p">,</span> <span class="n">GazeGoal</span><span class="o">.</span><span class="n">SHAKE</span><span class="p">]</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-22'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-22'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="k">def</span> <span class="nf">stop_recording</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">dummy</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
+        <span class="sd">&#39;&#39;&#39;Stops recording continuous motion&#39;&#39;&#39;</span>
+        <span class="k">if</span> <span class="p">(</span><span class="n">Interaction</span><span class="o">.</span><span class="n">_is_recording_motion</span><span class="p">):</span>
+            <span class="n">Interaction</span><span class="o">.</span><span class="n">_is_recording_motion</span> <span class="o">=</span> <span class="bp">False</span>
+            <span class="n">traj_step</span> <span class="o">=</span> <span class="n">ActionStep</span><span class="p">()</span>
+            <span class="n">traj_step</span><span class="o">.</span><span class="n">type</span> <span class="o">=</span> <span class="n">ActionStep</span><span class="o">.</span><span class="n">ARM_TRAJECTORY</span>
+
+            <span class="n">waited_time</span> <span class="o">=</span> <span class="n">Interaction</span><span class="o">.</span><span class="n">_arm_trajectory</span><span class="o">.</span><span class="n">timing</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+            <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">Interaction</span><span class="o">.</span><span class="n">_arm_trajectory</span><span class="o">.</span><span class="n">timing</span><span class="p">)):</span>
+                <span class="n">Interaction</span><span class="o">.</span><span class="n">_arm_trajectory</span><span class="o">.</span><span class="n">timing</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">-=</span> <span class="n">waited_time</span>
+                <span class="n">Interaction</span><span class="o">.</span><span class="n">_arm_trajectory</span><span class="o">.</span><span class="n">timing</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">+=</span> <span class="n">rospy</span><span class="o">.</span><span class="n">Duration</span><span class="p">(</span><span class="mf">0.1</span><span class="p">)</span>
+
+            <span class="bp">self</span><span class="o">.</span><span class="n">_fix_trajectory_ref</span><span class="p">()</span>
+            <span class="n">traj_step</span><span class="o">.</span><span class="n">arm_trajectory</span> <span class="o">=</span> <span class="n">ArmTrajectory</span><span class="p">(</span>
+                <span class="n">Interaction</span><span class="o">.</span><span class="n">_arm_trajectory</span><span class="o">.</span><span class="n">rArm</span><span class="p">[:],</span>
+                <span class="n">Interaction</span><span class="o">.</span><span class="n">_arm_trajectory</span><span class="o">.</span><span class="n">lArm</span><span class="p">[:],</span>
+                <span class="n">Interaction</span><span class="o">.</span><span class="n">_arm_trajectory</span><span class="o">.</span><span class="n">timing</span><span class="p">[:],</span>
+                <span class="n">Interaction</span><span class="o">.</span><span class="n">_arm_trajectory</span><span class="o">.</span><span class="n">r_ref</span><span class="p">,</span>
+                <span class="n">Interaction</span><span class="o">.</span><span class="n">_arm_trajectory</span><span class="o">.</span><span class="n">l_ref</span><span class="p">,</span>
+                <span class="n">Interaction</span><span class="o">.</span><span class="n">_arm_trajectory</span><span class="o">.</span><span class="n">r_ref_name</span><span class="p">,</span>
+                <span class="n">Interaction</span><span class="o">.</span><span class="n">_arm_trajectory</span><span class="o">.</span><span class="n">l_ref_name</span><span class="p">)</span>
+            <span class="n">traj_step</span><span class="o">.</span><span class="n">gripperAction</span> <span class="o">=</span> <span class="n">GripperAction</span><span class="p">(</span>
+                                        <span class="bp">self</span><span class="o">.</span><span class="n">arms</span><span class="o">.</span><span class="n">get_gripper_state</span><span class="p">(</span><span class="mi">0</span><span class="p">),</span>
+                                        <span class="bp">self</span><span class="o">.</span><span class="n">arms</span><span class="o">.</span><span class="n">get_gripper_state</span><span class="p">(</span><span class="mi">1</span><span class="p">))</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">session</span><span class="o">.</span><span class="n">add_step_to_action</span><span class="p">(</span><span class="n">traj_step</span><span class="p">,</span>
+                                        <span class="bp">self</span><span class="o">.</span><span class="n">world</span><span class="o">.</span><span class="n">get_frame_list</span><span class="p">())</span>
+            <span class="n">Interaction</span><span class="o">.</span><span class="n">_arm_trajectory</span> <span class="o">=</span> <span class="bp">None</span>
+            <span class="n">Interaction</span><span class="o">.</span><span class="n">_trajectory_start_time</span> <span class="o">=</span> <span class="bp">None</span>
+            <span class="k">return</span> <span class="p">[</span><span class="n">RobotSpeech</span><span class="o">.</span><span class="n">STOPPED_RECORDING_MOTION</span> <span class="o">+</span> <span class="s">&#39; &#39;</span> <span class="o">+</span>
+                    <span class="n">RobotSpeech</span><span class="o">.</span><span class="n">STEP_RECORDED</span><span class="p">,</span> <span class="n">GazeGoal</span><span class="o">.</span><span class="n">NOD</span><span class="p">]</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">return</span> <span class="p">[</span><span class="n">RobotSpeech</span><span class="o">.</span><span class="n">MOTION_NOT_RECORDING</span><span class="p">,</span> <span class="n">GazeGoal</span><span class="o">.</span><span class="n">SHAKE</span><span class="p">]</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-23'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-23'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="k">def</span> <span class="nf">_fix_trajectory_ref</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&#39;&#39;&#39;Makes the reference frame of continuous trajectories uniform&#39;&#39;&#39;</span>
+        <span class="n">r_ref</span><span class="p">,</span> <span class="n">r_ref_name</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_find_dominant_ref</span><span class="p">(</span>
+                                        <span class="n">Interaction</span><span class="o">.</span><span class="n">_arm_trajectory</span><span class="o">.</span><span class="n">rArm</span><span class="p">)</span>
+        <span class="n">l_ref</span><span class="p">,</span> <span class="n">l_ref_name</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_find_dominant_ref</span><span class="p">(</span>
+                                        <span class="n">Interaction</span><span class="o">.</span><span class="n">_arm_trajectory</span><span class="o">.</span><span class="n">lArm</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">Interaction</span><span class="o">.</span><span class="n">_arm_trajectory</span><span class="o">.</span><span class="n">timing</span><span class="p">)):</span>
+            <span class="n">Interaction</span><span class="o">.</span><span class="n">_arm_trajectory</span><span class="o">.</span><span class="n">rArm</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="n">World</span><span class="o">.</span><span class="n">convert_ref_frame</span><span class="p">(</span>
+                            <span class="n">Interaction</span><span class="o">.</span><span class="n">_arm_trajectory</span><span class="o">.</span><span class="n">rArm</span><span class="p">[</span><span class="n">i</span><span class="p">],</span>
+                            <span class="n">r_ref</span><span class="p">,</span> <span class="n">r_ref_name</span><span class="p">)</span>
+            <span class="n">Interaction</span><span class="o">.</span><span class="n">_arm_trajectory</span><span class="o">.</span><span class="n">lArm</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="n">World</span><span class="o">.</span><span class="n">convert_ref_frame</span><span class="p">(</span>
+                            <span class="n">Interaction</span><span class="o">.</span><span class="n">_arm_trajectory</span><span class="o">.</span><span class="n">lArm</span><span class="p">[</span><span class="n">i</span><span class="p">],</span>
+                            <span class="n">l_ref</span><span class="p">,</span> <span class="n">l_ref_name</span><span class="p">)</span>
+        <span class="n">Interaction</span><span class="o">.</span><span class="n">_arm_trajectory</span><span class="o">.</span><span class="n">r_ref</span> <span class="o">=</span> <span class="n">r_ref</span>
+        <span class="n">Interaction</span><span class="o">.</span><span class="n">_arm_trajectory</span><span class="o">.</span><span class="n">l_ref</span> <span class="o">=</span> <span class="n">l_ref</span>
+        <span class="n">Interaction</span><span class="o">.</span><span class="n">_arm_trajectory</span><span class="o">.</span><span class="n">r_ref_name</span> <span class="o">=</span> <span class="n">r_ref_name</span>
+        <span class="n">Interaction</span><span class="o">.</span><span class="n">_arm_trajectory</span><span class="o">.</span><span class="n">l_ref_name</span> <span class="o">=</span> <span class="n">l_ref_name</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-24'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-24'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="k">def</span> <span class="nf">_find_dominant_ref</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">arm_traj</span><span class="p">):</span>
+        <span class="sd">&#39;&#39;&#39;Finds the most dominant reference frame</span>
+<span class="sd">        in a continuous trajectory&#39;&#39;&#39;</span>
+        <span class="n">ref_names</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">world</span><span class="o">.</span><span class="n">get_frame_list</span><span class="p">()</span>
+        <span class="n">ref_counts</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">()</span>
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">ref_names</span><span class="p">)):</span>
+            <span class="n">ref_counts</span><span class="p">[</span><span class="n">ref_names</span><span class="p">[</span><span class="n">i</span><span class="p">]]</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">arm_traj</span><span class="p">)):</span>
+            <span class="k">if</span> <span class="p">(</span><span class="n">arm_traj</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">refFrameName</span> <span class="ow">in</span> <span class="n">ref_counts</span><span class="o">.</span><span class="n">keys</span><span class="p">()):</span>
+                <span class="n">ref_counts</span><span class="p">[</span><span class="n">arm_traj</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">refFrameName</span><span class="p">]</span> <span class="o">+=</span> <span class="mi">1</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">rospy</span><span class="o">.</span><span class="n">logwarn</span><span class="p">(</span><span class="s">&#39;Ignoring object with reference frame name &#39;</span>
+                    <span class="o">+</span> <span class="n">arm_traj</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">refFrameName</span>
+                    <span class="o">+</span> <span class="s">&#39; because the world does not have this object.&#39;</span><span class="p">)</span>
+        <span class="n">dominant_ref</span> <span class="o">=</span> <span class="n">ref_counts</span><span class="o">.</span><span class="n">values</span><span class="p">()</span><span class="o">.</span><span class="n">index</span><span class="p">(</span>
+                                                <span class="nb">max</span><span class="p">(</span><span class="n">ref_counts</span><span class="o">.</span><span class="n">values</span><span class="p">()))</span>
+        <span class="n">dominant_ref_name</span> <span class="o">=</span> <span class="n">ref_counts</span><span class="o">.</span><span class="n">keys</span><span class="p">()[</span><span class="n">dominant_ref</span><span class="p">]</span>
+        <span class="k">return</span> <span class="n">World</span><span class="o">.</span><span class="n">get_ref_from_name</span><span class="p">(</span><span class="n">dominant_ref_name</span><span class="p">),</span> <span class="n">dominant_ref_name</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-25'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-25'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="k">def</span> <span class="nf">_save_arm_to_trajectory</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&#39;&#39;&#39;Saves current arm state into continuous trajectory&#39;&#39;&#39;</span>
+        <span class="k">if</span> <span class="p">(</span><span class="n">Interaction</span><span class="o">.</span><span class="n">_arm_trajectory</span> <span class="o">!=</span> <span class="bp">None</span><span class="p">):</span>
+            <span class="n">states</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_arm_states</span><span class="p">()</span>
+            <span class="n">Interaction</span><span class="o">.</span><span class="n">_arm_trajectory</span><span class="o">.</span><span class="n">rArm</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">states</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+            <span class="n">Interaction</span><span class="o">.</span><span class="n">_arm_trajectory</span><span class="o">.</span><span class="n">lArm</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">states</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
+            <span class="n">Interaction</span><span class="o">.</span><span class="n">_arm_trajectory</span><span class="o">.</span><span class="n">timing</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+                        <span class="n">rospy</span><span class="o">.</span><span class="n">Time</span><span class="o">.</span><span class="n">now</span><span class="p">()</span> <span class="o">-</span> <span class="n">Interaction</span><span class="o">.</span><span class="n">_trajectory_start_time</span><span class="p">)</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-26'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-26'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="k">def</span> <span class="nf">save_step</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">dummy</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
+        <span class="sd">&#39;&#39;&#39;Saves current arm state as an action step&#39;&#39;&#39;</span>
+        <span class="k">if</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">session</span><span class="o">.</span><span class="n">n_actions</span><span class="p">()</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">):</span>
+            <span class="k">if</span> <span class="p">(</span><span class="n">Interaction</span><span class="o">.</span><span class="n">_is_programming</span><span class="p">):</span>
+                <span class="n">states</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_arm_states</span><span class="p">()</span>
+                <span class="n">step</span> <span class="o">=</span> <span class="n">ActionStep</span><span class="p">()</span>
+                <span class="n">step</span><span class="o">.</span><span class="n">type</span> <span class="o">=</span> <span class="n">ActionStep</span><span class="o">.</span><span class="n">ARM_TARGET</span>
+                <span class="n">step</span><span class="o">.</span><span class="n">armTarget</span> <span class="o">=</span> <span class="n">ArmTarget</span><span class="p">(</span><span class="n">states</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">states</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span>
+                                           <span class="mf">0.2</span><span class="p">,</span> <span class="mf">0.2</span><span class="p">)</span>
+                <span class="n">step</span><span class="o">.</span><span class="n">gripperAction</span> <span class="o">=</span> <span class="n">GripperAction</span><span class="p">(</span>
+                                            <span class="bp">self</span><span class="o">.</span><span class="n">arms</span><span class="o">.</span><span class="n">get_gripper_state</span><span class="p">(</span><span class="mi">0</span><span class="p">),</span>
+                                            <span class="bp">self</span><span class="o">.</span><span class="n">arms</span><span class="o">.</span><span class="n">get_gripper_state</span><span class="p">(</span><span class="mi">1</span><span class="p">))</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">session</span><span class="o">.</span><span class="n">add_step_to_action</span><span class="p">(</span><span class="n">step</span><span class="p">,</span>
+                                            <span class="bp">self</span><span class="o">.</span><span class="n">world</span><span class="o">.</span><span class="n">get_frame_list</span><span class="p">())</span>
+                <span class="k">return</span> <span class="p">[</span><span class="n">RobotSpeech</span><span class="o">.</span><span class="n">STEP_RECORDED</span><span class="p">,</span> <span class="n">GazeGoal</span><span class="o">.</span><span class="n">NOD</span><span class="p">]</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">return</span> <span class="p">[</span><span class="s">&#39;Action &#39;</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">session</span><span class="o">.</span><span class="n">current_action_index</span><span class="p">)</span> <span class="o">+</span>
+                        <span class="n">RobotSpeech</span><span class="o">.</span><span class="n">ERROR_NOT_IN_EDIT</span><span class="p">,</span> <span class="n">GazeGoal</span><span class="o">.</span><span class="n">SHAKE</span><span class="p">]</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">return</span> <span class="p">[</span><span class="n">RobotSpeech</span><span class="o">.</span><span class="n">ERROR_NO_SKILLS</span><span class="p">,</span> <span class="n">GazeGoal</span><span class="o">.</span><span class="n">SHAKE</span><span class="p">]</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-27'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-27'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="k">def</span> <span class="nf">_get_arm_states</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&#39;&#39;&#39;Returns the current arms states in the right format&#39;&#39;&#39;</span>
+        <span class="n">abs_ee_poses</span> <span class="o">=</span> <span class="p">[</span><span class="n">Arms</span><span class="o">.</span><span class="n">get_ee_state</span><span class="p">(</span><span class="mi">0</span><span class="p">),</span>
+                      <span class="n">Arms</span><span class="o">.</span><span class="n">get_ee_state</span><span class="p">(</span><span class="mi">1</span><span class="p">)]</span>
+        <span class="n">joint_poses</span> <span class="o">=</span> <span class="p">[</span><span class="n">Arms</span><span class="o">.</span><span class="n">get_joint_state</span><span class="p">(</span><span class="mi">0</span><span class="p">),</span>
+                      <span class="n">Arms</span><span class="o">.</span><span class="n">get_joint_state</span><span class="p">(</span><span class="mi">1</span><span class="p">)]</span>
+
+        <span class="n">rel_ee_poses</span> <span class="o">=</span> <span class="p">[</span><span class="bp">None</span><span class="p">,</span> <span class="bp">None</span><span class="p">]</span>
+        <span class="n">states</span> <span class="o">=</span> <span class="p">[</span><span class="bp">None</span><span class="p">,</span> <span class="bp">None</span><span class="p">]</span>
+
+        <span class="k">for</span> <span class="n">arm_index</span> <span class="ow">in</span> <span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">]:</span>
+            <span class="k">if</span> <span class="p">(</span><span class="ow">not</span> <span class="n">World</span><span class="o">.</span><span class="n">has_objects</span><span class="p">()):</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-28'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-28'>#</a>
+      </div>
+      <p>Absolute</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>                <span class="n">states</span><span class="p">[</span><span class="n">arm_index</span><span class="p">]</span> <span class="o">=</span> <span class="n">ArmState</span><span class="p">(</span><span class="n">ArmState</span><span class="o">.</span><span class="n">ROBOT_BASE</span><span class="p">,</span>
+                    <span class="n">abs_ee_poses</span><span class="p">[</span><span class="n">arm_index</span><span class="p">],</span> <span class="n">joint_poses</span><span class="p">[</span><span class="n">arm_index</span><span class="p">],</span> <span class="n">Object</span><span class="p">())</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">nearest_obj</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">world</span><span class="o">.</span><span class="n">get_nearest_object</span><span class="p">(</span>
+                                                    <span class="n">abs_ee_poses</span><span class="p">[</span><span class="n">arm_index</span><span class="p">])</span>
+
+                <span class="k">if</span> <span class="p">(</span><span class="n">nearest_obj</span> <span class="o">==</span> <span class="bp">None</span><span class="p">):</span>
+                    <span class="n">states</span><span class="p">[</span><span class="n">arm_index</span><span class="p">]</span> <span class="o">=</span> <span class="n">ArmState</span><span class="p">(</span><span class="n">ArmState</span><span class="o">.</span><span class="n">ROBOT_BASE</span><span class="p">,</span>
+                                        <span class="n">abs_ee_poses</span><span class="p">[</span><span class="n">arm_index</span><span class="p">],</span>
+                                        <span class="n">joint_poses</span><span class="p">[</span><span class="n">arm_index</span><span class="p">],</span> <span class="n">Object</span><span class="p">())</span>
+                <span class="k">else</span><span class="p">:</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-29'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-29'>#</a>
+      </div>
+      <p>Relative
+rospy.loginfo('Pose is relative for arm ' + str(arm_index))</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>                    <span class="n">rel_ee_poses</span><span class="p">[</span><span class="n">arm_index</span><span class="p">]</span> <span class="o">=</span> <span class="n">World</span><span class="o">.</span><span class="n">transform</span><span class="p">(</span>
+                                        <span class="n">abs_ee_poses</span><span class="p">[</span><span class="n">arm_index</span><span class="p">],</span>
+                                        <span class="s">&#39;base_link&#39;</span><span class="p">,</span> <span class="n">nearest_obj</span><span class="o">.</span><span class="n">name</span><span class="p">)</span>
+                    <span class="n">states</span><span class="p">[</span><span class="n">arm_index</span><span class="p">]</span> <span class="o">=</span> <span class="n">ArmState</span><span class="p">(</span><span class="n">ArmState</span><span class="o">.</span><span class="n">OBJECT</span><span class="p">,</span>
+                                        <span class="n">rel_ee_poses</span><span class="p">[</span><span class="n">arm_index</span><span class="p">],</span>
+                                        <span class="n">joint_poses</span><span class="p">[</span><span class="n">arm_index</span><span class="p">],</span> <span class="n">nearest_obj</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">states</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-30'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-30'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="k">def</span> <span class="nf">execute_action</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">dummy</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
+        <span class="sd">&#39;&#39;&#39;Starts the execution of the current action&#39;&#39;&#39;</span>
+	<span class="n">execution_z_offset</span> <span class="o">=</span> <span class="o">-</span><span class="mf">0.00</span>
+        <span class="k">if</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">session</span><span class="o">.</span><span class="n">n_actions</span><span class="p">()</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">):</span>
+            <span class="k">if</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">session</span><span class="o">.</span><span class="n">n_frames</span><span class="p">()</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">):</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">session</span><span class="o">.</span><span class="n">save_current_action</span><span class="p">()</span>
+                <span class="n">action</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">session</span><span class="o">.</span><span class="n">get_current_action</span><span class="p">()</span>
+
+                <span class="k">if</span> <span class="p">(</span><span class="n">action</span><span class="o">.</span><span class="n">is_object_required</span><span class="p">()):</span>
+                    <span class="k">if</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">world</span><span class="o">.</span><span class="n">update_object_pose</span><span class="p">()):</span>
+                        <span class="bp">self</span><span class="o">.</span><span class="n">session</span><span class="o">.</span><span class="n">get_current_action</span><span class="p">()</span><span class="o">.</span><span class="n">update_objects</span><span class="p">(</span>
+                                                <span class="bp">self</span><span class="o">.</span><span class="n">world</span><span class="o">.</span><span class="n">get_frame_list</span><span class="p">())</span>
+                        <span class="bp">self</span><span class="o">.</span><span class="n">arms</span><span class="o">.</span><span class="n">start_execution</span><span class="p">(</span><span class="n">action</span><span class="p">,</span> <span class="n">execution_z_offset</span><span class="p">)</span>
+                    <span class="k">else</span><span class="p">:</span>
+                        <span class="k">return</span> <span class="p">[</span><span class="n">RobotSpeech</span><span class="o">.</span><span class="n">OBJECT_NOT_DETECTED</span><span class="p">,</span>
+                                <span class="n">GazeGoal</span><span class="o">.</span><span class="n">SHAKE</span><span class="p">]</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">arms</span><span class="o">.</span><span class="n">start_execution</span><span class="p">(</span><span class="n">action</span><span class="p">,</span> <span class="n">execution_z_offset</span><span class="p">)</span>
+
+                <span class="k">return</span> <span class="p">[</span><span class="n">RobotSpeech</span><span class="o">.</span><span class="n">START_EXECUTION</span> <span class="o">+</span> <span class="s">&#39; &#39;</span> <span class="o">+</span>
+                        <span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">session</span><span class="o">.</span><span class="n">current_action_index</span><span class="p">),</span> <span class="bp">None</span><span class="p">]</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">return</span> <span class="p">[</span><span class="n">RobotSpeech</span><span class="o">.</span><span class="n">EXECUTION_ERROR_NOPOSES</span> <span class="o">+</span> <span class="s">&#39; &#39;</span> <span class="o">+</span>
+                        <span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">session</span><span class="o">.</span><span class="n">current_action_index</span><span class="p">),</span> <span class="n">GazeGoal</span><span class="o">.</span><span class="n">SHAKE</span><span class="p">]</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">return</span> <span class="p">[</span><span class="n">RobotSpeech</span><span class="o">.</span><span class="n">ERROR_NO_SKILLS</span><span class="p">,</span> <span class="n">GazeGoal</span><span class="o">.</span><span class="n">SHAKE</span><span class="p">]</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-31'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-31'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="k">def</span> <span class="nf">speech_command_cb</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">command</span><span class="p">):</span>
+        <span class="sd">&#39;&#39;&#39;Callback for when a speech command is received&#39;&#39;&#39;</span>
+        <span class="k">if</span> <span class="n">command</span><span class="o">.</span><span class="n">command</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">responses</span><span class="o">.</span><span class="n">keys</span><span class="p">():</span>
+            <span class="n">rospy</span><span class="o">.</span><span class="n">loginfo</span><span class="p">(</span><span class="s">&#39;</span><span class="se">\033</span><span class="s">[32m Calling response for command &#39;</span> <span class="o">+</span>
+                          <span class="n">command</span><span class="o">.</span><span class="n">command</span> <span class="o">+</span> <span class="s">&#39;</span><span class="se">\033</span><span class="s">[0m&#39;</span><span class="p">)</span>
+            <span class="n">response</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">responses</span><span class="p">[</span><span class="n">command</span><span class="o">.</span><span class="n">command</span><span class="p">]</span>
+
+            <span class="k">if</span> <span class="p">(</span><span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">arms</span><span class="o">.</span><span class="n">is_executing</span><span class="p">()):</span>
+                <span class="k">if</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_undo_function</span> <span class="o">!=</span> <span class="bp">None</span><span class="p">):</span>
+                    <span class="n">response</span><span class="o">.</span><span class="n">respond</span><span class="p">()</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">_undo_function</span> <span class="o">=</span> <span class="bp">None</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="n">response</span><span class="o">.</span><span class="n">respond</span><span class="p">()</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">command</span><span class="o">.</span><span class="n">command</span> <span class="o">==</span> <span class="n">Command</span><span class="o">.</span><span class="n">STOP_EXECUTION</span><span class="p">:</span>
+                    <span class="n">response</span><span class="o">.</span><span class="n">respond</span><span class="p">()</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="n">rospy</span><span class="o">.</span><span class="n">logwarn</span><span class="p">(</span><span class="s">&#39;Ignoring speech command during execution: &#39;</span>
+                                  <span class="o">+</span> <span class="n">command</span><span class="o">.</span><span class="n">command</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">switch_command</span> <span class="o">=</span> <span class="s">&#39;SWITCH_TO_ACTION&#39;</span>
+            <span class="k">if</span> <span class="p">(</span><span class="n">switch_command</span> <span class="ow">in</span> <span class="n">command</span><span class="o">.</span><span class="n">command</span><span class="p">):</span>
+                <span class="n">action_no</span> <span class="o">=</span> <span class="n">command</span><span class="o">.</span><span class="n">command</span><span class="p">[</span>
+                                <span class="nb">len</span><span class="p">(</span><span class="n">switch_command</span><span class="p">):</span><span class="nb">len</span><span class="p">(</span><span class="n">command</span><span class="o">.</span><span class="n">command</span><span class="p">)]</span>
+                <span class="n">action_no</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">action_no</span><span class="p">)</span>
+                <span class="k">if</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">session</span><span class="o">.</span><span class="n">n_actions</span><span class="p">()</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">):</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">session</span><span class="o">.</span><span class="n">switch_to_action</span><span class="p">(</span><span class="n">action_no</span><span class="p">,</span>
+                                                  <span class="bp">self</span><span class="o">.</span><span class="n">world</span><span class="o">.</span><span class="n">get_frame_list</span><span class="p">())</span>
+                    <span class="n">response</span> <span class="o">=</span> <span class="n">Response</span><span class="p">(</span><span class="n">Interaction</span><span class="o">.</span><span class="n">empty_response</span><span class="p">,</span>
+                        <span class="p">[</span><span class="n">RobotSpeech</span><span class="o">.</span><span class="n">SWITCH_SKILL</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="n">action_no</span><span class="p">),</span>
+                         <span class="n">GazeGoal</span><span class="o">.</span><span class="n">NOD</span><span class="p">])</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="n">response</span> <span class="o">=</span> <span class="n">Response</span><span class="p">(</span><span class="n">Interaction</span><span class="o">.</span><span class="n">empty_response</span><span class="p">,</span>
+                        <span class="p">[</span><span class="n">RobotSpeech</span><span class="o">.</span><span class="n">ERROR_NO_SKILLS</span><span class="p">,</span> <span class="n">GazeGoal</span><span class="o">.</span><span class="n">SHAKE</span><span class="p">])</span>
+                <span class="n">response</span><span class="o">.</span><span class="n">respond</span><span class="p">()</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">rospy</span><span class="o">.</span><span class="n">logwarn</span><span class="p">(</span><span class="s">&#39;</span><span class="se">\033</span><span class="s">[32m This command (&#39;</span> <span class="o">+</span> <span class="n">command</span><span class="o">.</span><span class="n">command</span>
+                              <span class="o">+</span> <span class="s">&#39;) is unknown. </span><span class="se">\033</span><span class="s">[0m&#39;</span><span class="p">)</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-32'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-32'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="k">def</span> <span class="nf">gui_command_cb</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">command</span><span class="p">):</span>
+        <span class="sd">&#39;&#39;&#39;Callback for when a GUI command is received&#39;&#39;&#39;</span>
+
+        <span class="k">if</span> <span class="p">(</span><span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">arms</span><span class="o">.</span><span class="n">is_executing</span><span class="p">()):</span>
+            <span class="k">if</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">session</span><span class="o">.</span><span class="n">n_actions</span><span class="p">()</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">):</span>
+                <span class="k">if</span> <span class="p">(</span><span class="n">command</span><span class="o">.</span><span class="n">command</span> <span class="o">==</span> <span class="n">GuiCommand</span><span class="o">.</span><span class="n">SWITCH_TO_ACTION</span><span class="p">):</span>
+                    <span class="n">action_no</span> <span class="o">=</span> <span class="n">command</span><span class="o">.</span><span class="n">param</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">session</span><span class="o">.</span><span class="n">switch_to_action</span><span class="p">(</span><span class="n">action_no</span><span class="p">,</span>
+                                                  <span class="bp">self</span><span class="o">.</span><span class="n">world</span><span class="o">.</span><span class="n">get_frame_list</span><span class="p">())</span>
+                    <span class="n">response</span> <span class="o">=</span> <span class="n">Response</span><span class="p">(</span><span class="n">Interaction</span><span class="o">.</span><span class="n">empty_response</span><span class="p">,</span>
+                        <span class="p">[</span><span class="n">RobotSpeech</span><span class="o">.</span><span class="n">SWITCH_SKILL</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="n">action_no</span><span class="p">),</span>
+                         <span class="n">GazeGoal</span><span class="o">.</span><span class="n">NOD</span><span class="p">])</span>
+                    <span class="n">response</span><span class="o">.</span><span class="n">respond</span><span class="p">()</span>
+                <span class="k">elif</span> <span class="p">(</span><span class="n">command</span><span class="o">.</span><span class="n">command</span> <span class="o">==</span> <span class="n">GuiCommand</span><span class="o">.</span><span class="n">SELECT_ACTION_STEP</span><span class="p">):</span>
+                    <span class="n">step_no</span> <span class="o">=</span> <span class="n">command</span><span class="o">.</span><span class="n">param</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">session</span><span class="o">.</span><span class="n">select_action_step</span><span class="p">(</span><span class="n">step_no</span><span class="p">)</span>
+                    <span class="n">rospy</span><span class="o">.</span><span class="n">loginfo</span><span class="p">(</span><span class="s">&#39;Selected action step &#39;</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="n">step_no</span><span class="p">))</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="n">rospy</span><span class="o">.</span><span class="n">logwarn</span><span class="p">(</span><span class="s">&#39;</span><span class="se">\033</span><span class="s">[32m This command (&#39;</span> <span class="o">+</span> <span class="n">command</span><span class="o">.</span><span class="n">command</span>
+                                  <span class="o">+</span> <span class="s">&#39;) is unknown. </span><span class="se">\033</span><span class="s">[0m&#39;</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">response</span> <span class="o">=</span> <span class="n">Response</span><span class="p">(</span><span class="n">Interaction</span><span class="o">.</span><span class="n">empty_response</span><span class="p">,</span>
+                    <span class="p">[</span><span class="n">RobotSpeech</span><span class="o">.</span><span class="n">ERROR_NO_SKILLS</span><span class="p">,</span> <span class="n">GazeGoal</span><span class="o">.</span><span class="n">SHAKE</span><span class="p">])</span>
+                <span class="n">response</span><span class="o">.</span><span class="n">respond</span><span class="p">()</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">rospy</span><span class="o">.</span><span class="n">logwarn</span><span class="p">(</span><span class="s">&#39;Ignoring GUI command during execution: &#39;</span> <span class="o">+</span>
+                                <span class="n">command</span><span class="o">.</span><span class="n">command</span><span class="p">)</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-33'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-33'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="k">def</span> <span class="nf">update</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&#39;&#39;&#39;General update for the main loop&#39;&#39;&#39;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">arms</span><span class="o">.</span><span class="n">update</span><span class="p">()</span>
+
+        <span class="k">if</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">arms</span><span class="o">.</span><span class="n">status</span> <span class="o">!=</span> <span class="n">ExecutionStatus</span><span class="o">.</span><span class="n">NOT_EXECUTING</span><span class="p">):</span>
+            <span class="k">if</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">arms</span><span class="o">.</span><span class="n">status</span> <span class="o">!=</span> <span class="n">ExecutionStatus</span><span class="o">.</span><span class="n">EXECUTING</span><span class="p">):</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_end_execution</span><span class="p">()</span>
+        <span class="k">if</span> <span class="p">(</span><span class="n">Interaction</span><span class="o">.</span><span class="n">_is_recording_motion</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_save_arm_to_trajectory</span><span class="p">()</span>
+
+        <span class="n">is_world_changed</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">world</span><span class="o">.</span><span class="n">update</span><span class="p">()</span>
+        <span class="k">if</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">session</span><span class="o">.</span><span class="n">n_actions</span><span class="p">()</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">):</span>
+            <span class="n">action</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">session</span><span class="o">.</span><span class="n">get_current_action</span><span class="p">()</span>
+            <span class="n">action</span><span class="o">.</span><span class="n">update_viz</span><span class="p">()</span>
+            <span class="n">r_target</span> <span class="o">=</span> <span class="n">action</span><span class="o">.</span><span class="n">get_requested_targets</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+            <span class="k">if</span> <span class="p">(</span><span class="n">r_target</span> <span class="o">!=</span> <span class="bp">None</span><span class="p">):</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">arms</span><span class="o">.</span><span class="n">start_move_to_pose</span><span class="p">(</span><span class="n">r_target</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+                <span class="n">action</span><span class="o">.</span><span class="n">reset_targets</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+            <span class="n">l_target</span> <span class="o">=</span> <span class="n">action</span><span class="o">.</span><span class="n">get_requested_targets</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+            <span class="k">if</span> <span class="p">(</span><span class="n">l_target</span> <span class="o">!=</span> <span class="bp">None</span><span class="p">):</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">arms</span><span class="o">.</span><span class="n">start_move_to_pose</span><span class="p">(</span><span class="n">l_target</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+                <span class="n">action</span><span class="o">.</span><span class="n">reset_targets</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+
+            <span class="n">action</span><span class="o">.</span><span class="n">delete_requested_steps</span><span class="p">()</span>
+
+            <span class="n">states</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_arm_states</span><span class="p">()</span>
+            <span class="n">action</span><span class="o">.</span><span class="n">change_requested_steps</span><span class="p">(</span><span class="n">states</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">states</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
+
+            <span class="k">if</span> <span class="p">(</span><span class="n">is_world_changed</span><span class="p">):</span>
+                <span class="n">rospy</span><span class="o">.</span><span class="n">loginfo</span><span class="p">(</span><span class="s">&#39;The world has changed.&#39;</span><span class="p">)</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">session</span><span class="o">.</span><span class="n">get_current_action</span><span class="p">()</span><span class="o">.</span><span class="n">update_objects</span><span class="p">(</span>
+                                        <span class="bp">self</span><span class="o">.</span><span class="n">world</span><span class="o">.</span><span class="n">get_frame_list</span><span class="p">())</span>
+
+        <span class="n">time</span><span class="o">.</span><span class="n">sleep</span><span class="p">(</span><span class="mf">0.1</span><span class="p">)</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-34'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-34'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="k">def</span> <span class="nf">_end_execution</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&#39;&#39;&#39;Responses for when the action execution ends&#39;&#39;&#39;</span>
+        <span class="k">if</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">arms</span><span class="o">.</span><span class="n">status</span> <span class="o">==</span> <span class="n">ExecutionStatus</span><span class="o">.</span><span class="n">SUCCEEDED</span><span class="p">):</span>
+            <span class="n">Response</span><span class="o">.</span><span class="n">say</span><span class="p">(</span><span class="n">RobotSpeech</span><span class="o">.</span><span class="n">EXECUTION_ENDED</span><span class="p">)</span>
+            <span class="n">Response</span><span class="o">.</span><span class="n">perform_gaze_action</span><span class="p">(</span><span class="n">GazeGoal</span><span class="o">.</span><span class="n">NOD</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">arms</span><span class="o">.</span><span class="n">status</span> <span class="o">==</span> <span class="n">ExecutionStatus</span><span class="o">.</span><span class="n">PREEMPTED</span><span class="p">):</span>
+            <span class="n">Response</span><span class="o">.</span><span class="n">say</span><span class="p">(</span><span class="n">RobotSpeech</span><span class="o">.</span><span class="n">EXECUTION_PREEMPTED</span><span class="p">)</span>
+            <span class="n">Response</span><span class="o">.</span><span class="n">perform_gaze_action</span><span class="p">(</span><span class="n">GazeGoal</span><span class="o">.</span><span class="n">SHAKE</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">Response</span><span class="o">.</span><span class="n">say</span><span class="p">(</span><span class="n">RobotSpeech</span><span class="o">.</span><span class="n">EXECUTION_ERROR_NOIK</span><span class="p">)</span>
+            <span class="n">Response</span><span class="o">.</span><span class="n">perform_gaze_action</span><span class="p">(</span><span class="n">GazeGoal</span><span class="o">.</span><span class="n">SHAKE</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">arms</span><span class="o">.</span><span class="n">status</span> <span class="o">=</span> <span class="n">ExecutionStatus</span><span class="o">.</span><span class="n">NOT_EXECUTING</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-35'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-35'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="k">def</span> <span class="nf">record_object_pose</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">dummy</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
+        <span class="sd">&#39;&#39;&#39;Makes the robot look for a table and objects&#39;&#39;&#39;</span>
+        <span class="k">if</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">world</span><span class="o">.</span><span class="n">update_object_pose</span><span class="p">()):</span>
+            <span class="k">if</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">session</span><span class="o">.</span><span class="n">n_actions</span><span class="p">()</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">):</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">session</span><span class="o">.</span><span class="n">get_current_action</span><span class="p">()</span><span class="o">.</span><span class="n">update_objects</span><span class="p">(</span>
+                                            <span class="bp">self</span><span class="o">.</span><span class="n">world</span><span class="o">.</span><span class="n">get_frame_list</span><span class="p">())</span>
+            <span class="k">return</span> <span class="p">[</span><span class="n">RobotSpeech</span><span class="o">.</span><span class="n">START_STATE_RECORDED</span><span class="p">,</span> <span class="n">GazeGoal</span><span class="o">.</span><span class="n">NOD</span><span class="p">]</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">return</span> <span class="p">[</span><span class="n">RobotSpeech</span><span class="o">.</span><span class="n">OBJECT_NOT_DETECTED</span><span class="p">,</span> <span class="n">GazeGoal</span><span class="o">.</span><span class="n">SHAKE</span><span class="p">]</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-36'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-36'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="k">def</span> <span class="nf">save_experiment_state</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&#39;&#39;&#39;Saves session state&#39;&#39;&#39;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">session</span><span class="o">.</span><span class="n">save_current_action</span><span class="p">()</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-37'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-37'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">empty_response</span><span class="p">(</span><span class="n">responses</span><span class="p">):</span>
+        <span class="sd">&#39;&#39;&#39;Default response to speech commands&#39;&#39;&#39;</span>
+        <span class="k">return</span> <span class="n">responses</span>
+
+</pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+</div>
+</body>

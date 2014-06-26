@@ -1,0 +1,1009 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta http-equiv="content-type" content="text/html;charset=utf-8">
+  <title>World.py</title>
+  <link rel="stylesheet" href="pycco.css">
+</head>
+<body>
+<div id="background"></div>
+<div id='container'>
+  <div class='section'>
+    <div class='docs'><h1>World.py</h1></div>
+  </div>
+  <div class='clearall'>
+  <div class='section' id='section-0'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-0'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre><span class="sd">&#39;&#39;&#39;Everything related to perception of the world&#39;&#39;&#39;</span>
+<span class="kn">import</span> <span class="nn">roslib</span>
+<span class="n">roslib</span><span class="o">.</span><span class="n">load_manifest</span><span class="p">(</span><span class="s">&#39;pr2_pbd_interaction&#39;</span><span class="p">)</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-1'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-1'>#</a>
+      </div>
+      <p>Generic libraries</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre><span class="kn">import</span> <span class="nn">time</span>
+<span class="kn">import</span> <span class="nn">threading</span>
+<span class="kn">from</span> <span class="nn">numpy.linalg</span> <span class="kn">import</span> <span class="n">norm</span>
+<span class="kn">from</span> <span class="nn">numpy</span> <span class="kn">import</span> <span class="n">array</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-2'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-2'>#</a>
+      </div>
+      <p>ROS libraries
+from actionlib_msgs.msg import</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre><span class="kn">import</span> <span class="nn">rospy</span>
+<span class="kn">import</span> <span class="nn">tf</span>
+<span class="kn">from</span> <span class="nn">tf</span> <span class="kn">import</span> <span class="n">TransformListener</span><span class="p">,</span> <span class="n">TransformBroadcaster</span>
+<span class="kn">from</span> <span class="nn">manipulation_msgs.msg</span> <span class="kn">import</span> <span class="n">GraspableObjectList</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-3'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-3'>#</a>
+      </div>
+      <p>from object_manipulation_msgs.msg import GraspableObjectList</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre><span class="kn">from</span> <span class="nn">object_manipulation_msgs.srv</span> <span class="kn">import</span> <span class="n">FindClusterBoundingBox</span>
+<span class="kn">from</span> <span class="nn">pr2_interactive_object_detection.msg</span> <span class="kn">import</span> <span class="n">UserCommandAction</span>
+<span class="kn">from</span> <span class="nn">pr2_interactive_object_detection.msg</span> <span class="kn">import</span> <span class="n">UserCommandGoal</span>
+<span class="kn">from</span> <span class="nn">geometry_msgs.msg</span> <span class="kn">import</span> <span class="n">Quaternion</span><span class="p">,</span> <span class="n">Vector3</span><span class="p">,</span> <span class="n">Point</span><span class="p">,</span> <span class="n">Pose</span><span class="p">,</span> <span class="n">PoseStamped</span>
+<span class="kn">from</span> <span class="nn">std_msgs.msg</span> <span class="kn">import</span> <span class="n">ColorRGBA</span><span class="p">,</span> <span class="n">Header</span>
+<span class="kn">from</span> <span class="nn">visualization_msgs.msg</span> <span class="kn">import</span> <span class="n">Marker</span><span class="p">,</span> <span class="n">InteractiveMarker</span>
+<span class="kn">from</span> <span class="nn">visualization_msgs.msg</span> <span class="kn">import</span> <span class="n">InteractiveMarkerControl</span>
+<span class="kn">from</span> <span class="nn">visualization_msgs.msg</span> <span class="kn">import</span> <span class="n">InteractiveMarkerFeedback</span>
+<span class="kn">from</span> <span class="nn">interactive_markers.interactive_marker_server</span> <span class="kn">import</span> <span class="n">InteractiveMarkerServer</span>
+<span class="kn">from</span> <span class="nn">interactive_markers.menu_handler</span> <span class="kn">import</span> <span class="n">MenuHandler</span>
+<span class="kn">from</span> <span class="nn">actionlib_msgs.msg</span> <span class="kn">import</span> <span class="n">GoalStatus</span>
+<span class="kn">import</span> <span class="nn">actionlib</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-4'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-4'>#</a>
+      </div>
+      <p>Local stuff</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre><span class="kn">from</span> <span class="nn">pr2_pbd_interaction.msg</span> <span class="kn">import</span> <span class="n">Object</span><span class="p">,</span> <span class="n">ArmState</span>
+<span class="kn">from</span> <span class="nn">pr2_social_gaze.msg</span> <span class="kn">import</span> <span class="n">GazeGoal</span>
+<span class="kn">from</span> <span class="nn">Response</span> <span class="kn">import</span> <span class="n">Response</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-5'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-5'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre><span class="k">class</span> <span class="nc">WorldObject</span><span class="p">:</span>
+    <span class="sd">&#39;&#39;&#39;Class for representing objects&#39;&#39;&#39;</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-6'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-6'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">pose</span><span class="p">,</span> <span class="n">index</span><span class="p">,</span> <span class="n">dimensions</span><span class="p">,</span> <span class="n">is_recognized</span><span class="p">):</span>
+        <span class="sd">&#39;&#39;&#39; Initialization of objects&#39;&#39;&#39;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">index</span> <span class="o">=</span> <span class="n">index</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assigned_name</span> <span class="o">=</span> <span class="bp">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">is_recognized</span> <span class="o">=</span> <span class="n">is_recognized</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">object</span> <span class="o">=</span> <span class="n">Object</span><span class="p">(</span><span class="n">Object</span><span class="o">.</span><span class="n">TABLE_TOP</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_name</span><span class="p">(),</span>
+                             <span class="n">pose</span><span class="p">,</span> <span class="n">dimensions</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">menu_handler</span> <span class="o">=</span> <span class="n">MenuHandler</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">int_marker</span> <span class="o">=</span> <span class="bp">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">is_removed</span> <span class="o">=</span> <span class="bp">False</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">menu_handler</span><span class="o">.</span><span class="n">insert</span><span class="p">(</span><span class="s">&#39;Remove from scene&#39;</span><span class="p">,</span> <span class="n">callback</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">remove</span><span class="p">)</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-7'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-7'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="k">def</span> <span class="nf">remove</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">dummy</span><span class="p">):</span>
+        <span class="sd">&#39;&#39;&#39;Function for removing object from the world&#39;&#39;&#39;</span>
+        <span class="n">rospy</span><span class="o">.</span><span class="n">loginfo</span><span class="p">(</span><span class="s">&#39;Will remove object&#39;</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_name</span><span class="p">())</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">is_removed</span> <span class="o">=</span> <span class="bp">True</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-8'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-8'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="k">def</span> <span class="nf">assign_name</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">):</span>
+        <span class="sd">&#39;&#39;&#39;Function for assigning a different name&#39;&#39;&#39;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assigned_name</span> <span class="o">=</span> <span class="n">name</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">object</span><span class="o">.</span><span class="n">name</span> <span class="o">=</span> <span class="n">name</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-9'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-9'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="k">def</span> <span class="nf">get_name</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&#39;&#39;&#39;Function to get the object name&#39;&#39;&#39;</span>
+        <span class="k">if</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">assigned_name</span> <span class="o">==</span> <span class="bp">None</span><span class="p">):</span>
+            <span class="k">if</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">is_recognized</span><span class="p">):</span>
+                <span class="k">return</span> <span class="s">&#39;object&#39;</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">index</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">return</span> <span class="s">&#39;thing&#39;</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">index</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">assigned_name</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-10'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-10'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="k">def</span> <span class="nf">decrease_index</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&#39;&#39;&#39;Function to decrese object index&#39;&#39;&#39;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">index</span> <span class="o">-=</span> <span class="mi">1</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-11'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-11'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre><span class="k">class</span> <span class="nc">World</span><span class="p">:</span>
+    <span class="sd">&#39;&#39;&#39;Object recognition and localization related stuff&#39;&#39;&#39;</span>
+
+    <span class="n">tf_listener</span> <span class="o">=</span> <span class="bp">None</span>
+    <span class="n">objects</span> <span class="o">=</span> <span class="p">[]</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-12'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-12'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+
+        <span class="k">if</span> <span class="n">World</span><span class="o">.</span><span class="n">tf_listener</span> <span class="o">==</span> <span class="bp">None</span><span class="p">:</span>
+            <span class="n">World</span><span class="o">.</span><span class="n">tf_listener</span> <span class="o">=</span> <span class="n">TransformListener</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_lock</span> <span class="o">=</span> <span class="n">threading</span><span class="o">.</span><span class="n">Lock</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">surface</span> <span class="o">=</span> <span class="bp">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_tf_broadcaster</span> <span class="o">=</span> <span class="n">TransformBroadcaster</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_im_server</span> <span class="o">=</span> <span class="n">InteractiveMarkerServer</span><span class="p">(</span><span class="s">&#39;world_objects&#39;</span><span class="p">)</span>
+        <span class="n">bb_service_name</span> <span class="o">=</span> <span class="s">&#39;find_cluster_bounding_box&#39;</span>
+        <span class="n">rospy</span><span class="o">.</span><span class="n">wait_for_service</span><span class="p">(</span><span class="n">bb_service_name</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_bb_service</span> <span class="o">=</span> <span class="n">rospy</span><span class="o">.</span><span class="n">ServiceProxy</span><span class="p">(</span><span class="n">bb_service_name</span><span class="p">,</span>
+                                            <span class="n">FindClusterBoundingBox</span><span class="p">)</span>
+        <span class="n">rospy</span><span class="o">.</span><span class="n">Subscriber</span><span class="p">(</span><span class="s">&#39;interactive_object_recognition_result&#39;</span><span class="p">,</span>
+            <span class="n">GraspableObjectList</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">receive_object_info</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_object_action_client</span> <span class="o">=</span> <span class="n">actionlib</span><span class="o">.</span><span class="n">SimpleActionClient</span><span class="p">(</span>
+            <span class="s">&#39;object_detection_user_command&#39;</span><span class="p">,</span> <span class="n">UserCommandAction</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_object_action_client</span><span class="o">.</span><span class="n">wait_for_server</span><span class="p">()</span>
+        <span class="n">rospy</span><span class="o">.</span><span class="n">loginfo</span><span class="p">(</span><span class="s">&#39;Interactive object detection action &#39;</span> <span class="o">+</span>
+                      <span class="s">&#39;server has responded.&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">clear_all_objects</span><span class="p">()</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-13'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-13'>#</a>
+      </div>
+      <p>The following is to get the table information</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>        <span class="n">rospy</span><span class="o">.</span><span class="n">Subscriber</span><span class="p">(</span><span class="s">&#39;tabletop_segmentation_markers&#39;</span><span class="p">,</span>
+                         <span class="n">Marker</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">receive_table_marker</span><span class="p">)</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-14'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-14'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="k">def</span> <span class="nf">_reset_objects</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&#39;&#39;&#39;Function that removes all objects&#39;&#39;&#39;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_lock</span><span class="o">.</span><span class="n">acquire</span><span class="p">()</span>
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">World</span><span class="o">.</span><span class="n">objects</span><span class="p">)):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_im_server</span><span class="o">.</span><span class="n">erase</span><span class="p">(</span><span class="n">World</span><span class="o">.</span><span class="n">objects</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">int_marker</span><span class="o">.</span><span class="n">name</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_im_server</span><span class="o">.</span><span class="n">applyChanges</span><span class="p">()</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">surface</span> <span class="o">!=</span> <span class="bp">None</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_remove_surface</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_im_server</span><span class="o">.</span><span class="n">clear</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_im_server</span><span class="o">.</span><span class="n">applyChanges</span><span class="p">()</span>
+        <span class="n">World</span><span class="o">.</span><span class="n">objects</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_lock</span><span class="o">.</span><span class="n">release</span><span class="p">()</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-15'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-15'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="k">def</span> <span class="nf">receive_table_marker</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">marker</span><span class="p">):</span>
+        <span class="sd">&#39;&#39;&#39;Callback function for markers to determine table&#39;&#39;&#39;</span>
+        <span class="k">if</span> <span class="p">(</span><span class="n">marker</span><span class="o">.</span><span class="n">type</span> <span class="o">==</span> <span class="n">Marker</span><span class="o">.</span><span class="n">LINE_STRIP</span><span class="p">):</span>
+            <span class="k">if</span> <span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">marker</span><span class="o">.</span><span class="n">points</span><span class="p">)</span> <span class="o">==</span> <span class="mi">6</span><span class="p">):</span>
+                <span class="n">rospy</span><span class="o">.</span><span class="n">loginfo</span><span class="p">(</span><span class="s">&#39;Received a TABLE marker.&#39;</span><span class="p">)</span>
+                <span class="n">xmin</span> <span class="o">=</span> <span class="n">marker</span><span class="o">.</span><span class="n">points</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">x</span>
+                <span class="n">ymin</span> <span class="o">=</span> <span class="n">marker</span><span class="o">.</span><span class="n">points</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">y</span>
+                <span class="n">xmax</span> <span class="o">=</span> <span class="n">marker</span><span class="o">.</span><span class="n">points</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span><span class="o">.</span><span class="n">x</span>
+                <span class="n">ymax</span> <span class="o">=</span> <span class="n">marker</span><span class="o">.</span><span class="n">points</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span><span class="o">.</span><span class="n">y</span>
+                <span class="n">depth</span> <span class="o">=</span> <span class="n">xmax</span> <span class="o">-</span> <span class="n">xmin</span>
+                <span class="n">width</span> <span class="o">=</span> <span class="n">ymax</span> <span class="o">-</span> <span class="n">ymin</span>
+
+                <span class="n">pose</span> <span class="o">=</span> <span class="n">Pose</span><span class="p">(</span><span class="n">marker</span><span class="o">.</span><span class="n">pose</span><span class="o">.</span><span class="n">position</span><span class="p">,</span> <span class="n">marker</span><span class="o">.</span><span class="n">pose</span><span class="o">.</span><span class="n">orientation</span><span class="p">)</span>
+                <span class="n">pose</span><span class="o">.</span><span class="n">position</span><span class="o">.</span><span class="n">x</span> <span class="o">=</span> <span class="n">pose</span><span class="o">.</span><span class="n">position</span><span class="o">.</span><span class="n">x</span> <span class="o">+</span> <span class="n">xmin</span> <span class="o">+</span> <span class="n">depth</span> <span class="o">/</span> <span class="mi">2</span>
+                <span class="n">pose</span><span class="o">.</span><span class="n">position</span><span class="o">.</span><span class="n">y</span> <span class="o">=</span> <span class="n">pose</span><span class="o">.</span><span class="n">position</span><span class="o">.</span><span class="n">y</span> <span class="o">+</span> <span class="n">ymin</span> <span class="o">+</span> <span class="n">width</span> <span class="o">/</span> <span class="mi">2</span>
+                <span class="n">dimensions</span> <span class="o">=</span> <span class="n">Vector3</span><span class="p">(</span><span class="n">depth</span><span class="p">,</span> <span class="n">width</span><span class="p">,</span> <span class="mf">0.01</span><span class="p">)</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">surface</span> <span class="o">=</span> <span class="n">World</span><span class="o">.</span><span class="n">_get_surface_marker</span><span class="p">(</span><span class="n">pose</span><span class="p">,</span> <span class="n">dimensions</span><span class="p">)</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_im_server</span><span class="o">.</span><span class="n">insert</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">surface</span><span class="p">,</span>
+                                     <span class="bp">self</span><span class="o">.</span><span class="n">marker_feedback_cb</span><span class="p">)</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_im_server</span><span class="o">.</span><span class="n">applyChanges</span><span class="p">()</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-16'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-16'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="k">def</span> <span class="nf">receive_object_info</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">object_list</span><span class="p">):</span>
+        <span class="sd">&#39;&#39;&#39;Callback function to receive object info&#39;&#39;&#39;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_lock</span><span class="o">.</span><span class="n">acquire</span><span class="p">()</span>
+        <span class="n">rospy</span><span class="o">.</span><span class="n">loginfo</span><span class="p">(</span><span class="s">&#39;Received recognized object list.&#39;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">object_list</span><span class="o">.</span><span class="n">graspable_objects</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">):</span>
+            <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">object_list</span><span class="o">.</span><span class="n">graspable_objects</span><span class="p">)):</span>
+                <span class="n">models</span> <span class="o">=</span> <span class="n">object_list</span><span class="o">.</span><span class="n">graspable_objects</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">potential_models</span>
+                <span class="k">if</span> <span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">models</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">):</span>
+                    <span class="n">object_pose</span> <span class="o">=</span> <span class="bp">None</span>
+                    <span class="n">best_confidence</span> <span class="o">=</span> <span class="mf">0.0</span>
+                    <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">models</span><span class="p">)):</span>
+                        <span class="k">if</span> <span class="p">(</span><span class="n">best_confidence</span> <span class="o">&lt;</span> <span class="n">models</span><span class="p">[</span><span class="n">j</span><span class="p">]</span><span class="o">.</span><span class="n">confidence</span><span class="p">):</span>
+                            <span class="n">object_pose</span> <span class="o">=</span> <span class="n">models</span><span class="p">[</span><span class="n">j</span><span class="p">]</span><span class="o">.</span><span class="n">pose</span><span class="o">.</span><span class="n">pose</span>
+                            <span class="n">best_confidence</span> <span class="o">=</span> <span class="n">models</span><span class="p">[</span><span class="n">j</span><span class="p">]</span><span class="o">.</span><span class="n">confidence</span>
+                    <span class="k">if</span> <span class="p">(</span><span class="n">object_pose</span> <span class="o">!=</span> <span class="bp">None</span><span class="p">):</span>
+                        <span class="n">rospy</span><span class="o">.</span><span class="n">logwarn</span><span class="p">(</span><span class="s">&#39;Adding the recognized object &#39;</span> <span class="o">+</span>
+                                      <span class="s">&#39;with most confident model.&#39;</span><span class="p">)</span>
+                        <span class="bp">self</span><span class="o">.</span><span class="n">_add_new_object</span><span class="p">(</span><span class="n">object_pose</span><span class="p">,</span> <span class="c"># pose</span>
+                            <span class="n">Vector3</span><span class="p">(</span><span class="mf">0.2</span><span class="p">,</span> <span class="mf">0.2</span><span class="p">,</span> <span class="mf">0.2</span><span class="p">),</span> <span class="c"># dimensions</span>
+                            <span class="bp">True</span><span class="p">,</span> <span class="c"># is_recognized</span>
+                            <span class="n">object_list</span><span class="o">.</span><span class="n">meshes</span><span class="p">[</span><span class="n">i</span><span class="p">])</span> <span class="c"># mesh</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="n">rospy</span><span class="o">.</span><span class="n">logwarn</span><span class="p">(</span><span class="s">&#39;... this is not a recognition result, &#39;</span> <span class="o">+</span>
+                                  <span class="s">&#39;it is probably just segmentation.&#39;</span><span class="p">)</span>
+                    <span class="n">cluster</span> <span class="o">=</span> <span class="n">object_list</span><span class="o">.</span><span class="n">graspable_objects</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">cluster</span>
+                    <span class="n">bbox</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_bb_service</span><span class="p">(</span><span class="n">cluster</span><span class="p">)</span>
+                    <span class="n">cluster_pose</span> <span class="o">=</span> <span class="n">bbox</span><span class="o">.</span><span class="n">pose</span><span class="o">.</span><span class="n">pose</span>
+                    <span class="k">if</span> <span class="p">(</span><span class="n">cluster_pose</span> <span class="o">!=</span> <span class="bp">None</span><span class="p">):</span>
+                        <span class="n">rospy</span><span class="o">.</span><span class="n">loginfo</span><span class="p">(</span><span class="s">&#39;Adding unrecognized object with</span><span class="se">\n</span><span class="s">&#39;</span> <span class="o">+</span>
+                            <span class="s">&#39;- pose: &#39;</span> <span class="o">+</span> <span class="n">World</span><span class="o">.</span><span class="n">pose_to_string</span><span class="p">(</span><span class="n">cluster_pose</span><span class="p">)</span> <span class="o">+</span>
+                            <span class="s">&#39;- dimensions: &#39;</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="n">bbox</span><span class="o">.</span><span class="n">box_dims</span><span class="p">)</span> <span class="o">+</span> 
+                            <span class="s">&#39;- in ref frame: &#39;</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="n">bbox</span><span class="o">.</span><span class="n">pose</span><span class="o">.</span><span class="n">header</span><span class="o">.</span><span class="n">frame_id</span><span class="p">))</span>
+                        <span class="bp">self</span><span class="o">.</span><span class="n">_add_new_object</span><span class="p">(</span><span class="n">cluster_pose</span><span class="p">,</span> <span class="c"># pose</span>
+                            <span class="n">bbox</span><span class="o">.</span><span class="n">box_dims</span><span class="p">,</span> <span class="c"># dimensions</span>
+                            <span class="bp">False</span><span class="p">)</span> <span class="c"># is_recognized</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">rospy</span><span class="o">.</span><span class="n">logwarn</span><span class="p">(</span><span class="s">&#39;... but the list was empty.&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_lock</span><span class="o">.</span><span class="n">release</span><span class="p">()</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-17'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-17'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">get_pose_from_transform</span><span class="p">(</span><span class="n">transform</span><span class="p">):</span>
+        <span class="sd">&#39;&#39;&#39;Returns pose for transformation matrix&#39;&#39;&#39;</span>
+        <span class="n">pos</span> <span class="o">=</span> <span class="n">transform</span><span class="p">[:</span><span class="mi">3</span><span class="p">,</span> <span class="mi">3</span><span class="p">]</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+        <span class="n">rot</span> <span class="o">=</span> <span class="n">tf</span><span class="o">.</span><span class="n">transformations</span><span class="o">.</span><span class="n">quaternion_from_matrix</span><span class="p">(</span><span class="n">transform</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">Pose</span><span class="p">(</span><span class="n">Point</span><span class="p">(</span><span class="n">pos</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">pos</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="n">pos</span><span class="p">[</span><span class="mi">2</span><span class="p">]),</span>
+                    <span class="n">Quaternion</span><span class="p">(</span><span class="n">rot</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">rot</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="n">rot</span><span class="p">[</span><span class="mi">2</span><span class="p">],</span> <span class="n">rot</span><span class="p">[</span><span class="mi">3</span><span class="p">]))</span>
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">get_matrix_from_pose</span><span class="p">(</span><span class="n">pose</span><span class="p">):</span>
+        <span class="sd">&#39;&#39;&#39;Returns the transformation matrix for given pose&#39;&#39;&#39;</span>
+        <span class="n">rotation</span> <span class="o">=</span> <span class="p">[</span><span class="n">pose</span><span class="o">.</span><span class="n">orientation</span><span class="o">.</span><span class="n">x</span><span class="p">,</span> <span class="n">pose</span><span class="o">.</span><span class="n">orientation</span><span class="o">.</span><span class="n">y</span><span class="p">,</span>
+                    <span class="n">pose</span><span class="o">.</span><span class="n">orientation</span><span class="o">.</span><span class="n">z</span><span class="p">,</span> <span class="n">pose</span><span class="o">.</span><span class="n">orientation</span><span class="o">.</span><span class="n">w</span><span class="p">]</span>
+        <span class="n">transformation</span> <span class="o">=</span> <span class="n">tf</span><span class="o">.</span><span class="n">transformations</span><span class="o">.</span><span class="n">quaternion_matrix</span><span class="p">(</span><span class="n">rotation</span><span class="p">)</span>
+        <span class="n">position</span> <span class="o">=</span> <span class="p">[</span><span class="n">pose</span><span class="o">.</span><span class="n">position</span><span class="o">.</span><span class="n">x</span><span class="p">,</span> <span class="n">pose</span><span class="o">.</span><span class="n">position</span><span class="o">.</span><span class="n">y</span><span class="p">,</span> <span class="n">pose</span><span class="o">.</span><span class="n">position</span><span class="o">.</span><span class="n">z</span><span class="p">]</span>
+        <span class="n">transformation</span><span class="p">[:</span><span class="mi">3</span><span class="p">,</span> <span class="mi">3</span><span class="p">]</span> <span class="o">=</span> <span class="n">position</span>
+        <span class="k">return</span> <span class="n">transformation</span>
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">get_absolute_pose</span><span class="p">(</span><span class="n">arm_state</span><span class="p">):</span>
+        <span class="sd">&#39;&#39;&#39;Returns absolute pose of an end effector state&#39;&#39;&#39;</span>
+        <span class="k">if</span> <span class="p">(</span><span class="n">arm_state</span><span class="o">.</span><span class="n">refFrame</span> <span class="o">==</span> <span class="n">ArmState</span><span class="o">.</span><span class="n">OBJECT</span><span class="p">):</span>
+            <span class="n">arm_state_copy</span> <span class="o">=</span> <span class="n">ArmState</span><span class="p">(</span><span class="n">arm_state</span><span class="o">.</span><span class="n">refFrame</span><span class="p">,</span>
+                            <span class="n">Pose</span><span class="p">(</span><span class="n">arm_state</span><span class="o">.</span><span class="n">ee_pose</span><span class="o">.</span><span class="n">position</span><span class="p">,</span>
+                                 <span class="n">arm_state</span><span class="o">.</span><span class="n">ee_pose</span><span class="o">.</span><span class="n">orientation</span><span class="p">),</span>
+                            <span class="n">arm_state</span><span class="o">.</span><span class="n">joint_pose</span><span class="p">[:],</span>
+                            <span class="n">arm_state</span><span class="o">.</span><span class="n">refFrameObject</span><span class="p">)</span>
+            <span class="n">World</span><span class="o">.</span><span class="n">convert_ref_frame</span><span class="p">(</span><span class="n">arm_state_copy</span><span class="p">,</span> <span class="n">ArmState</span><span class="o">.</span><span class="n">ROBOT_BASE</span><span class="p">)</span>
+            <span class="k">return</span> <span class="n">arm_state_copy</span><span class="o">.</span><span class="n">ee_pose</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">arm_state</span><span class="o">.</span><span class="n">ee_pose</span>
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">get_most_similar_obj</span><span class="p">(</span><span class="n">ref_object</span><span class="p">,</span> <span class="n">ref_frame_list</span><span class="p">):</span>
+        <span class="sd">&#39;&#39;&#39;Finds the most similar object in the world&#39;&#39;&#39;</span>
+        <span class="n">best_dist</span> <span class="o">=</span> <span class="mi">10000</span>
+        <span class="n">chosen_obj_index</span> <span class="o">=</span> <span class="o">-</span><span class="mi">1</span>
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">ref_frame_list</span><span class="p">)):</span>
+            <span class="n">dist</span> <span class="o">=</span> <span class="n">World</span><span class="o">.</span><span class="n">object_dissimilarity</span><span class="p">(</span><span class="n">ref_frame_list</span><span class="p">[</span><span class="n">i</span><span class="p">],</span> <span class="n">ref_object</span><span class="p">)</span>
+            <span class="k">if</span> <span class="p">(</span><span class="n">dist</span> <span class="o">&lt;</span> <span class="n">best_dist</span><span class="p">):</span>
+                <span class="n">best_dist</span> <span class="o">=</span> <span class="n">dist</span>
+                <span class="n">chosen_obj_index</span> <span class="o">=</span> <span class="n">i</span>
+        <span class="k">if</span> <span class="n">chosen_obj_index</span> <span class="o">==</span> <span class="o">-</span><span class="mi">1</span><span class="p">:</span>
+            <span class="n">rospy</span><span class="o">.</span><span class="n">logwarn</span><span class="p">(</span><span class="s">&#39;Did not find a similar object..&#39;</span><span class="p">)</span>
+            <span class="k">return</span> <span class="bp">None</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">print</span> <span class="s">&#39;Object dissimilarity is --- &#39;</span><span class="p">,</span> <span class="n">best_dist</span>
+            <span class="k">if</span> <span class="n">best_dist</span> <span class="o">&gt;</span> <span class="mf">0.075</span><span class="p">:</span>
+                <span class="n">rospy</span><span class="o">.</span><span class="n">logwarn</span><span class="p">(</span><span class="s">&#39;Found some objects, but not similar enough.&#39;</span><span class="p">)</span>
+                <span class="k">return</span> <span class="bp">None</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">rospy</span><span class="o">.</span><span class="n">loginfo</span><span class="p">(</span><span class="s">&#39;Most similar to new object &#39;</span>
+                                        <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="n">chosen_obj_index</span><span class="p">))</span>
+                <span class="k">return</span> <span class="n">ref_frame_list</span><span class="p">[</span><span class="n">chosen_obj_index</span><span class="p">]</span>
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">_get_mesh_marker</span><span class="p">(</span><span class="n">marker</span><span class="p">,</span> <span class="n">mesh</span><span class="p">):</span>
+        <span class="sd">&#39;&#39;&#39;Function that generated a marker from a mesh&#39;&#39;&#39;</span>
+        <span class="n">marker</span><span class="o">.</span><span class="n">type</span> <span class="o">=</span> <span class="n">Marker</span><span class="o">.</span><span class="n">TRIANGLE_LIST</span>
+        <span class="n">index</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="n">marker</span><span class="o">.</span><span class="n">scale</span> <span class="o">=</span> <span class="n">Vector3</span><span class="p">(</span><span class="mf">1.0</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">)</span>
+        <span class="k">while</span> <span class="p">(</span><span class="n">index</span> <span class="o">+</span> <span class="mi">2</span> <span class="o">&lt;</span> <span class="nb">len</span><span class="p">(</span><span class="n">mesh</span><span class="o">.</span><span class="n">triangles</span><span class="p">)):</span>
+            <span class="k">if</span> <span class="p">((</span><span class="n">mesh</span><span class="o">.</span><span class="n">triangles</span><span class="p">[</span><span class="n">index</span><span class="p">]</span> <span class="o">&lt;</span> <span class="nb">len</span><span class="p">(</span><span class="n">mesh</span><span class="o">.</span><span class="n">vertices</span><span class="p">))</span>
+                    <span class="ow">and</span> <span class="p">(</span><span class="n">mesh</span><span class="o">.</span><span class="n">triangles</span><span class="p">[</span><span class="n">index</span> <span class="o">+</span> <span class="mi">1</span><span class="p">]</span> <span class="o">&lt;</span> <span class="nb">len</span><span class="p">(</span><span class="n">mesh</span><span class="o">.</span><span class="n">vertices</span><span class="p">))</span>
+                    <span class="ow">and</span> <span class="p">(</span><span class="n">mesh</span><span class="o">.</span><span class="n">triangles</span><span class="p">[</span><span class="n">index</span> <span class="o">+</span> <span class="mi">2</span><span class="p">]</span> <span class="o">&lt;</span> <span class="nb">len</span><span class="p">(</span><span class="n">mesh</span><span class="o">.</span><span class="n">vertices</span><span class="p">))):</span>
+                <span class="n">marker</span><span class="o">.</span><span class="n">points</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">mesh</span><span class="o">.</span><span class="n">vertices</span><span class="p">[</span><span class="n">mesh</span><span class="o">.</span><span class="n">triangles</span><span class="p">[</span><span class="n">index</span><span class="p">]])</span>
+                <span class="n">marker</span><span class="o">.</span><span class="n">points</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">mesh</span><span class="o">.</span><span class="n">vertices</span><span class="p">[</span><span class="n">mesh</span><span class="o">.</span><span class="n">triangles</span><span class="p">[</span><span class="n">index</span> <span class="o">+</span> <span class="mi">1</span><span class="p">]])</span>
+                <span class="n">marker</span><span class="o">.</span><span class="n">points</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">mesh</span><span class="o">.</span><span class="n">vertices</span><span class="p">[</span><span class="n">mesh</span><span class="o">.</span><span class="n">triangles</span><span class="p">[</span><span class="n">index</span> <span class="o">+</span> <span class="mi">2</span><span class="p">]])</span>
+                <span class="n">index</span> <span class="o">+=</span> <span class="mi">3</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">rospy</span><span class="o">.</span><span class="n">logerr</span><span class="p">(</span><span class="s">&#39;Mesh contains invalid triangle!&#39;</span><span class="p">)</span>
+                <span class="k">break</span>
+        <span class="k">return</span> <span class="n">marker</span>
+
+    <span class="k">def</span> <span class="nf">_add_new_object</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">pose</span><span class="p">,</span> <span class="n">dimensions</span><span class="p">,</span> <span class="n">is_recognized</span><span class="p">,</span> <span class="n">mesh</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
+        <span class="sd">&#39;&#39;&#39;Function to add new objects&#39;&#39;&#39;</span>
+        <span class="n">dist_threshold</span> <span class="o">=</span> <span class="mf">0.02</span>
+        <span class="n">to_remove</span> <span class="o">=</span> <span class="bp">None</span>
+        <span class="k">if</span> <span class="p">(</span><span class="n">is_recognized</span><span class="p">):</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-18'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-18'>#</a>
+      </div>
+      <p>Temporary HACK for testing.
+Will remove all recognition completely if this works.</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>            <span class="k">return</span> <span class="bp">False</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-19'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-19'>#</a>
+      </div>
+      <p>Check if there is already an object</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>            <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">World</span><span class="o">.</span><span class="n">objects</span><span class="p">)):</span>
+                <span class="n">distance</span> <span class="o">=</span> <span class="n">World</span><span class="o">.</span><span class="n">pose_distance</span><span class="p">(</span><span class="n">World</span><span class="o">.</span><span class="n">objects</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">object</span><span class="o">.</span><span class="n">pose</span><span class="p">,</span>
+                                               <span class="n">pose</span><span class="p">)</span>
+                <span class="k">if</span> <span class="p">(</span><span class="n">distance</span> <span class="o">&lt;</span> <span class="n">dist_threshold</span><span class="p">):</span>
+                    <span class="k">if</span> <span class="p">(</span><span class="n">World</span><span class="o">.</span><span class="n">objects</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">is_recognized</span><span class="p">):</span>
+                        <span class="n">rospy</span><span class="o">.</span><span class="n">loginfo</span><span class="p">(</span><span class="s">&#39;Previously recognized object at &#39;</span> <span class="o">+</span>
+                            <span class="s">&#39;the same location, will not add this object.&#39;</span><span class="p">)</span>
+                        <span class="k">return</span> <span class="bp">False</span>
+                    <span class="k">else</span><span class="p">:</span>
+                        <span class="n">rospy</span><span class="o">.</span><span class="n">loginfo</span><span class="p">(</span><span class="s">&#39;Previously unrecognized object at &#39;</span> <span class="o">+</span>
+                            <span class="s">&#39;the same location, will replace it with the &#39;</span> <span class="o">+</span>
+                            <span class="s">&#39;recognized object.&#39;</span><span class="p">)</span>
+                        <span class="n">to_remove</span> <span class="o">=</span> <span class="n">i</span>
+                        <span class="k">break</span>
+
+            <span class="k">if</span> <span class="p">(</span><span class="n">to_remove</span> <span class="o">!=</span> <span class="bp">None</span><span class="p">):</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_remove_object</span><span class="p">(</span><span class="n">to_remove</span><span class="p">)</span>
+
+            <span class="n">n_objects</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">World</span><span class="o">.</span><span class="n">objects</span><span class="p">)</span>
+            <span class="n">World</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">WorldObject</span><span class="p">(</span><span class="n">pose</span><span class="p">,</span> <span class="n">n_objects</span><span class="p">,</span>
+                                            <span class="n">dimensions</span><span class="p">,</span> <span class="n">is_recognized</span><span class="p">))</span>
+            <span class="n">int_marker</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_object_marker</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">World</span><span class="o">.</span><span class="n">objects</span><span class="p">)</span> <span class="o">-</span> <span class="mi">1</span><span class="p">,</span> <span class="n">mesh</span><span class="p">)</span>
+            <span class="n">World</span><span class="o">.</span><span class="n">objects</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">int_marker</span> <span class="o">=</span> <span class="n">int_marker</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_im_server</span><span class="o">.</span><span class="n">insert</span><span class="p">(</span><span class="n">int_marker</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">marker_feedback_cb</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_im_server</span><span class="o">.</span><span class="n">applyChanges</span><span class="p">()</span>
+            <span class="n">World</span><span class="o">.</span><span class="n">objects</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">menu_handler</span><span class="o">.</span><span class="n">apply</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_im_server</span><span class="p">,</span>
+                                               <span class="n">int_marker</span><span class="o">.</span><span class="n">name</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_im_server</span><span class="o">.</span><span class="n">applyChanges</span><span class="p">()</span>
+            <span class="k">return</span> <span class="bp">True</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">World</span><span class="o">.</span><span class="n">objects</span><span class="p">)):</span>
+                <span class="k">if</span> <span class="p">(</span><span class="n">World</span><span class="o">.</span><span class="n">pose_distance</span><span class="p">(</span><span class="n">World</span><span class="o">.</span><span class="n">objects</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">object</span><span class="o">.</span><span class="n">pose</span><span class="p">,</span> <span class="n">pose</span><span class="p">)</span>
+                        <span class="o">&lt;</span> <span class="n">dist_threshold</span><span class="p">):</span>
+                    <span class="n">rospy</span><span class="o">.</span><span class="n">loginfo</span><span class="p">(</span><span class="s">&#39;Previously detected object at the same &#39;</span> <span class="o">+</span>
+                                  <span class="s">&#39;location, will not add this object.&#39;</span><span class="p">)</span>
+                    <span class="k">return</span> <span class="bp">False</span>
+
+            <span class="n">n_objects</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">World</span><span class="o">.</span><span class="n">objects</span><span class="p">)</span>
+            <span class="n">World</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">WorldObject</span><span class="p">(</span><span class="n">pose</span><span class="p">,</span> <span class="n">n_objects</span><span class="p">,</span>
+                                            <span class="n">dimensions</span><span class="p">,</span> <span class="n">is_recognized</span><span class="p">))</span>
+            <span class="n">int_marker</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_object_marker</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">World</span><span class="o">.</span><span class="n">objects</span><span class="p">)</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span>
+            <span class="n">World</span><span class="o">.</span><span class="n">objects</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">int_marker</span> <span class="o">=</span> <span class="n">int_marker</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_im_server</span><span class="o">.</span><span class="n">insert</span><span class="p">(</span><span class="n">int_marker</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">marker_feedback_cb</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_im_server</span><span class="o">.</span><span class="n">applyChanges</span><span class="p">()</span>
+            <span class="n">World</span><span class="o">.</span><span class="n">objects</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">menu_handler</span><span class="o">.</span><span class="n">apply</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_im_server</span><span class="p">,</span>
+                                               <span class="n">int_marker</span><span class="o">.</span><span class="n">name</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_im_server</span><span class="o">.</span><span class="n">applyChanges</span><span class="p">()</span>
+            <span class="k">return</span> <span class="bp">True</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-20'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-20'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="k">def</span> <span class="nf">_remove_object</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">to_remove</span><span class="p">):</span>
+        <span class="sd">&#39;&#39;&#39;Function to remove object by index&#39;&#39;&#39;</span>
+        <span class="n">obj</span> <span class="o">=</span> <span class="n">World</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="n">to_remove</span><span class="p">)</span>
+        <span class="n">rospy</span><span class="o">.</span><span class="n">loginfo</span><span class="p">(</span><span class="s">&#39;Removing object &#39;</span> <span class="o">+</span> <span class="n">obj</span><span class="o">.</span><span class="n">int_marker</span><span class="o">.</span><span class="n">name</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_im_server</span><span class="o">.</span><span class="n">erase</span><span class="p">(</span><span class="n">obj</span><span class="o">.</span><span class="n">int_marker</span><span class="o">.</span><span class="n">name</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_im_server</span><span class="o">.</span><span class="n">applyChanges</span><span class="p">()</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-21'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-21'>#</a>
+      </div>
+      <pre><code>   if (obj.is_recognized):
+       for i in range(len(World.objects)):
+           if ((World.objects[i].is_recognized)
+               and World.objects[i].index&gt;obj.index):
+               World.objects[i].decrease_index()
+       self.n_recognized -= 1
+   else:
+       for i in range(len(World.objects)):
+           if ((not World.objects[i].is_recognized) and
+               World.objects[i].index&gt;obj.index):
+               World.objects[i].decrease_index()
+       self.n_unrecognized -= 1
+</code></pre>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-22'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-22'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="k">def</span> <span class="nf">_remove_surface</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&#39;&#39;&#39;Function to request removing surface&#39;&#39;&#39;</span>
+        <span class="n">rospy</span><span class="o">.</span><span class="n">loginfo</span><span class="p">(</span><span class="s">&#39;Removing surface&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_im_server</span><span class="o">.</span><span class="n">erase</span><span class="p">(</span><span class="s">&#39;surface&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_im_server</span><span class="o">.</span><span class="n">applyChanges</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">surface</span> <span class="o">=</span> <span class="bp">None</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-23'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-23'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="k">def</span> <span class="nf">_get_object_marker</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">index</span><span class="p">,</span> <span class="n">mesh</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
+        <span class="sd">&#39;&#39;&#39;Generate a marker for world objects&#39;&#39;&#39;</span>
+        <span class="n">int_marker</span> <span class="o">=</span> <span class="n">InteractiveMarker</span><span class="p">()</span>
+        <span class="n">int_marker</span><span class="o">.</span><span class="n">name</span> <span class="o">=</span> <span class="n">World</span><span class="o">.</span><span class="n">objects</span><span class="p">[</span><span class="n">index</span><span class="p">]</span><span class="o">.</span><span class="n">get_name</span><span class="p">()</span>
+        <span class="n">int_marker</span><span class="o">.</span><span class="n">header</span><span class="o">.</span><span class="n">frame_id</span> <span class="o">=</span> <span class="s">&#39;base_link&#39;</span>
+        <span class="n">int_marker</span><span class="o">.</span><span class="n">pose</span> <span class="o">=</span> <span class="n">World</span><span class="o">.</span><span class="n">objects</span><span class="p">[</span><span class="n">index</span><span class="p">]</span><span class="o">.</span><span class="n">object</span><span class="o">.</span><span class="n">pose</span>
+        <span class="n">int_marker</span><span class="o">.</span><span class="n">scale</span> <span class="o">=</span> <span class="mi">1</span>
+
+        <span class="n">button_control</span> <span class="o">=</span> <span class="n">InteractiveMarkerControl</span><span class="p">()</span>
+        <span class="n">button_control</span><span class="o">.</span><span class="n">interaction_mode</span> <span class="o">=</span> <span class="n">InteractiveMarkerControl</span><span class="o">.</span><span class="n">BUTTON</span>
+        <span class="n">button_control</span><span class="o">.</span><span class="n">always_visible</span> <span class="o">=</span> <span class="bp">True</span>
+
+        <span class="n">object_marker</span> <span class="o">=</span> <span class="n">Marker</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="n">Marker</span><span class="o">.</span><span class="n">CUBE</span><span class="p">,</span> <span class="nb">id</span><span class="o">=</span><span class="n">index</span><span class="p">,</span>
+                <span class="n">lifetime</span><span class="o">=</span><span class="n">rospy</span><span class="o">.</span><span class="n">Duration</span><span class="p">(</span><span class="mi">2</span><span class="p">),</span>
+                <span class="n">scale</span><span class="o">=</span><span class="n">World</span><span class="o">.</span><span class="n">objects</span><span class="p">[</span><span class="n">index</span><span class="p">]</span><span class="o">.</span><span class="n">object</span><span class="o">.</span><span class="n">dimensions</span><span class="p">,</span>
+                <span class="n">header</span><span class="o">=</span><span class="n">Header</span><span class="p">(</span><span class="n">frame_id</span><span class="o">=</span><span class="s">&#39;base_link&#39;</span><span class="p">),</span>
+                <span class="n">color</span><span class="o">=</span><span class="n">ColorRGBA</span><span class="p">(</span><span class="mf">0.2</span><span class="p">,</span> <span class="mf">0.8</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.6</span><span class="p">),</span>
+                <span class="n">pose</span><span class="o">=</span><span class="n">World</span><span class="o">.</span><span class="n">objects</span><span class="p">[</span><span class="n">index</span><span class="p">]</span><span class="o">.</span><span class="n">object</span><span class="o">.</span><span class="n">pose</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="p">(</span><span class="n">mesh</span> <span class="o">!=</span> <span class="bp">None</span><span class="p">):</span>
+            <span class="n">object_marker</span> <span class="o">=</span> <span class="n">World</span><span class="o">.</span><span class="n">_get_mesh_marker</span><span class="p">(</span><span class="n">object_marker</span><span class="p">,</span> <span class="n">mesh</span><span class="p">)</span>
+        <span class="n">button_control</span><span class="o">.</span><span class="n">markers</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">object_marker</span><span class="p">)</span>
+
+        <span class="n">text_pos</span> <span class="o">=</span> <span class="n">Point</span><span class="p">()</span>
+        <span class="n">text_pos</span><span class="o">.</span><span class="n">x</span> <span class="o">=</span> <span class="n">World</span><span class="o">.</span><span class="n">objects</span><span class="p">[</span><span class="n">index</span><span class="p">]</span><span class="o">.</span><span class="n">object</span><span class="o">.</span><span class="n">pose</span><span class="o">.</span><span class="n">position</span><span class="o">.</span><span class="n">x</span>
+        <span class="n">text_pos</span><span class="o">.</span><span class="n">y</span> <span class="o">=</span> <span class="n">World</span><span class="o">.</span><span class="n">objects</span><span class="p">[</span><span class="n">index</span><span class="p">]</span><span class="o">.</span><span class="n">object</span><span class="o">.</span><span class="n">pose</span><span class="o">.</span><span class="n">position</span><span class="o">.</span><span class="n">y</span>
+        <span class="n">text_pos</span><span class="o">.</span><span class="n">z</span> <span class="o">=</span> <span class="p">(</span><span class="n">World</span><span class="o">.</span><span class="n">objects</span><span class="p">[</span><span class="n">index</span><span class="p">]</span><span class="o">.</span><span class="n">object</span><span class="o">.</span><span class="n">pose</span><span class="o">.</span><span class="n">position</span><span class="o">.</span><span class="n">z</span> <span class="o">+</span>
+                     <span class="n">World</span><span class="o">.</span><span class="n">objects</span><span class="p">[</span><span class="n">index</span><span class="p">]</span><span class="o">.</span><span class="n">object</span><span class="o">.</span><span class="n">dimensions</span><span class="o">.</span><span class="n">z</span> <span class="o">/</span> <span class="mi">2</span> <span class="o">+</span> <span class="mf">0.06</span><span class="p">)</span>
+        <span class="n">button_control</span><span class="o">.</span><span class="n">markers</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">Marker</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="n">Marker</span><span class="o">.</span><span class="n">TEXT_VIEW_FACING</span><span class="p">,</span>
+                <span class="nb">id</span><span class="o">=</span><span class="n">index</span><span class="p">,</span> <span class="n">scale</span><span class="o">=</span><span class="n">Vector3</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mf">0.03</span><span class="p">),</span>
+                <span class="n">text</span><span class="o">=</span><span class="n">int_marker</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="n">ColorRGBA</span><span class="p">(</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.5</span><span class="p">),</span>
+                <span class="n">header</span><span class="o">=</span><span class="n">Header</span><span class="p">(</span><span class="n">frame_id</span><span class="o">=</span><span class="s">&#39;base_link&#39;</span><span class="p">),</span>
+                <span class="n">pose</span><span class="o">=</span><span class="n">Pose</span><span class="p">(</span><span class="n">text_pos</span><span class="p">,</span> <span class="n">Quaternion</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">))))</span>
+        <span class="n">int_marker</span><span class="o">.</span><span class="n">controls</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">button_control</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">int_marker</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-24'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-24'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">_get_surface_marker</span><span class="p">(</span><span class="n">pose</span><span class="p">,</span> <span class="n">dimensions</span><span class="p">):</span>
+        <span class="sd">&#39;&#39;&#39; Function that generates a surface marker&#39;&#39;&#39;</span>
+        <span class="n">int_marker</span> <span class="o">=</span> <span class="n">InteractiveMarker</span><span class="p">()</span>
+        <span class="n">int_marker</span><span class="o">.</span><span class="n">name</span> <span class="o">=</span> <span class="s">&#39;surface&#39;</span>
+        <span class="n">int_marker</span><span class="o">.</span><span class="n">header</span><span class="o">.</span><span class="n">frame_id</span> <span class="o">=</span> <span class="s">&#39;base_link&#39;</span>
+        <span class="n">int_marker</span><span class="o">.</span><span class="n">pose</span> <span class="o">=</span> <span class="n">pose</span>
+        <span class="n">int_marker</span><span class="o">.</span><span class="n">scale</span> <span class="o">=</span> <span class="mi">1</span>
+        <span class="n">button_control</span> <span class="o">=</span> <span class="n">InteractiveMarkerControl</span><span class="p">()</span>
+        <span class="n">button_control</span><span class="o">.</span><span class="n">interaction_mode</span> <span class="o">=</span> <span class="n">InteractiveMarkerControl</span><span class="o">.</span><span class="n">BUTTON</span>
+        <span class="n">button_control</span><span class="o">.</span><span class="n">always_visible</span> <span class="o">=</span> <span class="bp">True</span>
+        <span class="n">object_marker</span> <span class="o">=</span> <span class="n">Marker</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="n">Marker</span><span class="o">.</span><span class="n">CUBE</span><span class="p">,</span> <span class="nb">id</span><span class="o">=</span><span class="mi">2000</span><span class="p">,</span>
+                            <span class="n">lifetime</span><span class="o">=</span><span class="n">rospy</span><span class="o">.</span><span class="n">Duration</span><span class="p">(</span><span class="mi">2</span><span class="p">),</span>
+                            <span class="n">scale</span><span class="o">=</span><span class="n">dimensions</span><span class="p">,</span>
+                            <span class="n">header</span><span class="o">=</span><span class="n">Header</span><span class="p">(</span><span class="n">frame_id</span><span class="o">=</span><span class="s">&#39;base_link&#39;</span><span class="p">),</span>
+                            <span class="n">color</span><span class="o">=</span><span class="n">ColorRGBA</span><span class="p">(</span><span class="mf">0.8</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.4</span><span class="p">,</span> <span class="mf">0.4</span><span class="p">),</span>
+                            <span class="n">pose</span><span class="o">=</span><span class="n">pose</span><span class="p">)</span>
+        <span class="n">button_control</span><span class="o">.</span><span class="n">markers</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">object_marker</span><span class="p">)</span>
+        <span class="n">text_pos</span> <span class="o">=</span> <span class="n">Point</span><span class="p">()</span>
+        <span class="n">position</span> <span class="o">=</span> <span class="n">pose</span><span class="o">.</span><span class="n">position</span>
+        <span class="n">dimensions</span> <span class="o">=</span> <span class="n">dimensions</span>
+        <span class="n">text_pos</span><span class="o">.</span><span class="n">x</span> <span class="o">=</span> <span class="n">position</span><span class="o">.</span><span class="n">x</span> <span class="o">+</span> <span class="n">dimensions</span><span class="o">.</span><span class="n">x</span> <span class="o">/</span> <span class="mi">2</span> <span class="o">-</span> <span class="mf">0.06</span>
+        <span class="n">text_pos</span><span class="o">.</span><span class="n">y</span> <span class="o">=</span> <span class="n">position</span><span class="o">.</span><span class="n">y</span> <span class="o">-</span> <span class="n">dimensions</span><span class="o">.</span><span class="n">y</span> <span class="o">/</span> <span class="mi">2</span> <span class="o">+</span> <span class="mf">0.06</span>
+        <span class="n">text_pos</span><span class="o">.</span><span class="n">z</span> <span class="o">=</span> <span class="n">position</span><span class="o">.</span><span class="n">z</span> <span class="o">+</span> <span class="n">dimensions</span><span class="o">.</span><span class="n">z</span> <span class="o">/</span> <span class="mi">2</span> <span class="o">+</span> <span class="mf">0.06</span>
+        <span class="n">text_marker</span> <span class="o">=</span> <span class="n">Marker</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="n">Marker</span><span class="o">.</span><span class="n">TEXT_VIEW_FACING</span><span class="p">,</span> <span class="nb">id</span><span class="o">=</span><span class="mi">2001</span><span class="p">,</span>
+                <span class="n">scale</span><span class="o">=</span><span class="n">Vector3</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mf">0.03</span><span class="p">),</span> <span class="n">text</span><span class="o">=</span><span class="n">int_marker</span><span class="o">.</span><span class="n">name</span><span class="p">,</span>
+                <span class="n">color</span><span class="o">=</span><span class="n">ColorRGBA</span><span class="p">(</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.5</span><span class="p">),</span>
+                <span class="n">header</span><span class="o">=</span><span class="n">Header</span><span class="p">(</span><span class="n">frame_id</span><span class="o">=</span><span class="s">&#39;base_link&#39;</span><span class="p">),</span>
+                <span class="n">pose</span><span class="o">=</span><span class="n">Pose</span><span class="p">(</span><span class="n">text_pos</span><span class="p">,</span> <span class="n">Quaternion</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">)))</span>
+        <span class="n">button_control</span><span class="o">.</span><span class="n">markers</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">text_marker</span><span class="p">)</span>
+        <span class="n">int_marker</span><span class="o">.</span><span class="n">controls</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">button_control</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">int_marker</span>
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">get_frame_list</span><span class="p">():</span>
+        <span class="sd">&#39;&#39;&#39;Function that returns the list of ref. frames&#39;&#39;&#39;</span>
+        <span class="n">objects</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">World</span><span class="o">.</span><span class="n">objects</span><span class="p">)):</span>
+            <span class="n">objects</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">World</span><span class="o">.</span><span class="n">objects</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">object</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">objects</span>
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">has_objects</span><span class="p">():</span>
+        <span class="sd">&#39;&#39;&#39;Function that checks if there are any objects&#39;&#39;&#39;</span>
+        <span class="k">return</span> <span class="nb">len</span><span class="p">(</span><span class="n">World</span><span class="o">.</span><span class="n">objects</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span>
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">object_dissimilarity</span><span class="p">(</span><span class="n">obj1</span><span class="p">,</span> <span class="n">obj2</span><span class="p">):</span>
+        <span class="sd">&#39;&#39;&#39;Distance between two objects&#39;&#39;&#39;</span>
+        <span class="n">dims1</span> <span class="o">=</span> <span class="n">obj1</span><span class="o">.</span><span class="n">dimensions</span>
+        <span class="n">dims2</span> <span class="o">=</span> <span class="n">obj2</span><span class="o">.</span><span class="n">dimensions</span>
+        <span class="k">return</span> <span class="n">norm</span><span class="p">(</span><span class="n">array</span><span class="p">([</span><span class="n">dims1</span><span class="o">.</span><span class="n">x</span><span class="p">,</span> <span class="n">dims1</span><span class="o">.</span><span class="n">y</span><span class="p">,</span> <span class="n">dims1</span><span class="o">.</span><span class="n">z</span><span class="p">])</span> <span class="o">-</span>
+                    <span class="n">array</span><span class="p">([</span><span class="n">dims2</span><span class="o">.</span><span class="n">x</span><span class="p">,</span> <span class="n">dims2</span><span class="o">.</span><span class="n">y</span><span class="p">,</span> <span class="n">dims2</span><span class="o">.</span><span class="n">z</span><span class="p">]))</span>
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">get_ref_from_name</span><span class="p">(</span><span class="n">ref_name</span><span class="p">):</span>
+        <span class="sd">&#39;&#39;&#39;Ref. frame type from ref. frame name&#39;&#39;&#39;</span>
+        <span class="k">if</span> <span class="n">ref_name</span> <span class="o">==</span> <span class="s">&#39;base_link&#39;</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">ArmState</span><span class="o">.</span><span class="n">ROBOT_BASE</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">ArmState</span><span class="o">.</span><span class="n">OBJECT</span>
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">convert_ref_frame</span><span class="p">(</span><span class="n">arm_frame</span><span class="p">,</span> <span class="n">ref_frame</span><span class="p">,</span> <span class="n">ref_frame_obj</span><span class="o">=</span><span class="n">Object</span><span class="p">()):</span>
+        <span class="sd">&#39;&#39;&#39;Transforms an arm frame to a new ref. frame&#39;&#39;&#39;</span>
+        <span class="k">if</span> <span class="n">ref_frame</span> <span class="o">==</span> <span class="n">ArmState</span><span class="o">.</span><span class="n">ROBOT_BASE</span><span class="p">:</span>
+            <span class="k">if</span> <span class="p">(</span><span class="n">arm_frame</span><span class="o">.</span><span class="n">refFrame</span> <span class="o">==</span> <span class="n">ArmState</span><span class="o">.</span><span class="n">ROBOT_BASE</span><span class="p">):</span>
+                <span class="n">rospy</span><span class="o">.</span><span class="n">logwarn</span><span class="p">(</span><span class="s">&#39;No reference frame transformations &#39;</span> <span class="o">+</span>
+                              <span class="s">&#39;needed (both absolute).&#39;</span><span class="p">)</span>
+            <span class="k">elif</span> <span class="p">(</span><span class="n">arm_frame</span><span class="o">.</span><span class="n">refFrame</span> <span class="o">==</span> <span class="n">ArmState</span><span class="o">.</span><span class="n">OBJECT</span><span class="p">):</span>
+                <span class="n">abs_ee_pose</span> <span class="o">=</span> <span class="n">World</span><span class="o">.</span><span class="n">transform</span><span class="p">(</span><span class="n">arm_frame</span><span class="o">.</span><span class="n">ee_pose</span><span class="p">,</span>
+                                <span class="n">arm_frame</span><span class="o">.</span><span class="n">refFrameObject</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="s">&#39;base_link&#39;</span><span class="p">)</span>
+                <span class="n">arm_frame</span><span class="o">.</span><span class="n">ee_pose</span> <span class="o">=</span> <span class="n">abs_ee_pose</span>
+                <span class="n">arm_frame</span><span class="o">.</span><span class="n">refFrame</span> <span class="o">=</span> <span class="n">ArmState</span><span class="o">.</span><span class="n">ROBOT_BASE</span>
+                <span class="n">arm_frame</span><span class="o">.</span><span class="n">refFrameObject</span> <span class="o">=</span> <span class="n">Object</span><span class="p">()</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">rospy</span><span class="o">.</span><span class="n">logerr</span><span class="p">(</span><span class="s">&#39;Unhandled reference frame conversion:&#39;</span> <span class="o">+</span>
+                    <span class="nb">str</span><span class="p">(</span><span class="n">arm_frame</span><span class="o">.</span><span class="n">refFrame</span><span class="p">)</span> <span class="o">+</span> <span class="s">&#39; to &#39;</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="n">ref_frame</span><span class="p">))</span>
+        <span class="k">elif</span> <span class="n">ref_frame</span> <span class="o">==</span> <span class="n">ArmState</span><span class="o">.</span><span class="n">OBJECT</span><span class="p">:</span>
+            <span class="k">if</span> <span class="p">(</span><span class="n">arm_frame</span><span class="o">.</span><span class="n">refFrame</span> <span class="o">==</span> <span class="n">ArmState</span><span class="o">.</span><span class="n">ROBOT_BASE</span><span class="p">):</span>
+                <span class="n">rel_ee_pose</span> <span class="o">=</span> <span class="n">World</span><span class="o">.</span><span class="n">transform</span><span class="p">(</span><span class="n">arm_frame</span><span class="o">.</span><span class="n">ee_pose</span><span class="p">,</span>
+                            <span class="s">&#39;base_link&#39;</span><span class="p">,</span> <span class="n">ref_frame_obj</span><span class="o">.</span><span class="n">name</span><span class="p">)</span>
+                <span class="n">arm_frame</span><span class="o">.</span><span class="n">ee_pose</span> <span class="o">=</span> <span class="n">rel_ee_pose</span>
+                <span class="n">arm_frame</span><span class="o">.</span><span class="n">refFrame</span> <span class="o">=</span> <span class="n">ArmState</span><span class="o">.</span><span class="n">OBJECT</span>
+                <span class="n">arm_frame</span><span class="o">.</span><span class="n">refFrameObject</span> <span class="o">=</span> <span class="n">ref_frame_obj</span>
+            <span class="k">elif</span> <span class="p">(</span><span class="n">arm_frame</span><span class="o">.</span><span class="n">refFrame</span> <span class="o">==</span> <span class="n">ArmState</span><span class="o">.</span><span class="n">OBJECT</span><span class="p">):</span>
+                <span class="k">if</span> <span class="p">(</span><span class="n">arm_frame</span><span class="o">.</span><span class="n">refFrameObject</span><span class="o">.</span><span class="n">name</span> <span class="o">==</span> <span class="n">ref_frame_obj</span><span class="o">.</span><span class="n">name</span><span class="p">):</span>
+                    <span class="n">rospy</span><span class="o">.</span><span class="n">logwarn</span><span class="p">(</span><span class="s">&#39;No reference frame transformations &#39;</span> <span class="o">+</span>
+                                  <span class="s">&#39;needed (same object).&#39;</span><span class="p">)</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="n">rel_ee_pose</span> <span class="o">=</span> <span class="n">World</span><span class="o">.</span><span class="n">transform</span><span class="p">(</span><span class="n">arm_frame</span><span class="o">.</span><span class="n">ee_pose</span><span class="p">,</span>
+                        <span class="n">arm_frame</span><span class="o">.</span><span class="n">refFrameObject</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="n">ref_frame_obj</span><span class="o">.</span><span class="n">name</span><span class="p">)</span>
+                    <span class="n">arm_frame</span><span class="o">.</span><span class="n">ee_pose</span> <span class="o">=</span> <span class="n">rel_ee_pose</span>
+                    <span class="n">arm_frame</span><span class="o">.</span><span class="n">refFrame</span> <span class="o">=</span> <span class="n">ArmState</span><span class="o">.</span><span class="n">OBJECT</span>
+                    <span class="n">arm_frame</span><span class="o">.</span><span class="n">refFrameObject</span> <span class="o">=</span> <span class="n">ref_frame_obj</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">rospy</span><span class="o">.</span><span class="n">logerr</span><span class="p">(</span><span class="s">&#39;Unhandled reference frame conversion:&#39;</span> <span class="o">+</span>
+                    <span class="nb">str</span><span class="p">(</span><span class="n">arm_frame</span><span class="o">.</span><span class="n">refFrame</span><span class="p">)</span> <span class="o">+</span> <span class="s">&#39; to &#39;</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="n">ref_frame</span><span class="p">))</span>
+        <span class="k">return</span> <span class="n">arm_frame</span>
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">has_object</span><span class="p">(</span><span class="n">object_name</span><span class="p">):</span>
+        <span class="sd">&#39;&#39;&#39;Checks if the world contains the object&#39;&#39;&#39;</span>
+        <span class="k">for</span> <span class="n">obj</span> <span class="ow">in</span> <span class="n">World</span><span class="o">.</span><span class="n">objects</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">obj</span><span class="o">.</span><span class="n">object</span><span class="o">.</span><span class="n">name</span> <span class="o">==</span> <span class="n">object_name</span><span class="p">:</span>
+                <span class="k">return</span> <span class="bp">True</span>
+        <span class="k">return</span> <span class="bp">False</span>
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">is_frame_valid</span><span class="p">(</span><span class="n">object_name</span><span class="p">):</span>
+        <span class="sd">&#39;&#39;&#39;Checks if the frame is valid for transforms&#39;&#39;&#39;</span>
+        <span class="k">return</span> <span class="p">(</span><span class="n">object_name</span> <span class="o">==</span> <span class="s">&#39;base_link&#39;</span><span class="p">)</span> <span class="ow">or</span> <span class="n">World</span><span class="o">.</span><span class="n">has_object</span><span class="p">(</span><span class="n">object_name</span><span class="p">)</span>
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">transform</span><span class="p">(</span><span class="n">pose</span><span class="p">,</span> <span class="n">from_frame</span><span class="p">,</span> <span class="n">to_frame</span><span class="p">):</span>
+        <span class="sd">&#39;&#39;&#39; Function to transform a pose between two ref. frames</span>
+<span class="sd">        if there is a TF exception or object does not exist it</span>
+<span class="sd">        will return the pose back without any transforms&#39;&#39;&#39;</span>
+        <span class="k">if</span> <span class="n">World</span><span class="o">.</span><span class="n">is_frame_valid</span><span class="p">(</span><span class="n">from_frame</span><span class="p">)</span> <span class="ow">and</span> <span class="n">World</span><span class="o">.</span><span class="n">is_frame_valid</span><span class="p">(</span><span class="n">to_frame</span><span class="p">):</span>
+            <span class="n">pose_stamped</span> <span class="o">=</span> <span class="n">PoseStamped</span><span class="p">()</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">common_time</span> <span class="o">=</span> <span class="n">World</span><span class="o">.</span><span class="n">tf_listener</span><span class="o">.</span><span class="n">getLatestCommonTime</span><span class="p">(</span><span class="n">from_frame</span><span class="p">,</span>
+                                                                    <span class="n">to_frame</span><span class="p">)</span>
+                <span class="n">pose_stamped</span><span class="o">.</span><span class="n">header</span><span class="o">.</span><span class="n">stamp</span> <span class="o">=</span> <span class="n">common_time</span>
+                <span class="n">pose_stamped</span><span class="o">.</span><span class="n">header</span><span class="o">.</span><span class="n">frame_id</span> <span class="o">=</span> <span class="n">from_frame</span>
+                <span class="n">pose_stamped</span><span class="o">.</span><span class="n">pose</span> <span class="o">=</span> <span class="n">pose</span>
+                <span class="n">rel_ee_pose</span> <span class="o">=</span> <span class="n">World</span><span class="o">.</span><span class="n">tf_listener</span><span class="o">.</span><span class="n">transformPose</span><span class="p">(</span><span class="n">to_frame</span><span class="p">,</span>
+                                                              <span class="n">pose_stamped</span><span class="p">)</span>
+                <span class="k">return</span> <span class="n">rel_ee_pose</span><span class="o">.</span><span class="n">pose</span>
+            <span class="k">except</span> <span class="n">tf</span><span class="o">.</span><span class="n">Exception</span><span class="p">:</span>
+                <span class="n">rospy</span><span class="o">.</span><span class="n">logerr</span><span class="p">(</span><span class="s">&#39;TF exception during transform.&#39;</span><span class="p">)</span>
+                <span class="k">return</span> <span class="n">pose</span>
+            <span class="k">except</span> <span class="n">rospy</span><span class="o">.</span><span class="n">ServiceException</span><span class="p">:</span>
+                <span class="n">rospy</span><span class="o">.</span><span class="n">logerr</span><span class="p">(</span><span class="s">&#39;Exception during transform.&#39;</span><span class="p">)</span>
+                <span class="k">return</span> <span class="n">pose</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">rospy</span><span class="o">.</span><span class="n">logwarn</span><span class="p">(</span><span class="s">&#39;One of the frame objects might not exist: &#39;</span> <span class="o">+</span>
+                          <span class="n">from_frame</span> <span class="o">+</span> <span class="s">&#39; or &#39;</span> <span class="o">+</span> <span class="n">to_frame</span><span class="p">)</span>
+            <span class="k">return</span> <span class="n">pose</span>
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">pose_to_string</span><span class="p">(</span><span class="n">pose</span><span class="p">):</span>
+        <span class="sd">&#39;&#39;&#39;For printing a pose to stdout&#39;&#39;&#39;</span>
+        <span class="k">return</span> <span class="p">(</span><span class="s">&#39;</span><span class="se">\t</span><span class="s"> - position: &#39;</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="n">pose</span><span class="o">.</span><span class="n">position</span><span class="o">.</span><span class="n">x</span><span class="p">)</span> <span class="o">+</span> <span class="s">&quot;, &quot;</span> <span class="o">+</span>
+                <span class="nb">str</span><span class="p">(</span><span class="n">pose</span><span class="o">.</span><span class="n">position</span><span class="o">.</span><span class="n">y</span><span class="p">)</span> <span class="o">+</span> <span class="s">&#39;, &#39;</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="n">pose</span><span class="o">.</span><span class="n">position</span><span class="o">.</span><span class="n">z</span><span class="p">)</span> <span class="o">+</span> <span class="s">&#39;</span><span class="se">\n</span><span class="s">&#39;</span> <span class="o">+</span>
+                <span class="s">&#39;</span><span class="se">\t</span><span class="s"> - orientation: &#39;</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="n">pose</span><span class="o">.</span><span class="n">orientation</span><span class="o">.</span><span class="n">x</span><span class="p">)</span> <span class="o">+</span> <span class="s">&quot;, &quot;</span> <span class="o">+</span>
+                <span class="nb">str</span><span class="p">(</span><span class="n">pose</span><span class="o">.</span><span class="n">orientation</span><span class="o">.</span><span class="n">y</span><span class="p">)</span> <span class="o">+</span> <span class="s">&#39;, &#39;</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="n">pose</span><span class="o">.</span><span class="n">orientation</span><span class="o">.</span><span class="n">z</span><span class="p">)</span> <span class="o">+</span>
+                <span class="s">&#39;, &#39;</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="n">pose</span><span class="o">.</span><span class="n">orientation</span><span class="o">.</span><span class="n">w</span><span class="p">)</span> <span class="o">+</span> <span class="s">&#39;</span><span class="se">\n</span><span class="s">&#39;</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">_publish_tf_pose</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">pose</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="n">parent</span><span class="p">):</span>
+        <span class="sd">&#39;&#39;&#39; Publishes a TF for object pose&#39;&#39;&#39;</span>
+        <span class="k">if</span> <span class="p">(</span><span class="n">pose</span> <span class="o">!=</span> <span class="bp">None</span><span class="p">):</span>
+            <span class="n">pos</span> <span class="o">=</span> <span class="p">(</span><span class="n">pose</span><span class="o">.</span><span class="n">position</span><span class="o">.</span><span class="n">x</span><span class="p">,</span> <span class="n">pose</span><span class="o">.</span><span class="n">position</span><span class="o">.</span><span class="n">y</span><span class="p">,</span> <span class="n">pose</span><span class="o">.</span><span class="n">position</span><span class="o">.</span><span class="n">z</span><span class="p">)</span>
+            <span class="n">rot</span> <span class="o">=</span> <span class="p">(</span><span class="n">pose</span><span class="o">.</span><span class="n">orientation</span><span class="o">.</span><span class="n">x</span><span class="p">,</span> <span class="n">pose</span><span class="o">.</span><span class="n">orientation</span><span class="o">.</span><span class="n">y</span><span class="p">,</span>
+                        <span class="n">pose</span><span class="o">.</span><span class="n">orientation</span><span class="o">.</span><span class="n">z</span><span class="p">,</span> <span class="n">pose</span><span class="o">.</span><span class="n">orientation</span><span class="o">.</span><span class="n">w</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_tf_broadcaster</span><span class="o">.</span><span class="n">sendTransform</span><span class="p">(</span><span class="n">pos</span><span class="p">,</span> <span class="n">rot</span><span class="p">,</span>
+                                        <span class="n">rospy</span><span class="o">.</span><span class="n">Time</span><span class="o">.</span><span class="n">now</span><span class="p">(),</span> <span class="n">name</span><span class="p">,</span> <span class="n">parent</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">update_object_pose</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&#39;&#39;&#39; Function to externally update an object pose&#39;&#39;&#39;</span>
+        <span class="n">Response</span><span class="o">.</span><span class="n">perform_gaze_action</span><span class="p">(</span><span class="n">GazeGoal</span><span class="o">.</span><span class="n">LOOK_DOWN</span><span class="p">)</span>
+        <span class="k">while</span> <span class="p">(</span><span class="n">Response</span><span class="o">.</span><span class="n">gaze_client</span><span class="o">.</span><span class="n">get_state</span><span class="p">()</span> <span class="o">==</span> <span class="n">GoalStatus</span><span class="o">.</span><span class="n">PENDING</span> <span class="ow">or</span>
+               <span class="n">Response</span><span class="o">.</span><span class="n">gaze_client</span><span class="o">.</span><span class="n">get_state</span><span class="p">()</span> <span class="o">==</span> <span class="n">GoalStatus</span><span class="o">.</span><span class="n">ACTIVE</span><span class="p">):</span>
+            <span class="n">time</span><span class="o">.</span><span class="n">sleep</span><span class="p">(</span><span class="mf">0.1</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="p">(</span><span class="n">Response</span><span class="o">.</span><span class="n">gaze_client</span><span class="o">.</span><span class="n">get_state</span><span class="p">()</span> <span class="o">!=</span> <span class="n">GoalStatus</span><span class="o">.</span><span class="n">SUCCEEDED</span><span class="p">):</span>
+            <span class="n">rospy</span><span class="o">.</span><span class="n">logerr</span><span class="p">(</span><span class="s">&#39;Could not look down to take table snapshot&#39;</span><span class="p">)</span>
+            <span class="k">return</span> <span class="bp">False</span>
+
+        <span class="n">rospy</span><span class="o">.</span><span class="n">loginfo</span><span class="p">(</span><span class="s">&#39;Looking at table now.&#39;</span><span class="p">)</span>
+        <span class="n">goal</span> <span class="o">=</span> <span class="n">UserCommandGoal</span><span class="p">(</span><span class="n">UserCommandGoal</span><span class="o">.</span><span class="n">RESET</span><span class="p">,</span> <span class="bp">False</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_object_action_client</span><span class="o">.</span><span class="n">send_goal</span><span class="p">(</span><span class="n">goal</span><span class="p">)</span>
+        <span class="k">while</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_object_action_client</span><span class="o">.</span><span class="n">get_state</span><span class="p">()</span> <span class="o">==</span> <span class="n">GoalStatus</span><span class="o">.</span><span class="n">ACTIVE</span> <span class="ow">or</span>
+               <span class="bp">self</span><span class="o">.</span><span class="n">_object_action_client</span><span class="o">.</span><span class="n">get_state</span><span class="p">()</span> <span class="o">==</span> <span class="n">GoalStatus</span><span class="o">.</span><span class="n">PENDING</span><span class="p">):</span>
+            <span class="n">time</span><span class="o">.</span><span class="n">sleep</span><span class="p">(</span><span class="mf">0.1</span><span class="p">)</span>
+        <span class="n">rospy</span><span class="o">.</span><span class="n">loginfo</span><span class="p">(</span><span class="s">&#39;Object recognition has been reset.&#39;</span><span class="p">)</span>
+        <span class="n">rospy</span><span class="o">.</span><span class="n">loginfo</span><span class="p">(</span><span class="s">&#39;STATUS: &#39;</span> <span class="o">+</span>
+                      <span class="bp">self</span><span class="o">.</span><span class="n">_object_action_client</span><span class="o">.</span><span class="n">get_goal_status_text</span><span class="p">())</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_reset_objects</span><span class="p">()</span>
+
+        <span class="k">if</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_object_action_client</span><span class="o">.</span><span class="n">get_state</span><span class="p">()</span> <span class="o">!=</span> <span class="n">GoalStatus</span><span class="o">.</span><span class="n">SUCCEEDED</span><span class="p">):</span>
+            <span class="n">rospy</span><span class="o">.</span><span class="n">logerr</span><span class="p">(</span><span class="s">&#39;Could not reset recognition.&#39;</span><span class="p">)</span>
+            <span class="k">return</span> <span class="bp">False</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-25'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-25'>#</a>
+      </div>
+      <p>Do segmentation</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>        <span class="n">goal</span> <span class="o">=</span> <span class="n">UserCommandGoal</span><span class="p">(</span><span class="n">UserCommandGoal</span><span class="o">.</span><span class="n">SEGMENT</span><span class="p">,</span> <span class="bp">False</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_object_action_client</span><span class="o">.</span><span class="n">send_goal</span><span class="p">(</span><span class="n">goal</span><span class="p">)</span>
+        <span class="k">while</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_object_action_client</span><span class="o">.</span><span class="n">get_state</span><span class="p">()</span> <span class="o">==</span> <span class="n">GoalStatus</span><span class="o">.</span><span class="n">ACTIVE</span> <span class="ow">or</span>
+               <span class="bp">self</span><span class="o">.</span><span class="n">_object_action_client</span><span class="o">.</span><span class="n">get_state</span><span class="p">()</span> <span class="o">==</span> <span class="n">GoalStatus</span><span class="o">.</span><span class="n">PENDING</span><span class="p">):</span>
+            <span class="n">time</span><span class="o">.</span><span class="n">sleep</span><span class="p">(</span><span class="mf">0.1</span><span class="p">)</span>
+        <span class="n">rospy</span><span class="o">.</span><span class="n">loginfo</span><span class="p">(</span><span class="s">&#39;Table segmentation is complete.&#39;</span><span class="p">)</span>
+        <span class="n">rospy</span><span class="o">.</span><span class="n">loginfo</span><span class="p">(</span><span class="s">&#39;STATUS: &#39;</span> <span class="o">+</span>
+                      <span class="bp">self</span><span class="o">.</span><span class="n">_object_action_client</span><span class="o">.</span><span class="n">get_goal_status_text</span><span class="p">())</span>
+
+        <span class="k">if</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_object_action_client</span><span class="o">.</span><span class="n">get_state</span><span class="p">()</span> <span class="o">!=</span> <span class="n">GoalStatus</span><span class="o">.</span><span class="n">SUCCEEDED</span><span class="p">):</span>
+            <span class="n">rospy</span><span class="o">.</span><span class="n">logerr</span><span class="p">(</span><span class="s">&#39;Could not segment.&#39;</span><span class="p">)</span>
+            <span class="k">return</span> <span class="bp">False</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-26'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-26'>#</a>
+      </div>
+      <p>Do recognition</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>        <span class="n">goal</span> <span class="o">=</span> <span class="n">UserCommandGoal</span><span class="p">(</span><span class="n">UserCommandGoal</span><span class="o">.</span><span class="n">RECOGNIZE</span><span class="p">,</span> <span class="bp">False</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_object_action_client</span><span class="o">.</span><span class="n">send_goal</span><span class="p">(</span><span class="n">goal</span><span class="p">)</span>
+        <span class="k">while</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_object_action_client</span><span class="o">.</span><span class="n">get_state</span><span class="p">()</span> <span class="o">==</span> <span class="n">GoalStatus</span><span class="o">.</span><span class="n">ACTIVE</span> <span class="ow">or</span>
+               <span class="bp">self</span><span class="o">.</span><span class="n">_object_action_client</span><span class="o">.</span><span class="n">get_state</span><span class="p">()</span> <span class="o">==</span> <span class="n">GoalStatus</span><span class="o">.</span><span class="n">PENDING</span><span class="p">):</span>
+            <span class="n">time</span><span class="o">.</span><span class="n">sleep</span><span class="p">(</span><span class="mf">0.1</span><span class="p">)</span>
+        <span class="n">rospy</span><span class="o">.</span><span class="n">loginfo</span><span class="p">(</span><span class="s">&#39;Objects on the table have been recognized.&#39;</span><span class="p">)</span>
+        <span class="n">rospy</span><span class="o">.</span><span class="n">loginfo</span><span class="p">(</span><span class="s">&#39;STATUS: &#39;</span> <span class="o">+</span>
+                      <span class="bp">self</span><span class="o">.</span><span class="n">_object_action_client</span><span class="o">.</span><span class="n">get_goal_status_text</span><span class="p">())</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-27'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-27'>#</a>
+      </div>
+      <p>Record the result</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>        <span class="k">if</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_object_action_client</span><span class="o">.</span><span class="n">get_state</span><span class="p">()</span> <span class="o">==</span> <span class="n">GoalStatus</span><span class="o">.</span><span class="n">SUCCEEDED</span><span class="p">):</span>
+            <span class="n">wait_time</span> <span class="o">=</span> <span class="mi">0</span>
+            <span class="n">total_wait_time</span> <span class="o">=</span> <span class="mi">5</span>
+            <span class="k">while</span> <span class="p">(</span><span class="ow">not</span> <span class="n">World</span><span class="o">.</span><span class="n">has_objects</span><span class="p">()</span> <span class="ow">and</span> <span class="n">wait_time</span> <span class="o">&lt;</span> <span class="n">total_wait_time</span><span class="p">):</span>
+                <span class="n">time</span><span class="o">.</span><span class="n">sleep</span><span class="p">(</span><span class="mf">0.1</span><span class="p">)</span>
+                <span class="n">wait_time</span> <span class="o">+=</span> <span class="mf">0.1</span>
+
+            <span class="k">if</span> <span class="p">(</span><span class="ow">not</span> <span class="n">World</span><span class="o">.</span><span class="n">has_objects</span><span class="p">()):</span>
+                <span class="n">rospy</span><span class="o">.</span><span class="n">logerr</span><span class="p">(</span><span class="s">&#39;Timeout waiting for a recognition result.&#39;</span><span class="p">)</span>
+                <span class="k">return</span> <span class="bp">False</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">rospy</span><span class="o">.</span><span class="n">loginfo</span><span class="p">(</span><span class="s">&#39;Got the object list.&#39;</span><span class="p">)</span>
+                <span class="k">return</span> <span class="bp">True</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">rospy</span><span class="o">.</span><span class="n">logerr</span><span class="p">(</span><span class="s">&#39;Could not recognize.&#39;</span><span class="p">)</span>
+            <span class="k">return</span> <span class="bp">False</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-28'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-28'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="k">def</span> <span class="nf">clear_all_objects</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&#39;&#39;&#39;Removes all objects from the world&#39;&#39;&#39;</span>
+        <span class="n">goal</span> <span class="o">=</span> <span class="n">UserCommandGoal</span><span class="p">(</span><span class="n">UserCommandGoal</span><span class="o">.</span><span class="n">RESET</span><span class="p">,</span> <span class="bp">False</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_object_action_client</span><span class="o">.</span><span class="n">send_goal</span><span class="p">(</span><span class="n">goal</span><span class="p">)</span>
+        <span class="k">while</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_object_action_client</span><span class="o">.</span><span class="n">get_state</span><span class="p">()</span> <span class="o">==</span> <span class="n">GoalStatus</span><span class="o">.</span><span class="n">ACTIVE</span> <span class="ow">or</span>
+               <span class="bp">self</span><span class="o">.</span><span class="n">_object_action_client</span><span class="o">.</span><span class="n">get_state</span><span class="p">()</span> <span class="o">==</span> <span class="n">GoalStatus</span><span class="o">.</span><span class="n">PENDING</span><span class="p">):</span>
+            <span class="n">time</span><span class="o">.</span><span class="n">sleep</span><span class="p">(</span><span class="mf">0.1</span><span class="p">)</span>
+        <span class="n">rospy</span><span class="o">.</span><span class="n">loginfo</span><span class="p">(</span><span class="s">&#39;Object recognition has been reset.&#39;</span><span class="p">)</span>
+        <span class="n">rospy</span><span class="o">.</span><span class="n">loginfo</span><span class="p">(</span><span class="s">&#39;STATUS: &#39;</span> <span class="o">+</span>
+                      <span class="bp">self</span><span class="o">.</span><span class="n">_object_action_client</span><span class="o">.</span><span class="n">get_goal_status_text</span><span class="p">())</span>
+        <span class="k">if</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_object_action_client</span><span class="o">.</span><span class="n">get_state</span><span class="p">()</span> <span class="o">==</span> <span class="n">GoalStatus</span><span class="o">.</span><span class="n">SUCCEEDED</span><span class="p">):</span>
+            <span class="n">rospy</span><span class="o">.</span><span class="n">loginfo</span><span class="p">(</span><span class="s">&#39;Successfully reset object localization pipeline.&#39;</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_reset_objects</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_remove_surface</span><span class="p">()</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-29'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-29'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="k">def</span> <span class="nf">get_nearest_object</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">arm_pose</span><span class="p">):</span>
+        <span class="sd">&#39;&#39;&#39;Gives a pointed to the nearest object&#39;&#39;&#39;</span>
+        <span class="n">distances</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">World</span><span class="o">.</span><span class="n">objects</span><span class="p">)):</span>
+            <span class="n">dist</span> <span class="o">=</span> <span class="n">World</span><span class="o">.</span><span class="n">pose_distance</span><span class="p">(</span><span class="n">World</span><span class="o">.</span><span class="n">objects</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">object</span><span class="o">.</span><span class="n">pose</span><span class="p">,</span>
+                                                            <span class="n">arm_pose</span><span class="p">)</span>
+            <span class="n">distances</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">dist</span><span class="p">)</span>
+        <span class="n">dist_threshold</span> <span class="o">=</span> <span class="mf">0.4</span>
+        <span class="k">if</span> <span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">distances</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">):</span>
+            <span class="k">if</span> <span class="p">(</span><span class="nb">min</span><span class="p">(</span><span class="n">distances</span><span class="p">)</span> <span class="o">&lt;</span> <span class="n">dist_threshold</span><span class="p">):</span>
+                <span class="n">chosen</span> <span class="o">=</span> <span class="n">distances</span><span class="o">.</span><span class="n">index</span><span class="p">(</span><span class="nb">min</span><span class="p">(</span><span class="n">distances</span><span class="p">))</span>
+                <span class="k">return</span> <span class="n">World</span><span class="o">.</span><span class="n">objects</span><span class="p">[</span><span class="n">chosen</span><span class="p">]</span><span class="o">.</span><span class="n">object</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">return</span> <span class="bp">None</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">None</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-30'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-30'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">pose_distance</span><span class="p">(</span><span class="n">pose1</span><span class="p">,</span> <span class="n">pose2</span><span class="p">,</span> <span class="n">is_on_table</span><span class="o">=</span><span class="bp">True</span><span class="p">):</span>
+        <span class="sd">&#39;&#39;&#39;Distance between two world poses&#39;&#39;&#39;</span>
+        <span class="k">if</span> <span class="n">pose1</span> <span class="o">==</span> <span class="p">[]</span> <span class="ow">or</span> <span class="n">pose2</span> <span class="o">==</span> <span class="p">[]:</span>
+            <span class="k">return</span> <span class="mf">0.0</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">if</span> <span class="p">(</span><span class="n">is_on_table</span><span class="p">):</span>
+                <span class="n">arr1</span> <span class="o">=</span> <span class="n">array</span><span class="p">([</span><span class="n">pose1</span><span class="o">.</span><span class="n">position</span><span class="o">.</span><span class="n">x</span><span class="p">,</span> <span class="n">pose1</span><span class="o">.</span><span class="n">position</span><span class="o">.</span><span class="n">y</span><span class="p">])</span>
+                <span class="n">arr2</span> <span class="o">=</span> <span class="n">array</span><span class="p">([</span><span class="n">pose2</span><span class="o">.</span><span class="n">position</span><span class="o">.</span><span class="n">x</span><span class="p">,</span> <span class="n">pose2</span><span class="o">.</span><span class="n">position</span><span class="o">.</span><span class="n">y</span><span class="p">])</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">arr1</span> <span class="o">=</span> <span class="n">array</span><span class="p">([</span><span class="n">pose1</span><span class="o">.</span><span class="n">position</span><span class="o">.</span><span class="n">x</span><span class="p">,</span>
+                              <span class="n">pose1</span><span class="o">.</span><span class="n">position</span><span class="o">.</span><span class="n">y</span><span class="p">,</span> <span class="n">pose1</span><span class="o">.</span><span class="n">position</span><span class="o">.</span><span class="n">z</span><span class="p">])</span>
+                <span class="n">arr2</span> <span class="o">=</span> <span class="n">array</span><span class="p">([</span><span class="n">pose2</span><span class="o">.</span><span class="n">position</span><span class="o">.</span><span class="n">x</span><span class="p">,</span>
+                              <span class="n">pose2</span><span class="o">.</span><span class="n">position</span><span class="o">.</span><span class="n">y</span><span class="p">,</span> <span class="n">pose2</span><span class="o">.</span><span class="n">position</span><span class="o">.</span><span class="n">z</span><span class="p">])</span>
+            <span class="n">dist</span> <span class="o">=</span> <span class="n">norm</span><span class="p">(</span><span class="n">arr1</span> <span class="o">-</span> <span class="n">arr2</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">dist</span> <span class="o">&lt;</span> <span class="mf">0.0001</span><span class="p">:</span>
+                <span class="n">dist</span> <span class="o">=</span> <span class="mi">0</span>
+            <span class="k">return</span> <span class="n">dist</span>
+
+    <span class="k">def</span> <span class="nf">marker_feedback_cb</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">feedback</span><span class="p">):</span>
+        <span class="sd">&#39;&#39;&#39;Callback for when feedback from a marker is received&#39;&#39;&#39;</span>
+        <span class="k">if</span> <span class="n">feedback</span><span class="o">.</span><span class="n">event_type</span> <span class="o">==</span> <span class="n">InteractiveMarkerFeedback</span><span class="o">.</span><span class="n">BUTTON_CLICK</span><span class="p">:</span>
+            <span class="n">rospy</span><span class="o">.</span><span class="n">loginfo</span><span class="p">(</span><span class="s">&#39;Clicked on object &#39;</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="n">feedback</span><span class="o">.</span><span class="n">marker_name</span><span class="p">))</span>
+            <span class="n">rospy</span><span class="o">.</span><span class="n">loginfo</span><span class="p">(</span><span class="s">&#39;Number of objects &#39;</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">World</span><span class="o">.</span><span class="n">objects</span><span class="p">)))</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">rospy</span><span class="o">.</span><span class="n">loginfo</span><span class="p">(</span><span class="s">&#39;Unknown event&#39;</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="n">feedback</span><span class="o">.</span><span class="n">event_type</span><span class="p">))</span>
+
+    <span class="k">def</span> <span class="nf">update</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&#39;&#39;&#39;Update function called in a loop&#39;&#39;&#39;</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-31'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-31'>#</a>
+      </div>
+      <p>Visualize the detected object</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>        <span class="n">is_world_changed</span> <span class="o">=</span> <span class="bp">False</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_lock</span><span class="o">.</span><span class="n">acquire</span><span class="p">()</span>
+        <span class="k">if</span> <span class="p">(</span><span class="n">World</span><span class="o">.</span><span class="n">has_objects</span><span class="p">()):</span>
+            <span class="n">to_remove</span> <span class="o">=</span> <span class="bp">None</span>
+            <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">World</span><span class="o">.</span><span class="n">objects</span><span class="p">)):</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_publish_tf_pose</span><span class="p">(</span><span class="n">World</span><span class="o">.</span><span class="n">objects</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">object</span><span class="o">.</span><span class="n">pose</span><span class="p">,</span>
+                    <span class="n">World</span><span class="o">.</span><span class="n">objects</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">get_name</span><span class="p">(),</span> <span class="s">&#39;base_link&#39;</span><span class="p">)</span>
+                <span class="k">if</span> <span class="p">(</span><span class="n">World</span><span class="o">.</span><span class="n">objects</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">is_removed</span><span class="p">):</span>
+                    <span class="n">to_remove</span> <span class="o">=</span> <span class="n">i</span>
+            <span class="k">if</span> <span class="n">to_remove</span> <span class="o">!=</span> <span class="bp">None</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_remove_object</span><span class="p">(</span><span class="n">to_remove</span><span class="p">)</span>
+                <span class="n">is_world_changed</span> <span class="o">=</span> <span class="bp">True</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_lock</span><span class="o">.</span><span class="n">release</span><span class="p">()</span>
+        <span class="k">return</span> <span class="n">is_world_changed</span>
+
+</pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+</div>
+</body>

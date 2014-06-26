@@ -1,0 +1,840 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta http-equiv="content-type" content="text/html;charset=utf-8">
+  <title>Arm.py</title>
+  <link rel="stylesheet" href="pycco.css">
+</head>
+<body>
+<div id="background"></div>
+<div id='container'>
+  <div class='section'>
+    <div class='docs'><h1>Arm.py</h1></div>
+  </div>
+  <div class='clearall'>
+  <div class='section' id='section-0'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-0'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre><span class="sd">&#39;&#39;&#39; Interface for controlling one arm &#39;&#39;&#39;</span>
+<span class="kn">import</span> <span class="nn">roslib</span>
+<span class="n">roslib</span><span class="o">.</span><span class="n">load_manifest</span><span class="p">(</span><span class="s">&#39;pr2_pbd_interaction&#39;</span><span class="p">)</span>
+
+<span class="kn">import</span> <span class="nn">threading</span>
+<span class="kn">import</span> <span class="nn">rospy</span>
+<span class="kn">import</span> <span class="nn">tf</span>
+<span class="kn">from</span> <span class="nn">numpy</span> <span class="kn">import</span> <span class="n">array</span><span class="p">,</span> <span class="n">sign</span><span class="p">,</span> <span class="n">pi</span><span class="p">,</span> <span class="n">dot</span>
+<span class="kn">from</span> <span class="nn">numpy.linalg</span> <span class="kn">import</span> <span class="n">norm</span>
+<span class="kn">from</span> <span class="nn">arm_navigation_msgs.srv</span> <span class="kn">import</span> <span class="n">FilterJointTrajectory</span>
+<span class="kn">from</span> <span class="nn">trajectory_msgs.msg</span> <span class="kn">import</span> <span class="n">JointTrajectoryPoint</span>
+<span class="kn">from</span> <span class="nn">trajectory_msgs.msg</span> <span class="kn">import</span> <span class="n">JointTrajectory</span>
+<span class="kn">from</span> <span class="nn">actionlib_msgs.msg</span> <span class="kn">import</span> <span class="n">GoalStatus</span>
+<span class="kn">from</span> <span class="nn">actionlib</span> <span class="kn">import</span> <span class="n">SimpleActionClient</span>
+<span class="kn">from</span> <span class="nn">pr2_mechanism_msgs.srv</span> <span class="kn">import</span> <span class="n">SwitchController</span>
+<span class="kn">from</span> <span class="nn">pr2_controllers_msgs.msg</span> <span class="kn">import</span> <span class="n">JointTrajectoryAction</span>
+<span class="kn">from</span> <span class="nn">pr2_controllers_msgs.msg</span> <span class="kn">import</span> <span class="n">JointTrajectoryGoal</span>
+<span class="kn">from</span> <span class="nn">pr2_controllers_msgs.msg</span> <span class="kn">import</span> <span class="n">Pr2GripperCommandAction</span>
+<span class="kn">from</span> <span class="nn">pr2_controllers_msgs.msg</span> <span class="kn">import</span> <span class="n">Pr2GripperCommandGoal</span>
+<span class="kn">from</span> <span class="nn">sensor_msgs.msg</span> <span class="kn">import</span> <span class="n">JointState</span>
+<span class="kn">from</span> <span class="nn">kinematics_msgs.srv</span> <span class="kn">import</span> <span class="n">GetKinematicSolverInfo</span><span class="p">,</span> <span class="n">GetPositionIK</span>
+<span class="kn">from</span> <span class="nn">kinematics_msgs.srv</span> <span class="kn">import</span> <span class="n">GetPositionIKRequest</span>
+<span class="kn">from</span> <span class="nn">geometry_msgs.msg</span> <span class="kn">import</span> <span class="n">Quaternion</span><span class="p">,</span> <span class="n">Point</span><span class="p">,</span> <span class="n">Pose</span>
+<span class="kn">from</span> <span class="nn">pr2_pbd_interaction.msg</span> <span class="kn">import</span> <span class="n">GripperState</span><span class="p">,</span> <span class="n">ArmMode</span><span class="p">,</span> <span class="n">Side</span>
+<span class="kn">from</span> <span class="nn">World</span> <span class="kn">import</span> <span class="n">World</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-1'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-1'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre><span class="k">class</span> <span class="nc">Arm</span><span class="p">:</span>
+    <span class="sd">&#39;&#39;&#39; Interfacing with one arm for controlling mode and action execution&#39;&#39;&#39;</span>
+
+    <span class="n">_is_autorelease_on</span> <span class="o">=</span> <span class="bp">False</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-2'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-2'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">arm_index</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">arm_index</span> <span class="o">=</span> <span class="n">arm_index</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">arm_mode</span> <span class="o">=</span> <span class="n">ArmMode</span><span class="o">.</span><span class="n">HOLD</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">gripper_state</span> <span class="o">=</span> <span class="bp">None</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">gripper_joint_name</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_side_prefix</span><span class="p">()</span> <span class="o">+</span> <span class="s">&#39;_gripper_joint&#39;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">ee_name</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_side_prefix</span><span class="p">()</span> <span class="o">+</span> <span class="s">&#39;_wrist_roll_link&#39;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">joint_names</span> <span class="o">=</span> <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">_side_prefix</span><span class="p">()</span> <span class="o">+</span> <span class="s">&#39;_shoulder_pan_joint&#39;</span><span class="p">,</span>
+                       <span class="bp">self</span><span class="o">.</span><span class="n">_side_prefix</span><span class="p">()</span> <span class="o">+</span> <span class="s">&#39;_shoulder_lift_joint&#39;</span><span class="p">,</span>
+                       <span class="bp">self</span><span class="o">.</span><span class="n">_side_prefix</span><span class="p">()</span> <span class="o">+</span> <span class="s">&#39;_upper_arm_roll_joint&#39;</span><span class="p">,</span>
+                       <span class="bp">self</span><span class="o">.</span><span class="n">_side_prefix</span><span class="p">()</span> <span class="o">+</span> <span class="s">&#39;_elbow_flex_joint&#39;</span><span class="p">,</span>
+                       <span class="bp">self</span><span class="o">.</span><span class="n">_side_prefix</span><span class="p">()</span> <span class="o">+</span> <span class="s">&#39;_forearm_roll_joint&#39;</span><span class="p">,</span>
+                       <span class="bp">self</span><span class="o">.</span><span class="n">_side_prefix</span><span class="p">()</span> <span class="o">+</span> <span class="s">&#39;_wrist_flex_joint&#39;</span><span class="p">,</span>
+                       <span class="bp">self</span><span class="o">.</span><span class="n">_side_prefix</span><span class="p">()</span> <span class="o">+</span> <span class="s">&#39;_wrist_roll_joint&#39;</span><span class="p">]</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">all_joint_names</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">all_joint_poses</span> <span class="o">=</span> <span class="p">[]</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">last_ee_pose</span> <span class="o">=</span> <span class="bp">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">movement_buffer_size</span> <span class="o">=</span> <span class="mi">40</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">last_unstable_time</span> <span class="o">=</span> <span class="n">rospy</span><span class="o">.</span><span class="n">Time</span><span class="o">.</span><span class="n">now</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">arm_movement</span> <span class="o">=</span> <span class="p">[]</span>
+
+        <span class="n">rospy</span><span class="o">.</span><span class="n">loginfo</span><span class="p">(</span><span class="s">&#39;Initializing &#39;</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">_side</span><span class="p">()</span> <span class="o">+</span> <span class="s">&#39; arm.&#39;</span><span class="p">)</span>
+
+        <span class="n">switch_controller</span> <span class="o">=</span> <span class="s">&#39;pr2_controller_manager/switch_controller&#39;</span>
+        <span class="n">rospy</span><span class="o">.</span><span class="n">wait_for_service</span><span class="p">(</span><span class="n">switch_controller</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">switch_service</span> <span class="o">=</span> <span class="n">rospy</span><span class="o">.</span><span class="n">ServiceProxy</span><span class="p">(</span><span class="n">switch_controller</span><span class="p">,</span>
+                                                 <span class="n">SwitchController</span><span class="p">)</span>
+        <span class="n">rospy</span><span class="o">.</span><span class="n">loginfo</span><span class="p">(</span><span class="s">&#39;Got response form the switch controller for &#39;</span>
+                      <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">_side</span><span class="p">()</span> <span class="o">+</span> <span class="s">&#39; arm.&#39;</span><span class="p">)</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-3'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-3'>#</a>
+      </div>
+      <p>Create a trajectory action client</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>        <span class="n">traj_controller_name</span> <span class="o">=</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_side_prefix</span><span class="p">()</span>
+                    <span class="o">+</span> <span class="s">&#39;_arm_controller/joint_trajectory_action&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">traj_action_client</span> <span class="o">=</span> <span class="n">SimpleActionClient</span><span class="p">(</span>
+                        <span class="n">traj_controller_name</span><span class="p">,</span> <span class="n">JointTrajectoryAction</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">traj_action_client</span><span class="o">.</span><span class="n">wait_for_server</span><span class="p">()</span>
+        <span class="n">rospy</span><span class="o">.</span><span class="n">loginfo</span><span class="p">(</span><span class="s">&#39;Got response form trajectory action server for &#39;</span>
+                      <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">_side</span><span class="p">()</span> <span class="o">+</span> <span class="s">&#39; arm.&#39;</span><span class="p">)</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-4'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-4'>#</a>
+      </div>
+      <p>Set up Inversse Kinematics</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>        <span class="bp">self</span><span class="o">.</span><span class="n">ik_srv</span> <span class="o">=</span> <span class="bp">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">ik_request</span> <span class="o">=</span> <span class="bp">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">ik_joints</span> <span class="o">=</span> <span class="bp">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">ik_limits</span> <span class="o">=</span> <span class="bp">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_setup_ik</span><span class="p">()</span>
+
+        <span class="n">gripper_name</span> <span class="o">=</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_side_prefix</span><span class="p">()</span> <span class="o">+</span>
+                        <span class="s">&#39;_gripper_controller/gripper_action&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">gripper_client</span> <span class="o">=</span> <span class="n">SimpleActionClient</span><span class="p">(</span><span class="n">gripper_name</span><span class="p">,</span>
+                                                    <span class="n">Pr2GripperCommandAction</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">gripper_client</span><span class="o">.</span><span class="n">wait_for_server</span><span class="p">()</span>
+        <span class="n">rospy</span><span class="o">.</span><span class="n">loginfo</span><span class="p">(</span><span class="s">&#39;Got response form gripper server for &#39;</span>
+                      <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">_side</span><span class="p">()</span> <span class="o">+</span> <span class="s">&#39; arm.&#39;</span><span class="p">)</span>
+
+        <span class="n">filter_srv_name</span> <span class="o">=</span> <span class="s">&#39;/trajectory_filter/filter_trajectory&#39;</span>
+        <span class="n">rospy</span><span class="o">.</span><span class="n">wait_for_service</span><span class="p">(</span><span class="n">filter_srv_name</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">filter_service</span> <span class="o">=</span> <span class="n">rospy</span><span class="o">.</span><span class="n">ServiceProxy</span><span class="p">(</span><span class="n">filter_srv_name</span><span class="p">,</span>
+                                                 <span class="n">FilterJointTrajectory</span><span class="p">)</span>
+        <span class="n">rospy</span><span class="o">.</span><span class="n">loginfo</span><span class="p">(</span><span class="s">&#39;Filtering service has responded for &#39;</span> <span class="o">+</span>
+                      <span class="bp">self</span><span class="o">.</span><span class="n">_side</span><span class="p">()</span> <span class="o">+</span> <span class="s">&#39; arm.&#39;</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">lock</span> <span class="o">=</span> <span class="n">threading</span><span class="o">.</span><span class="n">Lock</span><span class="p">()</span>
+        <span class="n">rospy</span><span class="o">.</span><span class="n">Subscriber</span><span class="p">(</span><span class="s">&#39;joint_states&#39;</span><span class="p">,</span> <span class="n">JointState</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">joint_states_cb</span><span class="p">)</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-5'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-5'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="k">def</span> <span class="nf">_setup_ik</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&#39;&#39;&#39;Sets up services for inverse kinematics&#39;&#39;&#39;</span>
+        <span class="n">ik_info_srv_name</span> <span class="o">=</span> <span class="p">(</span><span class="s">&#39;pr2_&#39;</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">_side</span><span class="p">()</span> <span class="o">+</span>
+                            <span class="s">&#39;_arm_kinematics_simple/get_ik_solver_info&#39;</span><span class="p">)</span>
+        <span class="n">ik_srv_name</span> <span class="o">=</span> <span class="s">&#39;pr2_&#39;</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">_side</span><span class="p">()</span> <span class="o">+</span> <span class="s">&#39;_arm_kinematics_simple/get_ik&#39;</span>
+        <span class="n">rospy</span><span class="o">.</span><span class="n">wait_for_service</span><span class="p">(</span><span class="n">ik_info_srv_name</span><span class="p">)</span>
+        <span class="n">ik_info_srv</span> <span class="o">=</span> <span class="n">rospy</span><span class="o">.</span><span class="n">ServiceProxy</span><span class="p">(</span><span class="n">ik_info_srv_name</span><span class="p">,</span>
+                                         <span class="n">GetKinematicSolverInfo</span><span class="p">)</span>
+        <span class="n">solver_info</span> <span class="o">=</span> <span class="n">ik_info_srv</span><span class="p">()</span>
+        <span class="n">rospy</span><span class="o">.</span><span class="n">loginfo</span><span class="p">(</span><span class="s">&#39;IK info service has responded for &#39;</span>
+                      <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">_side</span><span class="p">()</span> <span class="o">+</span> <span class="s">&#39; arm.&#39;</span><span class="p">)</span>
+        <span class="n">rospy</span><span class="o">.</span><span class="n">wait_for_service</span><span class="p">(</span><span class="n">ik_srv_name</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">ik_srv</span> <span class="o">=</span> <span class="n">rospy</span><span class="o">.</span><span class="n">ServiceProxy</span><span class="p">(</span><span class="n">ik_srv_name</span><span class="p">,</span>
+                                         <span class="n">GetPositionIK</span><span class="p">,</span> <span class="n">persistent</span><span class="o">=</span><span class="bp">True</span><span class="p">)</span>
+        <span class="n">rospy</span><span class="o">.</span><span class="n">loginfo</span><span class="p">(</span><span class="s">&#39;IK service has responded for &#39;</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">_side</span><span class="p">()</span> <span class="o">+</span> <span class="s">&#39; arm.&#39;</span><span class="p">)</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-6'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-6'>#</a>
+      </div>
+      <p>Set up common parts of an IK request</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>        <span class="bp">self</span><span class="o">.</span><span class="n">ik_request</span> <span class="o">=</span> <span class="n">GetPositionIKRequest</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">ik_request</span><span class="o">.</span><span class="n">timeout</span> <span class="o">=</span> <span class="n">rospy</span><span class="o">.</span><span class="n">Duration</span><span class="p">(</span><span class="mf">4.0</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">ik_joints</span> <span class="o">=</span> <span class="n">solver_info</span><span class="o">.</span><span class="n">kinematic_solver_info</span><span class="o">.</span><span class="n">joint_names</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">ik_limits</span> <span class="o">=</span> <span class="n">solver_info</span><span class="o">.</span><span class="n">kinematic_solver_info</span><span class="o">.</span><span class="n">limits</span>
+        <span class="n">ik_links</span> <span class="o">=</span> <span class="n">solver_info</span><span class="o">.</span><span class="n">kinematic_solver_info</span><span class="o">.</span><span class="n">link_names</span>
+
+        <span class="n">request</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">ik_request</span><span class="o">.</span><span class="n">ik_request</span>
+        <span class="n">request</span><span class="o">.</span><span class="n">ik_link_name</span> <span class="o">=</span> <span class="n">ik_links</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="n">request</span><span class="o">.</span><span class="n">pose_stamped</span><span class="o">.</span><span class="n">header</span><span class="o">.</span><span class="n">frame_id</span> <span class="o">=</span> <span class="s">&#39;base_link&#39;</span>
+        <span class="n">request</span><span class="o">.</span><span class="n">ik_seed_state</span><span class="o">.</span><span class="n">joint_state</span><span class="o">.</span><span class="n">name</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">ik_joints</span>
+        <span class="n">request</span><span class="o">.</span><span class="n">ik_seed_state</span><span class="o">.</span><span class="n">joint_state</span><span class="o">.</span><span class="n">position</span> <span class="o">=</span> <span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">*</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">ik_joints</span><span class="p">)</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-7'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-7'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="k">def</span> <span class="nf">_side</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&#39;&#39;&#39;Returns the word right or left depending on arm side&#39;&#39;&#39;</span>
+        <span class="k">if</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">arm_index</span> <span class="o">==</span> <span class="n">Side</span><span class="o">.</span><span class="n">RIGHT</span><span class="p">):</span>
+            <span class="k">return</span> <span class="s">&#39;right&#39;</span>
+        <span class="k">elif</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">arm_index</span> <span class="o">==</span> <span class="n">Side</span><span class="o">.</span><span class="n">LEFT</span><span class="p">):</span>
+            <span class="k">return</span> <span class="s">&#39;left&#39;</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-8'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-8'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="k">def</span> <span class="nf">_side_prefix</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&#39;&#39;&#39; Returns the letter r or l depending on arm side&#39;&#39;&#39;</span>
+        <span class="n">side</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_side</span><span class="p">()</span>
+        <span class="k">return</span> <span class="n">side</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-9'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-9'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="k">def</span> <span class="nf">get_ee_state</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_frame</span><span class="o">=</span><span class="s">&#39;base_link&#39;</span><span class="p">):</span>
+        <span class="sd">&#39;&#39;&#39; Returns end effector pose for the arm&#39;&#39;&#39;</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">time</span> <span class="o">=</span> <span class="n">World</span><span class="o">.</span><span class="n">tf_listener</span><span class="o">.</span><span class="n">getLatestCommonTime</span><span class="p">(</span><span class="n">ref_frame</span><span class="p">,</span>
+                                                         <span class="bp">self</span><span class="o">.</span><span class="n">ee_name</span><span class="p">)</span>
+            <span class="p">(</span><span class="n">position</span><span class="p">,</span> <span class="n">orientation</span><span class="p">)</span> <span class="o">=</span> <span class="n">World</span><span class="o">.</span><span class="n">tf_listener</span><span class="o">.</span><span class="n">lookupTransform</span><span class="p">(</span>
+                                                <span class="n">ref_frame</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">ee_name</span><span class="p">,</span> <span class="n">time</span><span class="p">)</span>
+            <span class="n">ee_pose</span> <span class="o">=</span> <span class="n">Pose</span><span class="p">()</span>
+            <span class="n">ee_pose</span><span class="o">.</span><span class="n">position</span> <span class="o">=</span> <span class="n">Point</span><span class="p">(</span><span class="n">position</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">position</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="n">position</span><span class="p">[</span><span class="mi">2</span><span class="p">])</span>
+            <span class="n">ee_pose</span><span class="o">.</span><span class="n">orientation</span> <span class="o">=</span> <span class="n">Quaternion</span><span class="p">(</span><span class="n">orientation</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">orientation</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span>
+                                             <span class="n">orientation</span><span class="p">[</span><span class="mi">2</span><span class="p">],</span> <span class="n">orientation</span><span class="p">[</span><span class="mi">3</span><span class="p">])</span>
+            <span class="k">return</span> <span class="n">ee_pose</span>
+        <span class="k">except</span> <span class="p">(</span><span class="n">tf</span><span class="o">.</span><span class="n">LookupException</span><span class="p">,</span> <span class="n">tf</span><span class="o">.</span><span class="n">ConnectivityException</span><span class="p">,</span>
+                <span class="n">tf</span><span class="o">.</span><span class="n">ExtrapolationException</span><span class="p">):</span>
+            <span class="n">rospy</span><span class="o">.</span><span class="n">logwarn</span><span class="p">(</span><span class="s">&#39;Something wrong with transform request.&#39;</span><span class="p">)</span>
+            <span class="k">return</span> <span class="bp">None</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-10'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-10'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="k">def</span> <span class="nf">joint_states_cb</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">msg</span><span class="p">):</span>
+        <span class="sd">&#39;&#39;&#39;Callback function that saves the joint positions when a</span>
+<span class="sd">        joint_states message is received&#39;&#39;&#39;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">lock</span><span class="o">.</span><span class="n">acquire</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">all_joint_names</span> <span class="o">=</span> <span class="n">msg</span><span class="o">.</span><span class="n">name</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">all_joint_poses</span> <span class="o">=</span> <span class="n">msg</span><span class="o">.</span><span class="n">position</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">lock</span><span class="o">.</span><span class="n">release</span><span class="p">()</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-11'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-11'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="k">def</span> <span class="nf">get_joint_state</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">joint_names</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
+        <span class="sd">&#39;&#39;&#39;Returns position for the requested or all arm joints&#39;&#39;&#39;</span>
+        <span class="k">if</span> <span class="n">joint_names</span> <span class="o">==</span> <span class="bp">None</span><span class="p">:</span>
+            <span class="n">joint_names</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">joint_names</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">all_joint_names</span> <span class="o">==</span> <span class="p">[]:</span>
+            <span class="n">rospy</span><span class="o">.</span><span class="n">logerr</span><span class="p">(</span><span class="s">&quot;No robot_state messages received!</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">)</span>
+            <span class="k">return</span> <span class="p">[]</span>
+
+        <span class="n">positions</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">lock</span><span class="o">.</span><span class="n">acquire</span><span class="p">()</span>
+        <span class="k">for</span> <span class="n">joint_name</span> <span class="ow">in</span> <span class="n">joint_names</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">joint_name</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">all_joint_names</span><span class="p">:</span>
+                <span class="n">index</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">all_joint_names</span><span class="o">.</span><span class="n">index</span><span class="p">(</span><span class="n">joint_name</span><span class="p">)</span>
+                <span class="n">position</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">all_joint_poses</span><span class="p">[</span><span class="n">index</span><span class="p">]</span>
+                <span class="n">positions</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">position</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">rospy</span><span class="o">.</span><span class="n">logerr</span><span class="p">(</span><span class="s">&quot;Joint </span><span class="si">%s</span><span class="s"> not found!&quot;</span><span class="p">,</span> <span class="n">joint_name</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">lock</span><span class="o">.</span><span class="n">release</span><span class="p">()</span>
+        <span class="k">return</span> <span class="n">positions</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-12'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-12'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="k">def</span> <span class="nf">_solve_ik</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ee_pose</span><span class="p">,</span> <span class="n">seed</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
+        <span class="sd">&#39;&#39;&#39;Gets the IK solution for end effector pose&#39;&#39;&#39;</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">ik_request</span><span class="o">.</span><span class="n">ik_request</span><span class="o">.</span><span class="n">pose_stamped</span><span class="o">.</span><span class="n">pose</span> <span class="o">=</span> <span class="n">ee_pose</span>
+
+        <span class="k">if</span> <span class="n">seed</span> <span class="o">==</span> <span class="bp">None</span><span class="p">:</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-13'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-13'>#</a>
+      </div>
+      <p>If no see is specified for IK search, start search at midpoint</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>            <span class="n">seed</span> <span class="o">=</span> <span class="p">[]</span>
+            <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">ik_joints</span><span class="p">)):</span>
+                <span class="n">seed</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="bp">self</span><span class="o">.</span><span class="n">ik_limits</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">min_position</span> <span class="o">+</span>
+                             <span class="bp">self</span><span class="o">.</span><span class="n">ik_limits</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">max_position</span><span class="p">)</span> <span class="o">/</span> <span class="mf">2.0</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">ik_request</span><span class="o">.</span><span class="n">ik_request</span><span class="o">.</span><span class="n">ik_seed_state</span><span class="o">.</span><span class="n">joint_state</span><span class="o">.</span><span class="n">position</span> <span class="o">=</span> <span class="n">seed</span>
+
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">rospy</span><span class="o">.</span><span class="n">loginfo</span><span class="p">(</span><span class="s">&#39;Sending IK request.&#39;</span><span class="p">)</span>
+            <span class="n">response</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">ik_srv</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">ik_request</span><span class="p">)</span>
+            <span class="k">if</span><span class="p">(</span><span class="n">response</span><span class="o">.</span><span class="n">error_code</span><span class="o">.</span><span class="n">val</span> <span class="o">==</span> <span class="n">response</span><span class="o">.</span><span class="n">error_code</span><span class="o">.</span><span class="n">SUCCESS</span><span class="p">):</span>
+                <span class="k">return</span> <span class="n">response</span><span class="o">.</span><span class="n">solution</span><span class="o">.</span><span class="n">joint_state</span><span class="o">.</span><span class="n">position</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">return</span> <span class="bp">None</span>
+        <span class="k">except</span> <span class="n">rospy</span><span class="o">.</span><span class="n">ServiceException</span><span class="p">:</span>
+            <span class="n">rospy</span><span class="o">.</span><span class="n">logerr</span><span class="p">(</span><span class="s">&#39;Exception while getting the IK solution.&#39;</span><span class="p">)</span>
+            <span class="k">return</span> <span class="bp">None</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-14'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-14'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="k">def</span> <span class="nf">set_mode</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">mode</span><span class="p">):</span>
+        <span class="sd">&#39;&#39;&#39;Releases or holds the arm by turning the controller on/off&#39;&#39;&#39;</span>
+        <span class="n">controller_name</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_side_prefix</span><span class="p">()</span> <span class="o">+</span> <span class="s">&#39;_arm_controller&#39;</span>
+        <span class="k">if</span> <span class="n">mode</span> <span class="o">==</span> <span class="n">ArmMode</span><span class="o">.</span><span class="n">RELEASE</span><span class="p">:</span>
+            <span class="n">start_controllers</span> <span class="o">=</span> <span class="p">[]</span>
+            <span class="n">stop_controllers</span> <span class="o">=</span> <span class="p">[</span><span class="n">controller_name</span><span class="p">]</span>
+            <span class="n">rospy</span><span class="o">.</span><span class="n">loginfo</span><span class="p">(</span><span class="s">&#39;Switching &#39;</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_side</span><span class="p">())</span> <span class="o">+</span>
+                          <span class="s">&#39; arm to the kinesthetic mode&#39;</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="n">mode</span> <span class="o">==</span> <span class="n">ArmMode</span><span class="o">.</span><span class="n">HOLD</span><span class="p">:</span>
+            <span class="n">start_controllers</span> <span class="o">=</span> <span class="p">[</span><span class="n">controller_name</span><span class="p">]</span>
+            <span class="n">stop_controllers</span> <span class="o">=</span> <span class="p">[]</span>
+            <span class="n">rospy</span><span class="o">.</span><span class="n">loginfo</span><span class="p">(</span><span class="s">&#39;Switching &#39;</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_side</span><span class="p">())</span> <span class="o">+</span>
+                          <span class="s">&#39; to the Joint-control mode&#39;</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">rospy</span><span class="o">.</span><span class="n">logwarn</span><span class="p">(</span><span class="s">&#39;Unknown mode &#39;</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="n">mode</span><span class="p">)</span> <span class="o">+</span>
+                          <span class="s">&#39;. Keeping the current mode.&#39;</span><span class="p">)</span>
+            <span class="k">return</span>
+
+        <span class="k">try</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">switch_service</span><span class="p">(</span><span class="n">start_controllers</span><span class="p">,</span> <span class="n">stop_controllers</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">arm_mode</span> <span class="o">=</span> <span class="n">mode</span>
+        <span class="k">except</span> <span class="n">rospy</span><span class="o">.</span><span class="n">ServiceException</span><span class="p">:</span>
+            <span class="n">rospy</span><span class="o">.</span><span class="n">logerr</span><span class="p">(</span><span class="s">&quot;Service did not process request&quot;</span><span class="p">)</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-15'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-15'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="k">def</span> <span class="nf">get_mode</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&#39;&#39;&#39;Returns the current arm mode (released/holding)&#39;&#39;&#39;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">arm_mode</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-16'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-16'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="k">def</span> <span class="nf">_send_gripper_command</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">pos</span><span class="o">=</span><span class="mf">0.08</span><span class="p">,</span> <span class="n">eff</span><span class="o">=</span><span class="mf">30.0</span><span class="p">,</span> <span class="n">wait</span><span class="o">=</span><span class="bp">False</span><span class="p">):</span>
+        <span class="sd">&#39;&#39;&#39;Sets the position of the gripper&#39;&#39;&#39;</span>
+        <span class="n">command</span> <span class="o">=</span> <span class="n">Pr2GripperCommandGoal</span><span class="p">()</span>
+        <span class="n">command</span><span class="o">.</span><span class="n">command</span><span class="o">.</span><span class="n">position</span> <span class="o">=</span> <span class="n">pos</span>
+        <span class="n">command</span><span class="o">.</span><span class="n">command</span><span class="o">.</span><span class="n">max_effort</span> <span class="o">=</span> <span class="n">eff</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">gripper_client</span><span class="o">.</span><span class="n">send_goal</span><span class="p">(</span><span class="n">command</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">wait</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">gripper_client</span><span class="o">.</span><span class="n">wait_for_result</span><span class="p">(</span><span class="n">rospy</span><span class="o">.</span><span class="n">Duration</span><span class="p">(</span><span class="mf">10.0</span><span class="p">))</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-17'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-17'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="k">def</span> <span class="nf">is_gripper_moving</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&#39;&#39;&#39; Whether or not the gripper is in the process of opening/closing&#39;&#39;&#39;</span>
+        <span class="k">return</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">gripper_client</span><span class="o">.</span><span class="n">get_state</span><span class="p">()</span> <span class="o">==</span> <span class="n">GoalStatus</span><span class="o">.</span><span class="n">ACTIVE</span> <span class="ow">or</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">gripper_client</span><span class="o">.</span><span class="n">get_state</span><span class="p">()</span> <span class="o">==</span> <span class="n">GoalStatus</span><span class="o">.</span><span class="n">PENDING</span><span class="p">)</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-18'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-18'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="k">def</span> <span class="nf">is_gripper_at_goal</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&#39;&#39;&#39; Whether or not the gripper has reached its goal&#39;&#39;&#39;</span>
+        <span class="k">return</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">gripper_client</span><span class="o">.</span><span class="n">get_state</span><span class="p">()</span> <span class="o">==</span> <span class="n">GoalStatus</span><span class="o">.</span><span class="n">SUCCEEDED</span><span class="p">)</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-19'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-19'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="k">def</span> <span class="nf">get_gripper_state</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&#39;&#39;&#39;Returns current gripper state&#39;&#39;&#39;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">gripper_state</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-20'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-20'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="k">def</span> <span class="nf">check_gripper_state</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">joint_name</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
+        <span class="sd">&#39;&#39;&#39;Checks gripper state at the hardware level&#39;&#39;&#39;</span>
+        <span class="k">if</span> <span class="p">(</span><span class="n">joint_name</span> <span class="o">==</span> <span class="bp">None</span><span class="p">):</span>
+            <span class="n">joint_name</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">gripper_joint_name</span>
+        <span class="n">gripper_pos</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_joint_state</span><span class="p">([</span><span class="n">joint_name</span><span class="p">])</span>
+        <span class="k">if</span> <span class="n">gripper_pos</span> <span class="o">!=</span> <span class="p">[]:</span>
+            <span class="k">if</span> <span class="n">gripper_pos</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">&gt;</span> <span class="mf">0.078</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">gripper_state</span> <span class="o">=</span> <span class="n">GripperState</span><span class="o">.</span><span class="n">OPEN</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">gripper_state</span> <span class="o">=</span> <span class="n">GripperState</span><span class="o">.</span><span class="n">CLOSED</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">rospy</span><span class="o">.</span><span class="n">logwarn</span><span class="p">(</span><span class="s">&#39;Could not update the gripper state.&#39;</span><span class="p">)</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-21'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-21'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="k">def</span> <span class="nf">open_gripper</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">pos</span><span class="o">=</span><span class="mf">0.08</span><span class="p">,</span> <span class="n">eff</span><span class="o">=</span><span class="mf">30.0</span><span class="p">,</span> <span class="n">wait</span><span class="o">=</span><span class="bp">False</span><span class="p">):</span>
+        <span class="sd">&#39;&#39;&#39;Opens gripper&#39;&#39;&#39;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_send_gripper_command</span><span class="p">(</span><span class="n">pos</span><span class="p">,</span> <span class="n">eff</span><span class="p">,</span> <span class="n">wait</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">gripper_state</span> <span class="o">=</span> <span class="n">GripperState</span><span class="o">.</span><span class="n">OPEN</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-22'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-22'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="k">def</span> <span class="nf">close_gripper</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">pos</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span> <span class="n">eff</span><span class="o">=</span><span class="mf">30.0</span><span class="p">,</span> <span class="n">wait</span><span class="o">=</span><span class="bp">False</span><span class="p">):</span>
+        <span class="sd">&#39;&#39;&#39;Closes gripper&#39;&#39;&#39;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_send_gripper_command</span><span class="p">(</span><span class="n">pos</span><span class="p">,</span> <span class="n">eff</span><span class="p">,</span> <span class="n">wait</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">gripper_state</span> <span class="o">=</span> <span class="n">GripperState</span><span class="o">.</span><span class="n">CLOSED</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-23'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-23'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="k">def</span> <span class="nf">set_gripper</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">gripper_state</span><span class="p">):</span>
+        <span class="sd">&#39;&#39;&#39;Sets gripper to the desired state&#39;&#39;&#39;</span>
+        <span class="k">if</span> <span class="p">(</span><span class="n">gripper_state</span> <span class="o">==</span> <span class="n">GripperState</span><span class="o">.</span><span class="n">CLOSED</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">close_gripper</span><span class="p">()</span>
+        <span class="k">elif</span> <span class="p">(</span><span class="n">gripper_state</span> <span class="o">==</span> <span class="n">GripperState</span><span class="o">.</span><span class="n">OPEN</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">open_gripper</span><span class="p">()</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-24'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-24'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="k">def</span> <span class="nf">exectute_joint_traj</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">joint_trajectory</span><span class="p">,</span> <span class="n">timing</span><span class="p">):</span>
+        <span class="sd">&#39;&#39;&#39;Moves the arm through the joint sequence&#39;&#39;&#39;</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-25'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-25'>#</a>
+      </div>
+      <p>First, do filtering on the trajectory to fix the velocities</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>        <span class="n">trajectory</span> <span class="o">=</span> <span class="n">JointTrajectory</span><span class="p">()</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-26'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-26'>#</a>
+      </div>
+      <p>Initialize the server
+When to start the trajectory: 0.1 seconds from now</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>        <span class="n">trajectory</span><span class="o">.</span><span class="n">header</span><span class="o">.</span><span class="n">stamp</span> <span class="o">=</span> <span class="n">rospy</span><span class="o">.</span><span class="n">Time</span><span class="o">.</span><span class="n">now</span><span class="p">()</span> <span class="o">+</span> <span class="n">rospy</span><span class="o">.</span><span class="n">Duration</span><span class="p">(</span><span class="mf">0.1</span><span class="p">)</span>
+        <span class="n">trajectory</span><span class="o">.</span><span class="n">joint_names</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">joint_names</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-27'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-27'>#</a>
+      </div>
+      <h1>Add all frames of the trajectory as way points</h1>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">timing</span><span class="p">)):</span>
+            <span class="n">positions</span> <span class="o">=</span> <span class="n">joint_trajectory</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">joint_pose</span>
+            <span class="n">velocities</span> <span class="o">=</span> <span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">*</span> <span class="nb">len</span><span class="p">(</span><span class="n">positions</span><span class="p">)</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-28'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-28'>#</a>
+      </div>
+      <p>Add frames to the trajectory</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>            <span class="n">trajectory</span><span class="o">.</span><span class="n">points</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">JointTrajectoryPoint</span><span class="p">(</span><span class="n">positions</span><span class="o">=</span><span class="n">positions</span><span class="p">,</span>
+                                     <span class="n">velocities</span><span class="o">=</span><span class="n">velocities</span><span class="p">,</span>
+                                     <span class="n">time_from_start</span><span class="o">=</span><span class="n">timing</span><span class="p">[</span><span class="n">i</span><span class="p">]))</span>
+
+        <span class="n">output</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">filter_service</span><span class="p">(</span><span class="n">trajectory</span><span class="o">=</span><span class="n">trajectory</span><span class="p">,</span>
+                                     <span class="n">allowed_time</span><span class="o">=</span><span class="n">rospy</span><span class="o">.</span><span class="n">Duration</span><span class="o">.</span><span class="n">from_sec</span><span class="p">(</span><span class="mi">20</span><span class="p">))</span>
+        <span class="n">rospy</span><span class="o">.</span><span class="n">loginfo</span><span class="p">(</span><span class="s">&#39;Trajectory for arm &#39;</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">arm_index</span><span class="p">)</span> <span class="o">+</span>
+                      <span class="s">&#39; has been filtered.&#39;</span><span class="p">)</span>
+        <span class="n">traj_goal</span> <span class="o">=</span> <span class="n">JointTrajectoryGoal</span><span class="p">()</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-29'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-29'>#</a>
+      </div>
+      <p>TO-DO: check output.error_code</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>        <span class="n">traj_goal</span><span class="o">.</span><span class="n">trajectory</span> <span class="o">=</span> <span class="n">output</span><span class="o">.</span><span class="n">trajectory</span>
+        <span class="n">traj_goal</span><span class="o">.</span><span class="n">trajectory</span><span class="o">.</span><span class="n">header</span><span class="o">.</span><span class="n">stamp</span> <span class="o">=</span> <span class="p">(</span><span class="n">rospy</span><span class="o">.</span><span class="n">Time</span><span class="o">.</span><span class="n">now</span><span class="p">()</span> <span class="o">+</span>
+                                            <span class="n">rospy</span><span class="o">.</span><span class="n">Duration</span><span class="p">(</span><span class="mf">0.1</span><span class="p">))</span>
+        <span class="n">traj_goal</span><span class="o">.</span><span class="n">trajectory</span><span class="o">.</span><span class="n">joint_names</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">joint_names</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-30'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-30'>#</a>
+      </div>
+      <p>Sends the goal to the trajectory server</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>        <span class="bp">self</span><span class="o">.</span><span class="n">traj_action_client</span><span class="o">.</span><span class="n">send_goal</span><span class="p">(</span><span class="n">traj_goal</span><span class="p">)</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-31'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-31'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="k">def</span> <span class="nf">move_to_joints</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">joints</span><span class="p">,</span> <span class="n">time_to_joint</span><span class="p">):</span>
+        <span class="sd">&#39;&#39;&#39;Moves the arm to the desired joints&#39;&#39;&#39;</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-32'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-32'>#</a>
+      </div>
+      <p>Setup the goal</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>        <span class="n">traj_goal</span> <span class="o">=</span> <span class="n">JointTrajectoryGoal</span><span class="p">()</span>
+        <span class="n">traj_goal</span><span class="o">.</span><span class="n">trajectory</span><span class="o">.</span><span class="n">header</span><span class="o">.</span><span class="n">stamp</span> <span class="o">=</span> <span class="p">(</span><span class="n">rospy</span><span class="o">.</span><span class="n">Time</span><span class="o">.</span><span class="n">now</span><span class="p">()</span> <span class="o">+</span>
+                                             <span class="n">rospy</span><span class="o">.</span><span class="n">Duration</span><span class="p">(</span><span class="mf">0.1</span><span class="p">))</span>
+        <span class="n">traj_goal</span><span class="o">.</span><span class="n">trajectory</span><span class="o">.</span><span class="n">joint_names</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">joint_names</span>
+        <span class="n">velocities</span> <span class="o">=</span> <span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">*</span> <span class="nb">len</span><span class="p">(</span><span class="n">joints</span><span class="p">)</span>
+        <span class="n">traj_goal</span><span class="o">.</span><span class="n">trajectory</span><span class="o">.</span><span class="n">points</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">JointTrajectoryPoint</span><span class="p">(</span>
+                        <span class="n">positions</span><span class="o">=</span><span class="n">joints</span><span class="p">,</span>
+                        <span class="n">velocities</span><span class="o">=</span><span class="n">velocities</span><span class="p">,</span>
+                        <span class="n">time_from_start</span><span class="o">=</span><span class="n">rospy</span><span class="o">.</span><span class="n">Duration</span><span class="p">(</span><span class="n">time_to_joint</span><span class="p">)))</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-33'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-33'>#</a>
+      </div>
+      <p>Client sends the goal to the Server</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>        <span class="bp">self</span><span class="o">.</span><span class="n">traj_action_client</span><span class="o">.</span><span class="n">send_goal</span><span class="p">(</span><span class="n">traj_goal</span><span class="p">)</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-34'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-34'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="k">def</span> <span class="nf">is_executing</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&#39;&#39;&#39;Whether or not there is an ongoing action execution on the arm&#39;&#39;&#39;</span>
+        <span class="k">return</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">traj_action_client</span><span class="o">.</span><span class="n">get_state</span><span class="p">()</span> <span class="o">==</span> <span class="n">GoalStatus</span><span class="o">.</span><span class="n">ACTIVE</span>
+                <span class="ow">or</span> <span class="bp">self</span><span class="o">.</span><span class="n">traj_action_client</span><span class="o">.</span><span class="n">get_state</span><span class="p">()</span> <span class="o">==</span> <span class="n">GoalStatus</span><span class="o">.</span><span class="n">PENDING</span><span class="p">)</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-35'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-35'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="k">def</span> <span class="nf">is_successful</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&#39;&#39;&#39;Whetehr the execution succeeded&#39;&#39;&#39;</span>
+        <span class="k">return</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">traj_action_client</span><span class="o">.</span><span class="n">get_state</span><span class="p">()</span> <span class="o">==</span> <span class="n">GoalStatus</span><span class="o">.</span><span class="n">SUCCEEDED</span><span class="p">)</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-36'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-36'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="k">def</span> <span class="nf">get_ik_for_ee</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ee_pose</span><span class="p">,</span> <span class="n">seed</span><span class="p">):</span>
+        <span class="sd">&#39;&#39;&#39; Finds the IK solution for given end effector pose&#39;&#39;&#39;</span>
+        <span class="n">joints</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_solve_ik</span><span class="p">(</span><span class="n">ee_pose</span><span class="p">,</span> <span class="n">seed</span><span class="p">)</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-37'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-37'>#</a>
+      </div>
+      <h1>If our seed did not work, try once again with the default seed</h1>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>        <span class="k">if</span> <span class="n">joints</span> <span class="o">==</span> <span class="bp">None</span><span class="p">:</span>
+            <span class="n">rospy</span><span class="o">.</span><span class="n">logwarn</span><span class="p">(</span><span class="s">&#39;Could not find IK solution with preferred seed,&#39;</span> <span class="o">+</span>
+                          <span class="s">&#39;will try default seed.&#39;</span><span class="p">)</span>
+            <span class="n">joints</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_solve_ik</span><span class="p">(</span><span class="n">ee_pose</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">joints</span> <span class="o">==</span> <span class="bp">None</span><span class="p">:</span>
+            <span class="n">rospy</span><span class="o">.</span><span class="n">logwarn</span><span class="p">(</span><span class="s">&#39;IK out of bounds, will use the seed directly.&#39;</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">rollover</span> <span class="o">=</span> <span class="n">array</span><span class="p">((</span><span class="n">array</span><span class="p">(</span><span class="n">joints</span><span class="p">)</span> <span class="o">-</span> <span class="n">array</span><span class="p">(</span><span class="n">seed</span><span class="p">))</span> <span class="o">/</span> <span class="n">pi</span><span class="p">,</span> <span class="nb">int</span><span class="p">)</span>
+            <span class="n">joints</span> <span class="o">-=</span> <span class="p">((</span><span class="n">rollover</span> <span class="o">+</span> <span class="p">(</span><span class="n">sign</span><span class="p">(</span><span class="n">rollover</span><span class="p">)</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span> <span class="o">/</span> <span class="mi">2</span><span class="p">)</span> <span class="o">/</span> <span class="mi">2</span><span class="p">)</span> <span class="o">*</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">pi</span>
+
+        <span class="k">return</span> <span class="n">joints</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-38'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-38'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">get_distance_bw_poses</span><span class="p">(</span><span class="n">pose0</span><span class="p">,</span> <span class="n">pose1</span><span class="p">):</span>
+        <span class="sd">&#39;&#39;&#39;Returns the dissimilarity between two end-effector poses&#39;&#39;&#39;</span>
+        <span class="n">w_pos</span> <span class="o">=</span> <span class="mf">1.0</span>
+        <span class="n">w_rot</span> <span class="o">=</span> <span class="mf">0.2</span>
+        <span class="n">pos0</span> <span class="o">=</span> <span class="n">array</span><span class="p">((</span><span class="n">pose0</span><span class="o">.</span><span class="n">position</span><span class="o">.</span><span class="n">x</span><span class="p">,</span> <span class="n">pose0</span><span class="o">.</span><span class="n">position</span><span class="o">.</span><span class="n">y</span><span class="p">,</span> <span class="n">pose0</span><span class="o">.</span><span class="n">position</span><span class="o">.</span><span class="n">z</span><span class="p">))</span>
+        <span class="n">pos1</span> <span class="o">=</span> <span class="n">array</span><span class="p">((</span><span class="n">pose1</span><span class="o">.</span><span class="n">position</span><span class="o">.</span><span class="n">x</span><span class="p">,</span> <span class="n">pose1</span><span class="o">.</span><span class="n">position</span><span class="o">.</span><span class="n">y</span><span class="p">,</span> <span class="n">pose1</span><span class="o">.</span><span class="n">position</span><span class="o">.</span><span class="n">z</span><span class="p">))</span>
+        <span class="n">rot0</span> <span class="o">=</span> <span class="n">array</span><span class="p">((</span><span class="n">pose0</span><span class="o">.</span><span class="n">orientation</span><span class="o">.</span><span class="n">x</span><span class="p">,</span> <span class="n">pose0</span><span class="o">.</span><span class="n">orientation</span><span class="o">.</span><span class="n">y</span><span class="p">,</span>
+                      <span class="n">pose0</span><span class="o">.</span><span class="n">orientation</span><span class="o">.</span><span class="n">z</span><span class="p">,</span> <span class="n">pose0</span><span class="o">.</span><span class="n">orientation</span><span class="o">.</span><span class="n">w</span><span class="p">))</span>
+        <span class="n">rot1</span> <span class="o">=</span> <span class="n">array</span><span class="p">((</span><span class="n">pose1</span><span class="o">.</span><span class="n">orientation</span><span class="o">.</span><span class="n">x</span><span class="p">,</span> <span class="n">pose1</span><span class="o">.</span><span class="n">orientation</span><span class="o">.</span><span class="n">y</span><span class="p">,</span>
+                      <span class="n">pose1</span><span class="o">.</span><span class="n">orientation</span><span class="o">.</span><span class="n">z</span><span class="p">,</span> <span class="n">pose1</span><span class="o">.</span><span class="n">orientation</span><span class="o">.</span><span class="n">w</span><span class="p">))</span>
+        <span class="n">pos_dist</span> <span class="o">=</span> <span class="n">w_pos</span> <span class="o">*</span> <span class="n">norm</span><span class="p">(</span><span class="n">pos0</span> <span class="o">-</span> <span class="n">pos1</span><span class="p">)</span>
+        <span class="n">rot_dist</span> <span class="o">=</span> <span class="n">w_rot</span> <span class="o">*</span> <span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="n">dot</span><span class="p">(</span><span class="n">rot0</span><span class="p">,</span> <span class="n">rot1</span><span class="p">))</span>
+
+        <span class="k">if</span> <span class="p">(</span><span class="n">pos_dist</span> <span class="o">&gt;</span> <span class="n">rot_dist</span><span class="p">):</span>
+            <span class="n">dist</span> <span class="o">=</span> <span class="n">pos_dist</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">dist</span> <span class="o">=</span> <span class="n">rot_dist</span>
+        <span class="k">return</span> <span class="n">dist</span>
+
+    <span class="k">def</span> <span class="nf">reset_movement_history</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&#39;&#39;&#39; Clears the saved history of arm movements&#39;&#39;&#39;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">last_unstable_time</span> <span class="o">=</span> <span class="n">rospy</span><span class="o">.</span><span class="n">Time</span><span class="o">.</span><span class="n">now</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">arm_movement</span> <span class="o">=</span> <span class="p">[]</span>
+
+    <span class="k">def</span> <span class="nf">get_movement</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&#39;&#39;&#39;Returns cumulative movement in recent history&#39;&#39;&#39;</span>
+        <span class="k">return</span> <span class="nb">sum</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">arm_movement</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">_record_arm_movement</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">reading</span><span class="p">):</span>
+        <span class="sd">&#39;&#39;&#39;Records the sensed arm movement&#39;&#39;&#39;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">arm_movement</span> <span class="o">=</span> <span class="p">[</span><span class="n">reading</span><span class="p">]</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">arm_movement</span>
+        <span class="k">if</span> <span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">arm_movement</span><span class="p">)</span> <span class="o">&gt;</span> <span class="bp">self</span><span class="o">.</span><span class="n">movement_buffer_size</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">arm_movement</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">arm_movement</span><span class="p">[</span><span class="mi">0</span><span class="p">:</span><span class="bp">self</span><span class="o">.</span><span class="n">movement_buffer_size</span><span class="p">]</span>
+
+    <span class="k">def</span> <span class="nf">_is_arm_moved_while_holding</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&#39;&#39;&#39;Checks if user is trying to move the arm while it is stiff&#39;&#39;&#39;</span>
+        <span class="n">threshold</span> <span class="o">=</span> <span class="mf">0.02</span>
+        <span class="k">if</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">get_mode</span><span class="p">()</span> <span class="o">==</span> <span class="n">ArmMode</span><span class="o">.</span><span class="n">HOLD</span>
+                <span class="ow">and</span> <span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">arm_movement</span><span class="p">)</span> <span class="o">==</span> <span class="bp">self</span><span class="o">.</span><span class="n">movement_buffer_size</span><span class="p">)</span>
+                <span class="ow">and</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">get_movement</span><span class="p">()</span> <span class="o">&gt;</span> <span class="n">threshold</span><span class="p">)):</span>
+            <span class="k">return</span> <span class="bp">True</span>
+        <span class="k">return</span> <span class="bp">False</span>
+
+    <span class="k">def</span> <span class="nf">_is_arm_stable_while_released</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&#39;&#39;&#39;Checks if the arm has been stable while being released&#39;&#39;&#39;</span>
+        <span class="n">movement_threshold</span> <span class="o">=</span> <span class="mf">0.02</span>
+        <span class="n">time_threshold</span> <span class="o">=</span> <span class="n">rospy</span><span class="o">.</span><span class="n">Duration</span><span class="p">(</span><span class="mf">5.0</span><span class="p">)</span>
+        <span class="n">is_arm_stable</span> <span class="o">=</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">get_movement</span><span class="p">()</span> <span class="o">&lt;</span> <span class="n">movement_threshold</span><span class="p">)</span>
+        <span class="k">if</span> <span class="p">(</span><span class="ow">not</span> <span class="n">is_arm_stable</span> <span class="ow">or</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_mode</span><span class="p">()</span> <span class="o">==</span> <span class="n">ArmMode</span><span class="o">.</span><span class="n">HOLD</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">last_unstable_time</span> <span class="o">=</span> <span class="n">rospy</span><span class="o">.</span><span class="n">Time</span><span class="o">.</span><span class="n">now</span><span class="p">()</span>
+            <span class="k">return</span> <span class="bp">False</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">if</span> <span class="p">(</span><span class="n">rospy</span><span class="o">.</span><span class="n">Time</span><span class="o">.</span><span class="n">now</span><span class="p">()</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">last_unstable_time</span><span class="p">)</span> <span class="o">&gt;</span> <span class="n">time_threshold</span><span class="p">:</span>
+                <span class="k">return</span> <span class="bp">True</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">return</span> <span class="bp">False</span>
+
+    <span class="k">def</span> <span class="nf">update</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">is_executing</span><span class="p">):</span>
+        <span class="sd">&#39;&#39;&#39; Periodical update for one arm&#39;&#39;&#39;</span>
+        <span class="n">ee_pose</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_ee_state</span><span class="p">()</span>
+        <span class="k">if</span> <span class="p">(</span><span class="n">ee_pose</span> <span class="o">!=</span> <span class="bp">None</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">last_ee_pose</span> <span class="o">!=</span> <span class="bp">None</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_record_arm_movement</span><span class="p">(</span><span class="n">Arm</span><span class="o">.</span><span class="n">get_distance_bw_poses</span><span class="p">(</span><span class="n">ee_pose</span><span class="p">,</span>
+                                                        <span class="bp">self</span><span class="o">.</span><span class="n">last_ee_pose</span><span class="p">))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">last_ee_pose</span> <span class="o">=</span> <span class="n">ee_pose</span>
+
+        <span class="k">if</span> <span class="p">(</span><span class="ow">not</span> <span class="n">is_executing</span> <span class="ow">and</span> <span class="n">Arm</span><span class="o">.</span><span class="n">_is_autorelease_on</span><span class="p">):</span>
+            <span class="k">if</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_is_arm_moved_while_holding</span><span class="p">()):</span>
+                <span class="n">rospy</span><span class="o">.</span><span class="n">loginfo</span><span class="p">(</span><span class="s">&#39;Automatically releasing arm.&#39;</span><span class="p">)</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">set_mode</span><span class="p">(</span><span class="n">ArmMode</span><span class="o">.</span><span class="n">RELEASE</span><span class="p">)</span>
+
+            <span class="k">if</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_is_arm_stable_while_released</span><span class="p">()):</span>
+                <span class="n">rospy</span><span class="o">.</span><span class="n">loginfo</span><span class="p">(</span><span class="s">&#39;Automatically holding arm.&#39;</span><span class="p">)</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">set_mode</span><span class="p">(</span><span class="n">ArmMode</span><span class="o">.</span><span class="n">HOLD</span><span class="p">)</span>
+
+</pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+</div>
+</body>

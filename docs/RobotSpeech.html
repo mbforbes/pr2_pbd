@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta http-equiv="content-type" content="text/html;charset=utf-8">
+  <title>RobotSpeech.py</title>
+  <link rel="stylesheet" href="pycco.css">
+</head>
+<body>
+<div id="background"></div>
+<div id='container'>
+  <div class='section'>
+    <div class='docs'><h1>RobotSpeech.py</h1></div>
+  </div>
+  <div class='clearall'>
+  <div class='section' id='section-0'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-0'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre><span class="sd">&#39;&#39;&#39; Robot speech&#39;&#39;&#39;</span>
+<span class="kn">import</span> <span class="nn">roslib</span>
+<span class="n">roslib</span><span class="o">.</span><span class="n">load_manifest</span><span class="p">(</span><span class="s">&#39;pr2_pbd_interaction&#39;</span><span class="p">)</span>
+<span class="kn">import</span> <span class="nn">rospy</span>
+<span class="kn">from</span> <span class="nn">sound_play.msg</span> <span class="kn">import</span> <span class="n">SoundRequest</span>
+<span class="kn">from</span> <span class="nn">visualization_msgs.msg</span> <span class="kn">import</span> <span class="n">Marker</span>
+<span class="kn">from</span> <span class="nn">geometry_msgs.msg</span> <span class="kn">import</span> <span class="n">Quaternion</span><span class="p">,</span> <span class="n">Pose</span><span class="p">,</span> <span class="n">Point</span><span class="p">,</span> <span class="n">Vector3</span>
+<span class="kn">from</span> <span class="nn">std_msgs.msg</span> <span class="kn">import</span> <span class="n">Header</span><span class="p">,</span> <span class="n">ColorRGBA</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-1'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-1'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre><span class="k">class</span> <span class="nc">RobotSpeech</span><span class="p">:</span>
+    <span class="sd">&#39;&#39;&#39; The robot&#39;s speech responses &#39;&#39;&#39;</span>
+
+    <span class="n">TEST_RESPONSE</span> <span class="o">=</span> <span class="s">&#39;Microphone working.&#39;</span>
+    <span class="n">SKILL_CREATED</span> <span class="o">=</span> <span class="s">&#39;Created action&#39;</span>
+    <span class="n">RIGHT_ARM_RELEASED</span> <span class="o">=</span> <span class="s">&#39;Right arm relaxed&#39;</span>
+    <span class="n">RIGHT_ARM_HOLDING</span> <span class="o">=</span> <span class="s">&#39;Right arm frozen&#39;</span>
+    <span class="n">RIGHT_HAND_OPENING</span> <span class="o">=</span> <span class="s">&#39;Opening right hand&#39;</span>
+    <span class="n">RIGHT_HAND_CLOSING</span> <span class="o">=</span> <span class="s">&#39;Closing right hand&#39;</span>
+    <span class="n">LEFT_ARM_RELEASED</span> <span class="o">=</span> <span class="s">&#39;Left arm relaxed&#39;</span>
+    <span class="n">LEFT_ARM_HOLDING</span> <span class="o">=</span> <span class="s">&#39;Left arm frozen&#39;</span>
+    <span class="n">LEFT_HAND_OPENING</span> <span class="o">=</span> <span class="s">&#39;Opening left hand&#39;</span>
+    <span class="n">LEFT_HAND_CLOSING</span> <span class="o">=</span> <span class="s">&#39;Closing left hand&#39;</span>
+    <span class="n">STEP_RECORDED</span> <span class="o">=</span> <span class="s">&#39;Pose saved.&#39;</span>
+    <span class="n">POSE_DELETED</span> <span class="o">=</span> <span class="s">&#39;Last pose deleted&#39;</span>
+    <span class="n">POSE_RESUMED</span> <span class="o">=</span> <span class="s">&#39;Pose resumed&#39;</span>
+    <span class="n">DELETED_SKILL</span> <span class="o">=</span> <span class="s">&#39;Deleted action&#39;</span>
+    <span class="n">START_EXECUTION</span> <span class="o">=</span> <span class="s">&#39;Starting execution of action&#39;</span>
+    <span class="n">EXECUTION_ENDED</span> <span class="o">=</span> <span class="s">&#39;Execution ended&#39;</span>
+    <span class="n">SWITCH_SKILL</span> <span class="o">=</span> <span class="s">&#39;Switched to action&#39;</span>
+    <span class="n">SKILL_EMPTY</span> <span class="o">=</span> <span class="s">&#39;Skill has no poses to delete.&#39;</span>
+    <span class="n">EXECUTION_ERROR_NOIK</span> <span class="o">=</span> <span class="s">&#39;Cannot execute action&#39;</span>
+    <span class="n">EXECUTION_ERROR_NOPOSES</span> <span class="o">=</span> <span class="s">&#39;Not enough poses in action&#39;</span>
+    <span class="n">ERROR_NEXT_SKILL</span> <span class="o">=</span> <span class="s">&#39;No actions after action&#39;</span>
+    <span class="n">ERROR_PREV_SKILL</span> <span class="o">=</span> <span class="s">&#39;No actions before action&#39;</span>
+    <span class="n">ERROR_NO_SKILLS</span> <span class="o">=</span> <span class="s">&#39;No actions created yet.&#39;</span>
+    <span class="n">ERROR_NOTHING_TO_UNDO</span> <span class="o">=</span> <span class="s">&#39;There is nothing to undo.&#39;</span>
+    <span class="n">ERROR_NO_EXECUTION</span> <span class="o">=</span> <span class="s">&#39;No executions in progress.&#39;</span>
+    <span class="n">EXECUTION_PREEMPTED</span> <span class="o">=</span> <span class="s">&#39;Stopping execution.&#39;</span>
+    <span class="n">RIGHT_HAND_ALREADY_OPEN</span> <span class="o">=</span> <span class="s">&#39;Right hand is already open.&#39;</span>
+    <span class="n">LEFT_HAND_ALREADY_OPEN</span> <span class="o">=</span> <span class="s">&#39;Left hand is already open.&#39;</span>
+    <span class="n">RIGHT_HAND_ALREADY_CLOSED</span> <span class="o">=</span> <span class="s">&#39;Right hand is already closed.&#39;</span>
+    <span class="n">LEFT_HAND_ALREADY_CLOSED</span> <span class="o">=</span> <span class="s">&#39;Left hand is already closed.&#39;</span>
+    <span class="n">RIGHT_ARM_ALREADY_HOLDING</span> <span class="o">=</span> <span class="s">&#39;Right arm is already frozen.&#39;</span>
+    <span class="n">LEFT_ARM_ALREADY_HOLDING</span> <span class="o">=</span> <span class="s">&#39;Left arm is already frozen.&#39;</span>
+    <span class="n">RIGHT_ARM_ALREADY_RELEASED</span> <span class="o">=</span> <span class="s">&#39;Right arm is already relaxed.&#39;</span>
+    <span class="n">LEFT_ARM_ALREADY_RELEASED</span> <span class="o">=</span> <span class="s">&#39;Left arm is already relaxed.&#39;</span>
+    <span class="n">SKILL_CLEARED</span> <span class="o">=</span> <span class="s">&#39;All poses deleted.&#39;</span>
+    <span class="n">LAST_POSE_DELETED</span> <span class="o">=</span> <span class="s">&#39;Last pose deleted.&#39;</span>
+    <span class="n">ALL_POSES_RESUMED</span> <span class="o">=</span> <span class="s">&#39;All poses resumed.&#39;</span>
+    <span class="n">START_STATE_RECORDED</span> <span class="o">=</span> <span class="s">&#39;Start state recorded.&#39;</span>
+    <span class="n">OBJECT_NOT_DETECTED</span> <span class="o">=</span> <span class="s">&#39;No objects were detected.&#39;</span>
+    <span class="n">ACTION_SAVED</span> <span class="o">=</span> <span class="s">&#39;Saved Action &#39;</span>
+    <span class="n">ALREADY_EDITING</span> <span class="o">=</span> <span class="s">&#39;Already in editing mode.&#39;</span>
+    <span class="n">SWITCH_TO_EDIT_MODE</span> <span class="o">=</span> <span class="s">&#39;Switched to edit mode.&#39;</span>
+    <span class="n">ERROR_NOT_IN_EDIT</span> <span class="o">=</span> <span class="s">&#39; has been saved. Say, edit action, to make changes.&#39;</span>
+    <span class="n">ACTION_ALREADY_STARTED</span> <span class="o">=</span> <span class="p">(</span><span class="s">&#39;Action already started. &#39;</span> <span class="o">+</span>
+                             <span class="s">&#39;Say, delete all steps, to start over.&#39;</span><span class="p">)</span>
+    <span class="n">ALREADY_RECORDING_MOTION</span> <span class="o">=</span> <span class="s">&#39;Already recording motion.&#39;</span>
+    <span class="n">STARTED_RECORDING_MOTION</span> <span class="o">=</span> <span class="s">&#39;Started recording motion.&#39;</span>
+    <span class="n">STOPPED_RECORDING_MOTION</span> <span class="o">=</span> <span class="s">&#39;Stopped recording motion.&#39;</span>
+    <span class="n">MOTION_NOT_RECORDING</span> <span class="o">=</span> <span class="s">&#39;Not currently recording motion.&#39;</span>
+    <span class="n">STOPPING_EXECUTION</span> <span class="o">=</span> <span class="s">&#39;Execution stopped.&#39;</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-2'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-2'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">speech_publisher</span> <span class="o">=</span> <span class="n">rospy</span><span class="o">.</span><span class="n">Publisher</span><span class="p">(</span><span class="s">&#39;robotsound&#39;</span><span class="p">,</span> <span class="n">SoundRequest</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">marker_publisher</span> <span class="o">=</span> <span class="n">rospy</span><span class="o">.</span><span class="n">Publisher</span><span class="p">(</span><span class="s">&#39;visualization_marker&#39;</span><span class="p">,</span> <span class="n">Marker</span><span class="p">)</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-3'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-3'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="k">def</span> <span class="nf">say</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">text</span><span class="p">,</span> <span class="n">is_using_sounds</span><span class="o">=</span><span class="bp">False</span><span class="p">):</span>
+        <span class="sd">&#39;&#39;&#39; Send a TTS command&#39;&#39;&#39;</span>
+        <span class="k">if</span> <span class="p">(</span><span class="ow">not</span> <span class="n">is_using_sounds</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">speech_publisher</span><span class="o">.</span><span class="n">publish</span><span class="p">(</span><span class="n">SoundRequest</span><span class="p">(</span>
+                                        <span class="n">command</span><span class="o">=</span><span class="n">SoundRequest</span><span class="o">.</span><span class="n">SAY</span><span class="p">,</span> <span class="n">arg</span><span class="o">=</span><span class="n">text</span><span class="p">))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">say_in_rviz</span><span class="p">(</span><span class="n">text</span><span class="p">)</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-4'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-4'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="k">def</span> <span class="nf">say_in_rviz</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">text</span><span class="p">):</span>
+        <span class="sd">&#39;&#39;&#39; Visualizes the text that is uttered by the robot in rviz&#39;&#39;&#39;</span>
+        <span class="n">marker</span> <span class="o">=</span> <span class="n">Marker</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="n">Marker</span><span class="o">.</span><span class="n">TEXT_VIEW_FACING</span><span class="p">,</span> <span class="nb">id</span><span class="o">=</span><span class="mi">1000</span><span class="p">,</span>
+                   <span class="n">lifetime</span><span class="o">=</span><span class="n">rospy</span><span class="o">.</span><span class="n">Duration</span><span class="p">(</span><span class="mf">1.5</span><span class="p">),</span>
+                   <span class="n">pose</span><span class="o">=</span><span class="n">Pose</span><span class="p">(</span><span class="n">Point</span><span class="p">(</span><span class="mf">0.5</span><span class="p">,</span> <span class="mf">0.5</span><span class="p">,</span> <span class="mf">1.45</span><span class="p">),</span> <span class="n">Quaternion</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">)),</span>
+                   <span class="n">scale</span><span class="o">=</span><span class="n">Vector3</span><span class="p">(</span><span class="mf">0.06</span><span class="p">,</span> <span class="mf">0.06</span><span class="p">,</span> <span class="mf">0.06</span><span class="p">),</span>
+                   <span class="n">header</span><span class="o">=</span><span class="n">Header</span><span class="p">(</span><span class="n">frame_id</span><span class="o">=</span><span class="s">&#39;base_link&#39;</span><span class="p">),</span>
+                   <span class="n">color</span><span class="o">=</span><span class="n">ColorRGBA</span><span class="p">(</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.8</span><span class="p">),</span> <span class="n">text</span><span class="o">=</span><span class="n">text</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">marker_publisher</span><span class="o">.</span><span class="n">publish</span><span class="p">(</span><span class="n">marker</span><span class="p">)</span>
+
+</pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+</div>
+</body>

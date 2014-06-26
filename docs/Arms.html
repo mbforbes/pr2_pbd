@@ -1,0 +1,896 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta http-equiv="content-type" content="text/html;charset=utf-8">
+  <title>Arms.py</title>
+  <link rel="stylesheet" href="pycco.css">
+</head>
+<body>
+<div id="background"></div>
+<div id='container'>
+  <div class='section'>
+    <div class='docs'><h1>Arms.py</h1></div>
+  </div>
+  <div class='clearall'>
+  <div class='section' id='section-0'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-0'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre><span class="sd">&#39;&#39;&#39;Control of the two arms for action execution&#39;&#39;&#39;</span>
+<span class="kn">import</span> <span class="nn">roslib</span>
+<span class="n">roslib</span><span class="o">.</span><span class="n">load_manifest</span><span class="p">(</span><span class="s">&#39;pr2_pbd_interaction&#39;</span><span class="p">)</span>
+<span class="kn">import</span> <span class="nn">rospy</span>
+
+<span class="kn">import</span> <span class="nn">time</span>
+<span class="kn">import</span> <span class="nn">threading</span>
+<span class="kn">from</span> <span class="nn">pr2_pbd_interaction.msg</span> <span class="kn">import</span> <span class="n">ArmState</span><span class="p">,</span> <span class="n">GripperState</span>
+<span class="kn">from</span> <span class="nn">pr2_pbd_interaction.msg</span> <span class="kn">import</span> <span class="n">ActionStep</span><span class="p">,</span> <span class="n">Side</span>
+<span class="kn">from</span> <span class="nn">pr2_pbd_interaction.msg</span> <span class="kn">import</span> <span class="n">ExecutionStatus</span>
+<span class="kn">from</span> <span class="nn">pr2_social_gaze.msg</span> <span class="kn">import</span> <span class="n">GazeGoal</span>
+<span class="kn">from</span> <span class="nn">geometry_msgs.msg</span> <span class="kn">import</span> <span class="n">Pose</span><span class="p">,</span> <span class="n">Point</span>
+<span class="kn">from</span> <span class="nn">Response</span> <span class="kn">import</span> <span class="n">Response</span>
+<span class="kn">from</span> <span class="nn">World</span> <span class="kn">import</span> <span class="n">World</span>
+<span class="kn">from</span> <span class="nn">Arm</span> <span class="kn">import</span> <span class="n">Arm</span><span class="p">,</span> <span class="n">ArmMode</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-1'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-1'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre><span class="k">class</span> <span class="nc">Arms</span><span class="p">:</span>
+    <span class="sd">&#39;&#39;&#39;Class for things related to moving arms&#39;&#39;&#39;</span>
+    <span class="n">arms</span> <span class="o">=</span> <span class="p">[]</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-2'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-2'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">r_arm</span> <span class="o">=</span> <span class="n">Arm</span><span class="p">(</span><span class="n">Side</span><span class="o">.</span><span class="n">RIGHT</span><span class="p">)</span>
+        <span class="n">l_arm</span> <span class="o">=</span> <span class="n">Arm</span><span class="p">(</span><span class="n">Side</span><span class="o">.</span><span class="n">LEFT</span><span class="p">)</span>
+        <span class="n">Arms</span><span class="o">.</span><span class="n">arms</span> <span class="o">=</span> <span class="p">[</span><span class="n">r_arm</span><span class="p">,</span> <span class="n">l_arm</span><span class="p">]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">attended_arm</span> <span class="o">=</span> <span class="o">-</span><span class="mi">1</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">action</span> <span class="o">=</span> <span class="bp">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">preempt</span> <span class="o">=</span> <span class="bp">False</span>
+	<span class="bp">self</span><span class="o">.</span><span class="n">z_offset</span> <span class="o">=</span> <span class="mi">0</span>
+
+        <span class="n">rospy</span><span class="o">.</span><span class="n">loginfo</span><span class="p">(</span><span class="s">&#39;Arms have been initialized.&#39;</span><span class="p">)</span>
+
+        <span class="n">Arms</span><span class="o">.</span><span class="n">arms</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">set_mode</span><span class="p">(</span><span class="n">ArmMode</span><span class="o">.</span><span class="n">HOLD</span><span class="p">)</span>
+        <span class="n">Arms</span><span class="o">.</span><span class="n">arms</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">set_mode</span><span class="p">(</span><span class="n">ArmMode</span><span class="o">.</span><span class="n">HOLD</span><span class="p">)</span>
+        <span class="n">Arms</span><span class="o">.</span><span class="n">arms</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">check_gripper_state</span><span class="p">()</span>
+        <span class="n">Arms</span><span class="o">.</span><span class="n">arms</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">check_gripper_state</span><span class="p">()</span>
+        <span class="n">Arms</span><span class="o">.</span><span class="n">arms</span><span class="p">[</span><span class="n">Side</span><span class="o">.</span><span class="n">RIGHT</span><span class="p">]</span><span class="o">.</span><span class="n">close_gripper</span><span class="p">()</span>
+        <span class="n">Arms</span><span class="o">.</span><span class="n">arms</span><span class="p">[</span><span class="n">Side</span><span class="o">.</span><span class="n">LEFT</span><span class="p">]</span><span class="o">.</span><span class="n">close_gripper</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">status</span> <span class="o">=</span> <span class="n">ExecutionStatus</span><span class="o">.</span><span class="n">NOT_EXECUTING</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-3'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-3'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">set_arm_mode</span><span class="p">(</span><span class="n">arm_index</span><span class="p">,</span> <span class="n">mode</span><span class="p">):</span>
+        <span class="sd">&#39;&#39;&#39;Set arm to stiff or relaxed&#39;&#39;&#39;</span>
+        <span class="k">if</span> <span class="p">(</span><span class="n">mode</span> <span class="o">==</span> <span class="n">Arms</span><span class="o">.</span><span class="n">arms</span><span class="p">[</span><span class="n">arm_index</span><span class="p">]</span><span class="o">.</span><span class="n">arm_mode</span><span class="p">):</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-4'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-4'>#</a>
+      </div>
+      <p>Already in that mode</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>            <span class="k">return</span> <span class="bp">False</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">Arms</span><span class="o">.</span><span class="n">arms</span><span class="p">[</span><span class="n">arm_index</span><span class="p">]</span><span class="o">.</span><span class="n">set_mode</span><span class="p">(</span><span class="n">mode</span><span class="p">)</span>
+            <span class="k">return</span> <span class="bp">True</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-5'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-5'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">set_gripper_state</span><span class="p">(</span><span class="n">arm_index</span><span class="p">,</span> <span class="n">gripper_state</span><span class="p">):</span>
+        <span class="sd">&#39;&#39;&#39;Set gripper to open or closed&#39;&#39;&#39;</span>
+        <span class="k">if</span> <span class="p">(</span><span class="n">gripper_state</span> <span class="o">==</span> <span class="n">Arms</span><span class="o">.</span><span class="n">get_gripper_state</span><span class="p">(</span><span class="n">arm_index</span><span class="p">)):</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-6'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-6'>#</a>
+      </div>
+      <p>Already in that mode</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>            <span class="k">return</span> <span class="bp">False</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">if</span> <span class="p">(</span><span class="n">gripper_state</span> <span class="o">==</span> <span class="n">GripperState</span><span class="o">.</span><span class="n">OPEN</span><span class="p">):</span>
+                <span class="n">Arms</span><span class="o">.</span><span class="n">arms</span><span class="p">[</span><span class="n">arm_index</span><span class="p">]</span><span class="o">.</span><span class="n">open_gripper</span><span class="p">()</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">Arms</span><span class="o">.</span><span class="n">arms</span><span class="p">[</span><span class="n">arm_index</span><span class="p">]</span><span class="o">.</span><span class="n">close_gripper</span><span class="p">()</span>
+        <span class="k">return</span> <span class="bp">True</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-7'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-7'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="k">def</span> <span class="nf">is_executing</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&#39;&#39;&#39;Whether or not there is an ongoing action execution&#39;&#39;&#39;</span>
+        <span class="k">return</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">status</span> <span class="o">==</span> <span class="n">ExecutionStatus</span><span class="o">.</span><span class="n">EXECUTING</span><span class="p">)</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-8'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-8'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="k">def</span> <span class="nf">start_execution</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">action</span><span class="p">,</span> <span class="n">z_offset</span><span class="o">=</span><span class="mi">0</span><span class="p">):</span>
+        <span class="sd">&#39;&#39;&#39; Starts execution of an action&#39;&#39;&#39;</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-9'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-9'>#</a>
+      </div>
+      <p>This will take long, create a thread</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>        <span class="bp">self</span><span class="o">.</span><span class="n">action</span> <span class="o">=</span> <span class="n">action</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">preempt</span> <span class="o">=</span> <span class="bp">False</span>
+	<span class="bp">self</span><span class="o">.</span><span class="n">z_offset</span> <span class="o">=</span> <span class="n">z_offset</span>
+        <span class="n">thread</span> <span class="o">=</span> <span class="n">threading</span><span class="o">.</span><span class="n">Thread</span><span class="p">(</span><span class="n">group</span><span class="o">=</span><span class="bp">None</span><span class="p">,</span> <span class="n">target</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">execute_action</span><span class="p">,</span>
+                                  <span class="n">name</span><span class="o">=</span><span class="s">&#39;skill_execution_thread&#39;</span><span class="p">)</span>
+        <span class="n">thread</span><span class="o">.</span><span class="n">start</span><span class="p">()</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-10'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-10'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="k">def</span> <span class="nf">stop_execution</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&#39;&#39;&#39;Preempts an ongoing execution&#39;&#39;&#39;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">preempt</span> <span class="o">=</span> <span class="bp">True</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-11'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-11'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="k">def</span> <span class="nf">solve_ik_for_action</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&#39;&#39;&#39;Computes joint positions for all end-effector poses</span>
+<span class="sd">        in an action&#39;&#39;&#39;</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-12'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-12'>#</a>
+      </div>
+      <p>Go over steps of the action</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">action</span><span class="o">.</span><span class="n">n_frames</span><span class="p">()):</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-13'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-13'>#</a>
+      </div>
+      <p>For each step check step type
+If arm target action</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>            <span class="k">if</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">action</span><span class="o">.</span><span class="n">seq</span><span class="o">.</span><span class="n">seq</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">type</span> <span class="o">==</span> <span class="n">ActionStep</span><span class="o">.</span><span class="n">ARM_TARGET</span><span class="p">):</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-14'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-14'>#</a>
+      </div>
+      <p>Find frames that are relative and convert to absolute</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>                <span class="n">r_arm</span><span class="p">,</span> <span class="n">has_solution_r</span> <span class="o">=</span> <span class="n">Arms</span><span class="o">.</span><span class="n">solve_ik_for_arm</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span>
+                                        <span class="bp">self</span><span class="o">.</span><span class="n">action</span><span class="o">.</span><span class="n">seq</span><span class="o">.</span><span class="n">seq</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">armTarget</span><span class="o">.</span><span class="n">rArm</span><span class="p">,</span>
+					<span class="bp">self</span><span class="o">.</span><span class="n">z_offset</span><span class="p">)</span>
+                <span class="n">l_arm</span><span class="p">,</span> <span class="n">has_solution_l</span> <span class="o">=</span> <span class="n">Arms</span><span class="o">.</span><span class="n">solve_ik_for_arm</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span>
+                                        <span class="bp">self</span><span class="o">.</span><span class="n">action</span><span class="o">.</span><span class="n">seq</span><span class="o">.</span><span class="n">seq</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">armTarget</span><span class="o">.</span><span class="n">lArm</span><span class="p">,</span>
+					<span class="bp">self</span><span class="o">.</span><span class="n">z_offset</span><span class="p">)</span>
+
+                <span class="bp">self</span><span class="o">.</span><span class="n">action</span><span class="o">.</span><span class="n">seq</span><span class="o">.</span><span class="n">seq</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">armTarget</span><span class="o">.</span><span class="n">rArm</span> <span class="o">=</span> <span class="n">r_arm</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">action</span><span class="o">.</span><span class="n">seq</span><span class="o">.</span><span class="n">seq</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">armTarget</span><span class="o">.</span><span class="n">lArm</span> <span class="o">=</span> <span class="n">l_arm</span>
+                <span class="k">if</span> <span class="p">(</span><span class="ow">not</span> <span class="n">has_solution_r</span><span class="p">)</span> <span class="ow">or</span> <span class="p">(</span><span class="ow">not</span> <span class="n">has_solution_l</span><span class="p">):</span>
+                    <span class="k">return</span> <span class="bp">False</span>
+
+            <span class="k">if</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">action</span><span class="o">.</span><span class="n">seq</span><span class="o">.</span><span class="n">seq</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">type</span> <span class="o">==</span> <span class="n">ActionStep</span><span class="o">.</span><span class="n">ARM_TRAJECTORY</span><span class="p">):</span>
+                <span class="n">n_frames</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">action</span><span class="o">.</span><span class="n">seq</span><span class="o">.</span><span class="n">seq</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">armTrajectory</span><span class="o">.</span><span class="n">timing</span><span class="p">)</span>
+                <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">n_frames</span><span class="p">):</span>
+                    <span class="n">r_arm</span><span class="p">,</span> <span class="n">has_solution_r</span> <span class="o">=</span> <span class="n">Arms</span><span class="o">.</span><span class="n">solve_ik_for_arm</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span>
+                            <span class="bp">self</span><span class="o">.</span><span class="n">action</span><span class="o">.</span><span class="n">seq</span><span class="o">.</span><span class="n">seq</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">armTrajectory</span><span class="o">.</span><span class="n">r_arm</span><span class="p">[</span><span class="n">j</span><span class="p">],</span>
+			    <span class="bp">self</span><span class="o">.</span><span class="n">z_offset</span><span class="p">)</span>
+                    <span class="n">l_arm</span><span class="p">,</span> <span class="n">has_solution_l</span> <span class="o">=</span> <span class="n">Arms</span><span class="o">.</span><span class="n">solve_ik_for_arm</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span>
+                            <span class="bp">self</span><span class="o">.</span><span class="n">action</span><span class="o">.</span><span class="n">seq</span><span class="o">.</span><span class="n">seq</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">armTrajectory</span><span class="o">.</span><span class="n">l_arm</span><span class="p">[</span><span class="n">j</span><span class="p">],</span>
+			    <span class="bp">self</span><span class="o">.</span><span class="n">z_offset</span><span class="p">)</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">action</span><span class="o">.</span><span class="n">seq</span><span class="o">.</span><span class="n">seq</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">armTrajectory</span><span class="o">.</span><span class="n">r_arm</span><span class="p">[</span><span class="n">j</span><span class="p">]</span> <span class="o">=</span> <span class="n">r_arm</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">action</span><span class="o">.</span><span class="n">seq</span><span class="o">.</span><span class="n">seq</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">armTrajectory</span><span class="o">.</span><span class="n">l_arm</span><span class="p">[</span><span class="n">j</span><span class="p">]</span> <span class="o">=</span> <span class="n">l_arm</span>
+                    <span class="k">if</span> <span class="p">(</span><span class="ow">not</span> <span class="n">has_solution_r</span><span class="p">)</span> <span class="ow">or</span> <span class="p">(</span><span class="ow">not</span> <span class="n">has_solution_l</span><span class="p">):</span>
+                        <span class="k">return</span> <span class="bp">False</span>
+        <span class="k">return</span> <span class="bp">True</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-15'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-15'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">solve_ik_for_arm</span><span class="p">(</span><span class="n">arm_index</span><span class="p">,</span> <span class="n">arm_state</span><span class="p">,</span> <span class="n">z_offset</span><span class="o">=</span><span class="mi">0</span><span class="p">):</span>
+        <span class="sd">&#39;&#39;&#39;Finds an  IK solution for a particular arm pose&#39;&#39;&#39;</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-16'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-16'>#</a>
+      </div>
+      <p>We need to find IK only if the frame is relative to an object</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>        <span class="k">if</span> <span class="p">(</span><span class="n">arm_state</span><span class="o">.</span><span class="n">refFrame</span> <span class="o">==</span> <span class="n">ArmState</span><span class="o">.</span><span class="n">OBJECT</span><span class="p">):</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-17'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-17'>#</a>
+      </div>
+      <p>rospy.loginfo('solve_ik_for_arm: Arm ' + str(arm_index) + ' is relative')</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>            <span class="n">solution</span> <span class="o">=</span> <span class="n">ArmState</span><span class="p">()</span>
+            <span class="n">target_pose</span> <span class="o">=</span> <span class="n">World</span><span class="o">.</span><span class="n">transform</span><span class="p">(</span><span class="n">arm_state</span><span class="o">.</span><span class="n">ee_pose</span><span class="p">,</span>
+                            <span class="n">arm_state</span><span class="o">.</span><span class="n">refFrameObject</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="s">&#39;base_link&#39;</span><span class="p">)</span>
+
+	    <span class="n">target_pose</span><span class="o">.</span><span class="n">position</span><span class="o">.</span><span class="n">z</span> <span class="o">=</span> <span class="n">target_pose</span><span class="o">.</span><span class="n">position</span><span class="o">.</span><span class="n">z</span> <span class="o">+</span> <span class="n">z_offset</span>
+
+            <span class="n">target_joints</span> <span class="o">=</span> <span class="n">Arms</span><span class="o">.</span><span class="n">arms</span><span class="p">[</span><span class="n">arm_index</span><span class="p">]</span><span class="o">.</span><span class="n">get_ik_for_ee</span><span class="p">(</span><span class="n">target_pose</span><span class="p">,</span>
+                                            <span class="n">arm_state</span><span class="o">.</span><span class="n">joint_pose</span><span class="p">)</span>
+            <span class="k">if</span> <span class="p">(</span><span class="n">target_joints</span> <span class="o">==</span> <span class="bp">None</span><span class="p">):</span>
+                <span class="n">rospy</span><span class="o">.</span><span class="n">logerr</span><span class="p">(</span><span class="s">&#39;No IK for relative end-effector pose.&#39;</span><span class="p">)</span>
+                <span class="k">return</span> <span class="n">solution</span><span class="p">,</span> <span class="bp">False</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">solution</span><span class="o">.</span><span class="n">refFrame</span> <span class="o">=</span> <span class="n">ArmState</span><span class="o">.</span><span class="n">ROBOT_BASE</span>
+                <span class="n">solution</span><span class="o">.</span><span class="n">ee_pose</span> <span class="o">=</span> <span class="n">Pose</span><span class="p">(</span><span class="n">target_pose</span><span class="o">.</span><span class="n">position</span><span class="p">,</span>
+                                        <span class="n">target_pose</span><span class="o">.</span><span class="n">orientation</span><span class="p">)</span>
+                <span class="n">solution</span><span class="o">.</span><span class="n">joint_pose</span> <span class="o">=</span> <span class="n">target_joints</span>
+                <span class="k">return</span> <span class="n">solution</span><span class="p">,</span> <span class="bp">True</span>
+        <span class="k">elif</span> <span class="p">(</span><span class="n">arm_state</span><span class="o">.</span><span class="n">refFrame</span> <span class="o">==</span> <span class="n">ArmState</span><span class="o">.</span><span class="n">ROBOT_BASE</span><span class="p">):</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-18'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-18'>#</a>
+      </div>
+      <p>rospy.loginfo('solve_ik_for_arm: Arm ' + str(arm_index) + ' is absolute')</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>	    <span class="n">pos</span> <span class="o">=</span> <span class="n">arm_state</span><span class="o">.</span><span class="n">ee_pose</span><span class="o">.</span><span class="n">position</span>
+	    <span class="n">target_position</span> <span class="o">=</span> <span class="n">Point</span><span class="p">(</span><span class="n">pos</span><span class="o">.</span><span class="n">x</span><span class="p">,</span> <span class="n">pos</span><span class="o">.</span><span class="n">y</span><span class="p">,</span> <span class="n">pos</span><span class="o">.</span><span class="n">z</span> <span class="o">+</span> <span class="n">z_offset</span><span class="p">)</span>
+	    <span class="n">target_pose</span> <span class="o">=</span> <span class="n">Pose</span><span class="p">(</span><span class="n">target_position</span><span class="p">,</span> <span class="n">arm_state</span><span class="o">.</span><span class="n">ee_pose</span><span class="o">.</span><span class="n">orientation</span><span class="p">)</span>
+            <span class="n">target_joints</span> <span class="o">=</span> <span class="n">Arms</span><span class="o">.</span><span class="n">arms</span><span class="p">[</span><span class="n">arm_index</span><span class="p">]</span><span class="o">.</span><span class="n">get_ik_for_ee</span><span class="p">(</span><span class="n">target_pose</span><span class="p">,</span>
+                                                    <span class="n">arm_state</span><span class="o">.</span><span class="n">joint_pose</span><span class="p">)</span>
+            <span class="k">if</span> <span class="p">(</span><span class="n">target_joints</span> <span class="o">==</span> <span class="bp">None</span><span class="p">):</span>
+                <span class="n">rospy</span><span class="o">.</span><span class="n">logerr</span><span class="p">(</span><span class="s">&#39;No IK for absolute end-effector pose.&#39;</span><span class="p">)</span>
+                <span class="k">return</span> <span class="n">arm_state</span><span class="p">,</span> <span class="bp">False</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">solution</span> <span class="o">=</span> <span class="n">ArmState</span><span class="p">()</span>
+                <span class="n">solution</span><span class="o">.</span><span class="n">refFrame</span> <span class="o">=</span> <span class="n">ArmState</span><span class="o">.</span><span class="n">ROBOT_BASE</span>
+                <span class="n">solution</span><span class="o">.</span><span class="n">ee_pose</span> <span class="o">=</span> <span class="n">Pose</span><span class="p">(</span><span class="n">arm_state</span><span class="o">.</span><span class="n">ee_pose</span><span class="o">.</span><span class="n">position</span><span class="p">,</span>
+                                        <span class="n">arm_state</span><span class="o">.</span><span class="n">ee_pose</span><span class="o">.</span><span class="n">orientation</span><span class="p">)</span>
+                <span class="n">solution</span><span class="o">.</span><span class="n">joint_pose</span> <span class="o">=</span> <span class="n">target_joints</span>
+                <span class="k">return</span> <span class="n">solution</span><span class="p">,</span> <span class="bp">True</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">arm_state</span><span class="p">,</span> <span class="bp">True</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-19'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-19'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">is_condition_met</span><span class="p">(</span><span class="n">dummy</span><span class="p">):</span>
+        <span class="sd">&#39;&#39;&#39; Checks if the given precondition is currently met&#39;&#39;&#39;</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-20'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-20'>#</a>
+      </div>
+      <p>TO-DO</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>        <span class="k">return</span> <span class="bp">True</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-21'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-21'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="k">def</span> <span class="nf">start_move_to_pose</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">arm_state</span><span class="p">,</span> <span class="n">arm_index</span><span class="p">):</span>
+        <span class="sd">&#39;&#39;&#39;Creates a thread for moving to a target pose&#39;&#39;&#39;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">preempt</span> <span class="o">=</span> <span class="bp">False</span>
+        <span class="n">thread</span> <span class="o">=</span> <span class="n">threading</span><span class="o">.</span><span class="n">Thread</span><span class="p">(</span><span class="n">group</span><span class="o">=</span><span class="bp">None</span><span class="p">,</span> <span class="n">target</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">move_to_pose</span><span class="p">,</span>
+                    <span class="n">args</span><span class="o">=</span><span class="p">(</span><span class="n">arm_state</span><span class="p">,</span> <span class="n">arm_index</span><span class="p">,),</span>
+                    <span class="n">name</span><span class="o">=</span><span class="s">&#39;move_to_arm_state_thread&#39;</span><span class="p">)</span>
+        <span class="n">thread</span><span class="o">.</span><span class="n">start</span><span class="p">()</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-22'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-22'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="k">def</span> <span class="nf">move_to_pose</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">arm_state</span><span class="p">,</span> <span class="n">arm_index</span><span class="p">):</span>
+        <span class="sd">&#39;&#39;&#39;The thread function that makes the arm move to</span>
+<span class="sd">        a target end-effector pose&#39;&#39;&#39;</span>
+        <span class="n">rospy</span><span class="o">.</span><span class="n">loginfo</span><span class="p">(</span><span class="s">&#39;Started thread to move arm &#39;</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="n">arm_index</span><span class="p">))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">status</span> <span class="o">=</span> <span class="n">ExecutionStatus</span><span class="o">.</span><span class="n">EXECUTING</span>
+        <span class="n">solution</span><span class="p">,</span> <span class="n">has_solution</span> <span class="o">=</span> <span class="n">Arms</span><span class="o">.</span><span class="n">solve_ik_for_arm</span><span class="p">(</span><span class="n">arm_index</span><span class="p">,</span> <span class="n">arm_state</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="p">(</span><span class="n">has_solution</span><span class="p">):</span>
+            <span class="k">if</span> <span class="p">(</span><span class="n">arm_index</span> <span class="o">==</span> <span class="mi">0</span><span class="p">):</span>
+                <span class="n">is_successful</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">move_to_joints</span><span class="p">(</span><span class="n">solution</span><span class="p">,</span> <span class="bp">None</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">is_successful</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">move_to_joints</span><span class="p">(</span><span class="bp">None</span><span class="p">,</span> <span class="n">solution</span><span class="p">)</span>
+
+            <span class="k">if</span> <span class="p">(</span><span class="n">is_successful</span><span class="p">):</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">status</span> <span class="o">=</span> <span class="n">ExecutionStatus</span><span class="o">.</span><span class="n">SUCCEEDED</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">status</span> <span class="o">=</span> <span class="n">ExecutionStatus</span><span class="o">.</span><span class="n">OBSTRUCTED</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">status</span> <span class="o">=</span> <span class="n">ExecutionStatus</span><span class="o">.</span><span class="n">NO_IK</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-23'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-23'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="k">def</span> <span class="nf">execute_action</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&#39;&#39;&#39; Function to replay the demonstrated two-arm action</span>
+<span class="sd">        of type ProgrammedAction&#39;&#39;&#39;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">status</span> <span class="o">=</span> <span class="n">ExecutionStatus</span><span class="o">.</span><span class="n">EXECUTING</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-24'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-24'>#</a>
+      </div>
+      <p>Check if the very first precondition is met</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>        <span class="n">action_step</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">action</span><span class="o">.</span><span class="n">get_step</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+        <span class="k">if</span> <span class="p">(</span><span class="ow">not</span> <span class="n">Arms</span><span class="o">.</span><span class="n">is_condition_met</span><span class="p">(</span><span class="n">action_step</span><span class="o">.</span><span class="n">preCond</span><span class="p">)):</span>
+            <span class="n">rospy</span><span class="o">.</span><span class="n">logwarn</span><span class="p">(</span><span class="s">&#39;First precond is not met, first make sure &#39;</span> <span class="o">+</span>
+                          <span class="s">&#39;the robot is ready to execute action &#39;</span> <span class="o">+</span>
+                          <span class="s">&#39;(hand object or free hands).&#39;</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">status</span> <span class="o">=</span> <span class="n">ExecutionStatus</span><span class="o">.</span><span class="n">CONDITION_ERROR</span>
+        <span class="k">else</span><span class="p">:</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-25'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-25'>#</a>
+      </div>
+      <p>Check that all parts of the action are reachable</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>            <span class="k">if</span> <span class="p">(</span><span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">solve_ik_for_action</span><span class="p">()):</span>
+                <span class="n">rospy</span><span class="o">.</span><span class="n">logwarn</span><span class="p">(</span><span class="s">&#39;Problems in finding IK solutions...&#39;</span><span class="p">)</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">status</span> <span class="o">=</span> <span class="n">ExecutionStatus</span><span class="o">.</span><span class="n">NO_IK</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">Arms</span><span class="o">.</span><span class="n">set_arm_mode</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">ArmMode</span><span class="o">.</span><span class="n">HOLD</span><span class="p">)</span>
+                <span class="n">Arms</span><span class="o">.</span><span class="n">set_arm_mode</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">ArmMode</span><span class="o">.</span><span class="n">HOLD</span><span class="p">)</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_loop_through_action_steps</span><span class="p">()</span>
+
+            <span class="n">Arms</span><span class="o">.</span><span class="n">arms</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">reset_movement_history</span><span class="p">()</span>
+            <span class="n">Arms</span><span class="o">.</span><span class="n">arms</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">reset_movement_history</span><span class="p">()</span>
+
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">status</span> <span class="o">==</span> <span class="n">ExecutionStatus</span><span class="o">.</span><span class="n">EXECUTING</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">status</span> <span class="o">=</span> <span class="n">ExecutionStatus</span><span class="o">.</span><span class="n">SUCCEEDED</span>
+                <span class="n">rospy</span><span class="o">.</span><span class="n">loginfo</span><span class="p">(</span><span class="s">&#39;Skill execution has succeeded.&#39;</span><span class="p">)</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-26'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-26'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="k">def</span> <span class="nf">_loop_through_action_steps</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&#39;&#39;&#39; Goes through the steps of the current action&#39;&#39;&#39;</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-27'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-27'>#</a>
+      </div>
+      <p>Go over steps of the action</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">action</span><span class="o">.</span><span class="n">n_frames</span><span class="p">()):</span>
+            <span class="n">rospy</span><span class="o">.</span><span class="n">loginfo</span><span class="p">(</span><span class="s">&#39;Executing step &#39;</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="n">i</span><span class="p">))</span>
+            <span class="n">action_step</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">action</span><span class="o">.</span><span class="n">get_step</span><span class="p">(</span><span class="n">i</span><span class="p">)</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-28'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-28'>#</a>
+      </div>
+      <p>Check that preconditions are met</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>            <span class="k">if</span> <span class="p">(</span><span class="ow">not</span> <span class="n">Arms</span><span class="o">.</span><span class="n">is_condition_met</span><span class="p">(</span><span class="n">action_step</span><span class="o">.</span><span class="n">preCond</span><span class="p">)):</span>
+                <span class="n">rospy</span><span class="o">.</span><span class="n">logwarn</span><span class="p">(</span><span class="s">&#39;Preconditions of action step &#39;</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="n">i</span><span class="p">)</span> <span class="o">+</span>
+                              <span class="s">&#39; are not satisfied. Aborting.&#39;</span><span class="p">)</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">status</span> <span class="o">=</span> <span class="n">ExecutionStatus</span><span class="o">.</span><span class="n">PREEMPTED</span>
+                <span class="k">break</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">if</span> <span class="p">(</span><span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_execute_action_step</span><span class="p">(</span><span class="n">action_step</span><span class="p">)):</span>
+                    <span class="k">break</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-29'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-29'>#</a>
+      </div>
+      <p>Check that postconditions are met</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>                <span class="k">if</span> <span class="p">(</span><span class="n">Arms</span><span class="o">.</span><span class="n">is_condition_met</span><span class="p">(</span><span class="n">action_step</span><span class="o">.</span><span class="n">postCond</span><span class="p">)):</span>
+                    <span class="n">rospy</span><span class="o">.</span><span class="n">loginfo</span><span class="p">(</span><span class="s">&#39;Post-conditions of the action are met.&#39;</span><span class="p">)</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="n">rospy</span><span class="o">.</span><span class="n">logwarn</span><span class="p">(</span><span class="s">&#39;Post-conditions of action step &#39;</span> <span class="o">+</span>
+                                  <span class="nb">str</span><span class="p">(</span><span class="n">i</span><span class="p">)</span> <span class="o">+</span> <span class="s">&#39; are not satisfied. Aborting.&#39;</span><span class="p">)</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">status</span> <span class="o">=</span> <span class="n">ExecutionStatus</span><span class="o">.</span><span class="n">PREEMPTED</span>
+                    <span class="k">break</span>
+
+            <span class="k">if</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">preempt</span><span class="p">):</span>
+                <span class="n">rospy</span><span class="o">.</span><span class="n">logwarn</span><span class="p">(</span><span class="s">&#39;Execution preempted by user.&#39;</span><span class="p">)</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">status</span> <span class="o">=</span> <span class="n">ExecutionStatus</span><span class="o">.</span><span class="n">PREEMPTED</span>
+                <span class="k">break</span>
+
+            <span class="n">rospy</span><span class="o">.</span><span class="n">loginfo</span><span class="p">(</span><span class="s">&#39;Step &#39;</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="n">i</span><span class="p">)</span> <span class="o">+</span> <span class="s">&#39; of action is complete.&#39;</span><span class="p">)</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-30'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-30'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="k">def</span> <span class="nf">_execute_action_step</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">action_step</span><span class="p">):</span>
+        <span class="sd">&#39;&#39;&#39;Executes the motion part of an action step&#39;&#39;&#39;</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-31'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-31'>#</a>
+      </div>
+      <p>For each step check step type
+If arm target action</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>        <span class="k">if</span> <span class="p">(</span><span class="n">action_step</span><span class="o">.</span><span class="n">type</span> <span class="o">==</span> <span class="n">ActionStep</span><span class="o">.</span><span class="n">ARM_TARGET</span><span class="p">):</span>
+            <span class="n">rospy</span><span class="o">.</span><span class="n">loginfo</span><span class="p">(</span><span class="s">&#39;Will perform arm target action step.&#39;</span><span class="p">)</span>
+
+            <span class="k">if</span> <span class="p">(</span><span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">move_to_joints</span><span class="p">(</span><span class="n">action_step</span><span class="o">.</span><span class="n">armTarget</span><span class="o">.</span><span class="n">rArm</span><span class="p">,</span>
+                                        <span class="n">action_step</span><span class="o">.</span><span class="n">armTarget</span><span class="o">.</span><span class="n">lArm</span><span class="p">)):</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">status</span> <span class="o">=</span> <span class="n">ExecutionStatus</span><span class="o">.</span><span class="n">OBSTRUCTED</span>
+                <span class="k">return</span> <span class="bp">False</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-32'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-32'>#</a>
+      </div>
+      <p>If arm trajectory action</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>        <span class="k">elif</span> <span class="p">(</span><span class="n">action_step</span><span class="o">.</span><span class="n">type</span> <span class="o">==</span> <span class="n">ActionStep</span><span class="o">.</span><span class="n">ARM_TRAJECTORY</span><span class="p">):</span>
+
+            <span class="n">rospy</span><span class="o">.</span><span class="n">loginfo</span><span class="p">(</span><span class="s">&#39;Will perform arm trajectory action step.&#39;</span><span class="p">)</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-33'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-33'>#</a>
+      </div>
+      <p>First move to the start frame</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>            <span class="k">if</span> <span class="p">(</span><span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">move_to_joints</span><span class="p">(</span><span class="n">action_step</span><span class="o">.</span><span class="n">armTrajectory</span><span class="o">.</span><span class="n">r_arm</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span>
+                                        <span class="n">action_step</span><span class="o">.</span><span class="n">armTrajectory</span><span class="o">.</span><span class="n">l_arm</span><span class="p">[</span><span class="mi">0</span><span class="p">])):</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">status</span> <span class="o">=</span> <span class="n">ExecutionStatus</span><span class="o">.</span><span class="n">OBSTRUCTED</span>
+                <span class="k">return</span> <span class="bp">False</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-34'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-34'>#</a>
+      </div>
+      <p>Then execute the trajectory</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>            <span class="n">Arms</span><span class="o">.</span><span class="n">arms</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">exectute_joint_traj</span><span class="p">(</span><span class="n">action_step</span><span class="o">.</span><span class="n">armTrajectory</span><span class="o">.</span><span class="n">r_arm</span><span class="p">,</span>
+                                             <span class="n">action_step</span><span class="o">.</span><span class="n">armTrajectory</span><span class="o">.</span><span class="n">timing</span><span class="p">)</span>
+            <span class="n">Arms</span><span class="o">.</span><span class="n">arms</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">exectute_joint_traj</span><span class="p">(</span><span class="n">action_step</span><span class="o">.</span><span class="n">armTrajectory</span><span class="o">.</span><span class="n">l_arm</span><span class="p">,</span>
+                                             <span class="n">action_step</span><span class="o">.</span><span class="n">armTrajectory</span><span class="o">.</span><span class="n">timing</span><span class="p">)</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-35'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-35'>#</a>
+      </div>
+      <p>Wait until both arms complete the trajectory</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>            <span class="k">while</span><span class="p">((</span><span class="n">Arms</span><span class="o">.</span><span class="n">arms</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">is_executing</span><span class="p">()</span> <span class="ow">or</span> <span class="n">Arms</span><span class="o">.</span><span class="n">arms</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">is_executing</span><span class="p">())</span>
+                  <span class="ow">and</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">preempt</span><span class="p">):</span>
+                <span class="n">time</span><span class="o">.</span><span class="n">sleep</span><span class="p">(</span><span class="mf">0.01</span><span class="p">)</span>
+            <span class="n">rospy</span><span class="o">.</span><span class="n">loginfo</span><span class="p">(</span><span class="s">&#39;Trajectory complete.&#39;</span><span class="p">)</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-36'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-36'>#</a>
+      </div>
+      <p>Verify that both arms succeeded</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>            <span class="k">if</span> <span class="p">((</span><span class="ow">not</span> <span class="n">Arms</span><span class="o">.</span><span class="n">arms</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">is_successful</span><span class="p">())</span> <span class="ow">or</span>
+                <span class="p">(</span><span class="ow">not</span> <span class="n">Arms</span><span class="o">.</span><span class="n">arms</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">is_successful</span><span class="p">())):</span>
+                <span class="n">rospy</span><span class="o">.</span><span class="n">logwarn</span><span class="p">(</span><span class="s">&#39;Aborting execution; &#39;</span> <span class="o">+</span>
+                              <span class="s">&#39;arms failed to follow trajectory.&#39;</span><span class="p">)</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">status</span> <span class="o">=</span> <span class="n">ExecutionStatus</span><span class="o">.</span><span class="n">OBSTRUCTED</span>
+                <span class="k">return</span> <span class="bp">False</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-37'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-37'>#</a>
+      </div>
+      <p>If hand action do it for both sides</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>        <span class="k">if</span> <span class="p">(</span><span class="n">action_step</span><span class="o">.</span><span class="n">gripperAction</span><span class="o">.</span><span class="n">rGripper</span> <span class="o">!=</span>
+                            <span class="n">Arms</span><span class="o">.</span><span class="n">arms</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">get_gripper_state</span><span class="p">()):</span>
+            <span class="n">rospy</span><span class="o">.</span><span class="n">loginfo</span><span class="p">(</span><span class="s">&#39;Will perform right gripper action &#39;</span> <span class="o">+</span>
+                          <span class="nb">str</span><span class="p">(</span><span class="n">action_step</span><span class="o">.</span><span class="n">gripperAction</span><span class="o">.</span><span class="n">rGripper</span><span class="p">))</span>
+            <span class="n">Arms</span><span class="o">.</span><span class="n">arms</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">set_gripper</span><span class="p">(</span><span class="n">action_step</span><span class="o">.</span><span class="n">gripperAction</span><span class="o">.</span><span class="n">rGripper</span><span class="p">)</span>
+            <span class="n">Response</span><span class="o">.</span><span class="n">perform_gaze_action</span><span class="p">(</span><span class="n">GazeGoal</span><span class="o">.</span><span class="n">FOLLOW_RIGHT_EE</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="p">(</span><span class="n">action_step</span><span class="o">.</span><span class="n">gripperAction</span><span class="o">.</span><span class="n">lGripper</span> <span class="o">!=</span>
+                            <span class="n">Arms</span><span class="o">.</span><span class="n">arms</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">get_gripper_state</span><span class="p">()):</span>
+            <span class="n">rospy</span><span class="o">.</span><span class="n">loginfo</span><span class="p">(</span><span class="s">&#39;Will perform LEFT gripper action &#39;</span> <span class="o">+</span>
+                          <span class="nb">str</span><span class="p">(</span><span class="n">action_step</span><span class="o">.</span><span class="n">gripperAction</span><span class="o">.</span><span class="n">lGripper</span><span class="p">))</span>
+            <span class="n">Arms</span><span class="o">.</span><span class="n">arms</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">set_gripper</span><span class="p">(</span><span class="n">action_step</span><span class="o">.</span><span class="n">gripperAction</span><span class="o">.</span><span class="n">lGripper</span><span class="p">)</span>
+            <span class="n">Response</span><span class="o">.</span><span class="n">perform_gaze_action</span><span class="p">(</span><span class="n">GazeGoal</span><span class="o">.</span><span class="n">FOLLOW_LEFT_EE</span><span class="p">)</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-38'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-38'>#</a>
+      </div>
+      <p>Wait for grippers to be done</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>        <span class="k">while</span><span class="p">(</span><span class="n">Arms</span><span class="o">.</span><span class="n">arms</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">is_gripper_moving</span><span class="p">()</span> <span class="ow">or</span>
+              <span class="n">Arms</span><span class="o">.</span><span class="n">arms</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">is_gripper_moving</span><span class="p">()):</span>
+            <span class="n">time</span><span class="o">.</span><span class="n">sleep</span><span class="p">(</span><span class="mf">0.01</span><span class="p">)</span>
+        <span class="n">rospy</span><span class="o">.</span><span class="n">loginfo</span><span class="p">(</span><span class="s">&#39;Hands done moving.&#39;</span><span class="p">)</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-39'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-39'>#</a>
+      </div>
+      <p>Verify that both grippers succeeded</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>        <span class="k">if</span> <span class="p">((</span><span class="ow">not</span> <span class="n">Arms</span><span class="o">.</span><span class="n">arms</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">is_gripper_at_goal</span><span class="p">())</span> <span class="ow">or</span>
+            <span class="p">(</span><span class="ow">not</span> <span class="n">Arms</span><span class="o">.</span><span class="n">arms</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">is_gripper_at_goal</span><span class="p">())):</span>
+            <span class="n">rospy</span><span class="o">.</span><span class="n">logwarn</span><span class="p">(</span><span class="s">&#39;Hand(s) did not fully close or open!&#39;</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="bp">True</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-40'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-40'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">_get_time_to_pose</span><span class="p">(</span><span class="n">pose</span><span class="p">,</span> <span class="n">arm_index</span><span class="p">):</span>
+        <span class="sd">&#39;&#39;&#39; Returns the time to get to an arm pose&#39;&#39;&#39;</span>
+        <span class="k">if</span> <span class="p">(</span><span class="n">pose</span> <span class="o">==</span> <span class="bp">None</span><span class="p">):</span>
+            <span class="n">rospy</span><span class="o">.</span><span class="n">logwarn</span><span class="p">(</span><span class="s">&#39;Arm &#39;</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="n">arm_index</span><span class="p">)</span> <span class="o">+</span> <span class="s">&#39;will not move.&#39;</span><span class="p">)</span>
+            <span class="k">return</span> <span class="bp">None</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">time_to_pose</span> <span class="o">=</span> <span class="n">Arms</span><span class="o">.</span><span class="n">_get_time_bw_poses</span><span class="p">(</span>
+                            <span class="n">Arms</span><span class="o">.</span><span class="n">arms</span><span class="p">[</span><span class="n">arm_index</span><span class="p">]</span><span class="o">.</span><span class="n">get_ee_state</span><span class="p">(),</span>
+                            <span class="n">pose</span><span class="o">.</span><span class="n">ee_pose</span><span class="p">)</span>
+            <span class="n">rospy</span><span class="o">.</span><span class="n">loginfo</span><span class="p">(</span><span class="s">&#39;Duration until next frame for arm &#39;</span> <span class="o">+</span>
+                          <span class="nb">str</span><span class="p">(</span><span class="n">arm_index</span><span class="p">)</span> <span class="o">+</span> <span class="s">&#39;: &#39;</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="n">time_to_pose</span><span class="p">))</span>
+            <span class="k">return</span> <span class="n">time_to_pose</span>
+
+    <span class="k">def</span> <span class="nf">move_to_joints</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">r_arm</span><span class="p">,</span> <span class="n">l_arm</span><span class="p">):</span>
+        <span class="sd">&#39;&#39;&#39;Makes the arms move to indicated joint poses&#39;&#39;&#39;</span>
+        <span class="n">time_to_r_pose</span> <span class="o">=</span> <span class="n">Arms</span><span class="o">.</span><span class="n">_get_time_to_pose</span><span class="p">(</span><span class="n">r_arm</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+        <span class="n">time_to_l_pose</span> <span class="o">=</span> <span class="n">Arms</span><span class="o">.</span><span class="n">_get_time_to_pose</span><span class="p">(</span><span class="n">l_arm</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-41'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-41'>#</a>
+      </div>
+      <p>If both arms are moving adjust velocities and find most moving arm</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>        <span class="n">is_r_moving</span> <span class="o">=</span> <span class="p">(</span><span class="n">time_to_r_pose</span> <span class="o">!=</span> <span class="bp">None</span><span class="p">)</span>
+        <span class="n">is_l_moving</span> <span class="o">=</span> <span class="p">(</span><span class="n">time_to_l_pose</span> <span class="o">!=</span> <span class="bp">None</span><span class="p">)</span>
+        <span class="k">if</span> <span class="p">(</span><span class="ow">not</span> <span class="n">is_r_moving</span><span class="p">):</span>
+            <span class="n">Response</span><span class="o">.</span><span class="n">look_at_point</span><span class="p">(</span><span class="n">l_arm</span><span class="o">.</span><span class="n">ee_pose</span><span class="o">.</span><span class="n">position</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="p">(</span><span class="ow">not</span> <span class="n">is_l_moving</span><span class="p">):</span>
+            <span class="n">Response</span><span class="o">.</span><span class="n">look_at_point</span><span class="p">(</span><span class="n">r_arm</span><span class="o">.</span><span class="n">ee_pose</span><span class="o">.</span><span class="n">position</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">if</span> <span class="p">(</span><span class="n">time_to_r_pose</span> <span class="o">&gt;</span> <span class="n">time_to_l_pose</span><span class="p">):</span>
+                <span class="n">time_to_l_pose</span> <span class="o">=</span> <span class="n">time_to_r_pose</span>
+                <span class="n">Response</span><span class="o">.</span><span class="n">look_at_point</span><span class="p">(</span><span class="n">r_arm</span><span class="o">.</span><span class="n">ee_pose</span><span class="o">.</span><span class="n">position</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">time_to_r_pose</span> <span class="o">=</span> <span class="n">time_to_l_pose</span>
+                <span class="n">Response</span><span class="o">.</span><span class="n">look_at_point</span><span class="p">(</span><span class="n">l_arm</span><span class="o">.</span><span class="n">ee_pose</span><span class="o">.</span><span class="n">position</span><span class="p">)</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-42'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-42'>#</a>
+      </div>
+      <p>Move arms to target</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>        <span class="k">if</span> <span class="p">(</span><span class="n">is_r_moving</span><span class="p">):</span>
+            <span class="n">Arms</span><span class="o">.</span><span class="n">arms</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">move_to_joints</span><span class="p">(</span><span class="n">r_arm</span><span class="o">.</span><span class="n">joint_pose</span><span class="p">,</span> <span class="n">time_to_r_pose</span><span class="p">)</span>
+        <span class="k">if</span> <span class="p">(</span><span class="n">is_l_moving</span><span class="p">):</span>
+            <span class="n">Arms</span><span class="o">.</span><span class="n">arms</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">move_to_joints</span><span class="p">(</span><span class="n">l_arm</span><span class="o">.</span><span class="n">joint_pose</span><span class="p">,</span> <span class="n">time_to_l_pose</span><span class="p">)</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-43'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-43'>#</a>
+      </div>
+      <p>Wait until both arms complete the trajectory</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>        <span class="k">while</span><span class="p">((</span><span class="n">Arms</span><span class="o">.</span><span class="n">arms</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">is_executing</span><span class="p">()</span> <span class="ow">or</span>
+               <span class="n">Arms</span><span class="o">.</span><span class="n">arms</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">is_executing</span><span class="p">())</span> <span class="ow">and</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">preempt</span><span class="p">):</span>
+            <span class="n">time</span><span class="o">.</span><span class="n">sleep</span><span class="p">(</span><span class="mf">0.01</span><span class="p">)</span>
+        <span class="n">rospy</span><span class="o">.</span><span class="n">loginfo</span><span class="p">(</span><span class="s">&#39;Arms reached target.&#39;</span><span class="p">)</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-44'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-44'>#</a>
+      </div>
+      <p>Verify that both arms succeeded</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>        <span class="k">if</span> <span class="p">((</span><span class="ow">not</span> <span class="n">Arms</span><span class="o">.</span><span class="n">arms</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">is_successful</span><span class="p">()</span> <span class="ow">and</span> <span class="n">is_r_moving</span><span class="p">)</span> <span class="ow">or</span>
+            <span class="p">(</span><span class="ow">not</span> <span class="n">Arms</span><span class="o">.</span><span class="n">arms</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">is_successful</span><span class="p">()</span> <span class="ow">and</span> <span class="n">is_l_moving</span><span class="p">)):</span>
+            <span class="n">rospy</span><span class="o">.</span><span class="n">logwarn</span><span class="p">(</span><span class="s">&#39;Aborting because arms failed to move to pose.&#39;</span><span class="p">)</span>
+            <span class="k">return</span> <span class="bp">False</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">True</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-45'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-45'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">_get_most_moving_arm</span><span class="p">():</span>
+        <span class="sd">&#39;&#39;&#39;Determines which of the two arms has moved more</span>
+<span class="sd">        in the recent past&#39;&#39;&#39;</span>
+        <span class="n">threshold</span> <span class="o">=</span> <span class="mf">0.02</span>
+        <span class="k">if</span> <span class="p">(</span><span class="n">Arms</span><span class="o">.</span><span class="n">arms</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">get_movement</span><span class="p">()</span> <span class="o">&lt;</span> <span class="n">threshold</span> <span class="ow">and</span>
+            <span class="n">Arms</span><span class="o">.</span><span class="n">arms</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">get_movement</span><span class="p">()</span> <span class="o">&lt;</span> <span class="n">threshold</span><span class="p">):</span>
+            <span class="k">return</span> <span class="o">-</span><span class="mi">1</span>
+        <span class="k">elif</span> <span class="p">(</span><span class="n">Arms</span><span class="o">.</span><span class="n">arms</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">get_movement</span><span class="p">()</span> <span class="o">&lt;</span> <span class="n">threshold</span><span class="p">):</span>
+            <span class="k">return</span> <span class="mi">1</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">return</span> <span class="mi">0</span>
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">get_joint_state</span><span class="p">(</span><span class="n">arm_index</span><span class="p">):</span>
+        <span class="sd">&#39;&#39;&#39;Get joint poritions&#39;&#39;&#39;</span>
+        <span class="k">return</span> <span class="n">Arms</span><span class="o">.</span><span class="n">arms</span><span class="p">[</span><span class="n">arm_index</span><span class="p">]</span><span class="o">.</span><span class="n">get_joint_state</span><span class="p">()</span>
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">get_gripper_state</span><span class="p">(</span><span class="n">arm_index</span><span class="p">):</span>
+        <span class="sd">&#39;&#39;&#39; Get gripper status on the indicated side&#39;&#39;&#39;</span>
+        <span class="k">return</span> <span class="n">Arms</span><span class="o">.</span><span class="n">arms</span><span class="p">[</span><span class="n">arm_index</span><span class="p">]</span><span class="o">.</span><span class="n">get_gripper_state</span><span class="p">()</span>
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">get_ee_state</span><span class="p">(</span><span class="n">arm_index</span><span class="p">):</span>
+        <span class="sd">&#39;&#39;&#39; Get pose of the end-effector on the indicated side&#39;&#39;&#39;</span>
+        <span class="k">return</span> <span class="n">Arms</span><span class="o">.</span><span class="n">arms</span><span class="p">[</span><span class="n">arm_index</span><span class="p">]</span><span class="o">.</span><span class="n">get_ee_state</span><span class="p">()</span>
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">_get_time_bw_poses</span><span class="p">(</span><span class="n">pose0</span><span class="p">,</span> <span class="n">pose1</span><span class="p">,</span> <span class="n">velocity</span><span class="o">=</span><span class="mf">0.2</span><span class="p">):</span>
+        <span class="sd">&#39;&#39;&#39;Determines how much time should be allowed for</span>
+<span class="sd">        moving between two poses&#39;&#39;&#39;</span>
+        <span class="n">dist</span> <span class="o">=</span> <span class="n">Arm</span><span class="o">.</span><span class="n">get_distance_bw_poses</span><span class="p">(</span><span class="n">pose0</span><span class="p">,</span> <span class="n">pose1</span><span class="p">)</span>
+        <span class="n">duration</span> <span class="o">=</span> <span class="n">dist</span> <span class="o">/</span> <span class="n">velocity</span>
+        <span class="k">if</span> <span class="n">duration</span> <span class="o">&lt;</span> <span class="mf">0.5</span><span class="p">:</span>
+            <span class="n">duration</span> <span class="o">=</span> <span class="mf">0.5</span>
+        <span class="k">return</span> <span class="n">duration</span>
+
+    <span class="k">def</span> <span class="nf">update</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&#39;&#39;&#39;Periodic update for the two arms&#39;&#39;&#39;</span>
+        <span class="n">Arms</span><span class="o">.</span><span class="n">arms</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">is_executing</span><span class="p">())</span>
+        <span class="n">Arms</span><span class="o">.</span><span class="n">arms</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">is_executing</span><span class="p">())</span>
+
+        <span class="n">moving_arm</span> <span class="o">=</span> <span class="n">Arms</span><span class="o">.</span><span class="n">_get_most_moving_arm</span><span class="p">()</span>
+        <span class="k">if</span> <span class="p">(</span><span class="n">moving_arm</span> <span class="o">!=</span> <span class="bp">self</span><span class="o">.</span><span class="n">attended_arm</span> <span class="ow">and</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">is_executing</span><span class="p">()):</span>
+            <span class="k">if</span> <span class="p">(</span><span class="n">moving_arm</span> <span class="o">==</span> <span class="o">-</span><span class="mi">1</span><span class="p">):</span>
+                <span class="n">Response</span><span class="o">.</span><span class="n">perform_gaze_action</span><span class="p">(</span><span class="n">GazeGoal</span><span class="o">.</span><span class="n">LOOK_FORWARD</span><span class="p">)</span>
+            <span class="k">elif</span> <span class="p">(</span><span class="n">moving_arm</span> <span class="o">==</span> <span class="mi">0</span><span class="p">):</span>
+                <span class="n">Response</span><span class="o">.</span><span class="n">perform_gaze_action</span><span class="p">(</span><span class="n">GazeGoal</span><span class="o">.</span><span class="n">FOLLOW_RIGHT_EE</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">Response</span><span class="o">.</span><span class="n">perform_gaze_action</span><span class="p">(</span><span class="n">GazeGoal</span><span class="o">.</span><span class="n">FOLLOW_LEFT_EE</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">attended_arm</span> <span class="o">=</span> <span class="n">moving_arm</span>
+
+</pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+</div>
+</body>
