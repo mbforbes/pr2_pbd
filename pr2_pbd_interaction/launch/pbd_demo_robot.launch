@@ -4,7 +4,7 @@
   <arg name="isReload" value="False" />
   <arg name="dataRoot" value="$(env HOME)" />
   <arg name="experimentNumber" value="3" />
-  <arg name="sim" value="true" />
+  <arg name="sim" default="false" />
 
   <!-- This runs the interactive manipulation -->
 
