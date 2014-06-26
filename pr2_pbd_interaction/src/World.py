@@ -37,13 +37,14 @@ from Response import Response
 class WorldObject:
     '''Class for representing objects'''
 
-    def __init__(self, pose, index, dimensions, is_recognized):
-        ''' Initialization of objects'''
+    def __init__(self, pose, index, dimensions, is_recognized,
+            graspableObject=None):
         self.index = index
         self.assigned_name = None
         self.is_recognized = is_recognized
         self.object = Object(Object.TABLE_TOP, self.get_name(),
                              pose, dimensions)
+        self.graspableObject = graspableObject
         self.menu_handler = MenuHandler()
         self.int_marker = None
         self.is_removed = False
@@ -289,7 +290,7 @@ class World:
 
             n_objects = len(World.objects)
             World.objects.append(WorldObject(pose, n_objects,
-                                            dimensions, is_recognized))
+                    dimensions, is_recognized, graspableObject))
             int_marker = self._get_object_marker(len(World.objects) - 1, mesh)
             World.objects[-1].int_marker = int_marker
             self._im_server.insert(int_marker, self.marker_feedback_cb)
@@ -308,7 +309,7 @@ class World:
 
             n_objects = len(World.objects)
             World.objects.append(WorldObject(pose, n_objects,
-                                            dimensions, is_recognized))
+                    dimensions, is_recognized, graspableObject))
             int_marker = self._get_object_marker(len(World.objects) - 1)
             World.objects[-1].int_marker = int_marker
             self._im_server.insert(int_marker, self.marker_feedback_cb)

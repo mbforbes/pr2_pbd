@@ -1,13 +1,24 @@
 '''Main interaction loop'''
 
+# Must go first
 import roslib
 roslib.load_manifest('pr2_pbd_interaction')
-
-# Generic libraries
 import rospy
-import time
-from visualization_msgs.msg import MarkerArray
+
+# Generic ROS libraries
+import actionlib
 from geometry_msgs.msg import Quaternion, Vector3, Point, Pose
+from visualization_msgs.msg import MarkerArray
+
+# Generic builtin libraries
+import time
+
+# ROS packages
+#from object_manipulation_msgs.msg import GraspableObject # may not need
+from pr2_object_manipulation_msgs.msg import IMGUIAction
+from pr2_object_manipulation_msgs.msg import IMGUIActionGoal, IMGUIActionResult
+from pr2_object_manipulation_msgs.msg import IMGUIGoal, IMGUIOptions
+from pr2_object_manipulation_msgs.msg import IMGUICommand, IMGUIAdvancedOptions
 
 # Local stuff
 from World import World
@@ -42,6 +53,15 @@ class Interaction:
 
         rospy.Subscriber('recognized_command', Command, self.speech_command_cb)
         rospy.Subscriber('gui_command', GuiCommand, self.gui_command_cb)
+
+        # New: for doing automatic grasping.
+        self.im_gui_action_client = actionlib.SimpleActionClient(
+            'imgui_action',  # namespace
+            IMGUIAction  # action message type
+        )
+        rospy.loginfo('Waiting for im_gui_action server...')
+        self.im_gui_action_client.wait_for_server()
+        rospy.loginfo('Got response from im_gui_action server.')
 
         self._undo_function = None
 
@@ -549,89 +569,143 @@ class Interaction:
 
         self.arms.status = ExecutionStatus.NOT_EXECUTING
 
+    def _pickup_obj_hack(self, obj):
+        '''Poor-man's grasping; just go above centroid, down, close,
+        grasp, up.'''
+        # Settings
+        arm_index = 0 # right arm: 0, left arm: 1
+
+        # Open hand
+        self.open_hand(arm_index)
+
+        # Get location
+        objname = obj.name
+        rospy.loginfo('Object ' + objname + ' at: ' +
+            str(obj.pose))
+
+        # Start of grasping data
+        # -----------------------------------------------------
+        #  refFrame: 0
+        # ee_pose:
+        #   position:
+        #     x: 0.722373452614
+        #     y: -0.0157659750775
+        #     z: 1.14839023874
+        #   orientation:
+        #     x: -0.69987504269
+        #     y: -0.0289561889715
+        #     z: 0.712701230833
+        #     w: -0.0373285320999
+        # joint_pose: [  0.20002106  -0.35347237  -3.04645402  -0.52702965  31.31729613
+        #   -1.41955357   0.15604402]
+        # refFrameObject:
+        #   type: 0
+        #   name: ''
+        #   pose:
+        #     position:
+        #       x: 0.0
+        #       y: 0.0
+        #       z: 0.0
+        #     orientation:
+        #       x: 0.0
+        #       y: 0.0
+        #       z: 0.0
+        #       w: 0.0
+        #   dimensions:
+        #     x: 0.0
+        #     y: 0.0
+        #     z: 0.0
+
+        # Go to above object
+        rospy.loginfo('Elevating arm.')
+        arm_state = ArmState(
+            0,
+            Pose(
+                Point(0.722373452614, -0.0157659750775,
+                    1.14839023874),
+                Quaternion(-0.69987504269, -0.0289561889715,
+                    0.712701230833, -0.0373285320999)
+            ),
+            [0.20002106, -0.35347237, -3.04645402, -0.52702965,
+                31.31729613, -1.41955357, 0.15604402],
+            Object(0,'', Pose(Point(),Quaternion()), Vector3())
+        )
+        self.arms.start_move_to_pose(arm_state, arm_index)
+
+        # NOTE(max): Would need to do the above synchronously for this
+        # to really work.
+
+        # Go to object
+        rospy.loginfo('Moving arm to: ' + objname)
+        arm_state = ArmState(0,
+            obj.pose,
+            [],
+            Object(0, '', Pose(), Vector3())
+        )
+        self.arms.start_move_to_pose(arm_state, arm_index)
+
+        # Close hand
+        rospy.loginfo('Closing hand')
+        self.close_hand(arm_index)
+
     def record_object_pose(self, dummy=None):
         '''Makes the robot look for a table and objects'''
         if (self.world.update_object_pose()):
+            # NOTE(max): Only doing something if we've made an action!
             if (self.session.n_actions() > 0):
                 self.session.get_current_action().update_objects(
-                                            self.world.get_frame_list())
-                # # TODO Find pose
-                objs = self.world.get_frame_list()
-                rospy.loginfo('Number of objects found: ' + str(len(objs)))
+                        self.world.get_frame_list())
+                objs = World.objects
                 if len(objs) > 0:
-                    # Settings
-                    arm_index = 0 # right arm: 0, left arm: 1
+                    # Old method: poor man's (hack) pick up.
+                    # objs = self.world.get_frame_list()
+                    # rospy.loginfo('Number of objects found: ' + str(len(objs)))
+                    # self._pickup_obj_hack(objs[0].object)
 
-                    # Open hand
-                    self.open_hand(arm_index)
+                    # New method: try built-in grasping from
+                    # pr2_object_manipulation folks.
 
-                    # Get location
-                    obj = objs[0]
-                    objname = obj.name
-                    rospy.loginfo('Object ' + objname + ' at: ' +
-                        str(obj.pose))
-
-                    # Start of grasping data
-                    # -----------------------------------------------------
-                    #  refFrame: 0
-                    # ee_pose:
-                    #   position:
-                    #     x: 0.722373452614
-                    #     y: -0.0157659750775
-                    #     z: 1.14839023874
-                    #   orientation:
-                    #     x: -0.69987504269
-                    #     y: -0.0289561889715
-                    #     z: 0.712701230833
-                    #     w: -0.0373285320999
-                    # joint_pose: [  0.20002106  -0.35347237  -3.04645402  -0.52702965  31.31729613
-                    #   -1.41955357   0.15604402]
-                    # refFrameObject:
-                    #   type: 0
-                    #   name: ''
-                    #   pose:
-                    #     position:
-                    #       x: 0.0
-                    #       y: 0.0
-                    #       z: 0.0
-                    #     orientation:
-                    #       x: 0.0
-                    #       y: 0.0
-                    #       z: 0.0
-                    #       w: 0.0
-                    #   dimensions:
-                    #     x: 0.0
-                    #     y: 0.0
-                    #     z: 0.0
-
-                    # Go to above object
-                    rospy.loginfo('Elevating arm.')
-                    arm_state = ArmState(
-                        0,
-                        Pose(
-                            Point(0.722373452614, -0.0157659750775,
-                                1.14839023874),
-                            Quaternion(-0.69987504269, -0.0289561889715,
-                                0.712701230833, -0.0373285320999)
-                        ),
-                        [0.20002106, -0.35347237, -3.04645402, -0.52702965,
-                            31.31729613, -1.41955357, 0.15604402],
-                        Object(0,'', Pose(Point(),Quaternion()), Vector3())
+                    # See the following for documentation of these
+                    # objects (and links to their spec).
+                    # https://docs.google.com/document/d/
+                    #     10Pqi5M2aKWgubR7UMSLoYJhApbD3fhWq-9C7yrxvdpA/
+                    #     edit#
+                    adv_opt = IMGUIAdvancedOptions(
+                        False,  # reactive_grasping
+                        False,  # reactive_force
+                        False,  # reactive_place
+                        10,  # lift_steps
+                        10,  # retreat_steps
+                        0,  # lift_direction_choice
+                        0,  # desired_approach
+                        0,  # min_approach
+                        0.0,  # max_contact_force # TODO(max): 30?
+                        False,  # find_alternatives
+                        False,  # always_plan_grasps
+                        False  # cycle_gripper_opening
                     )
-                    self.arms.start_move_to_pose(arm_state, arm_index)
-
-                    # Go to object
-                    rospy.loginfo('Moving arm to: ' + objname)
-                    arm_state = ArmState(0,
-                        obj.pose,
-                        [],
-                        Object(0, '', Pose(), Vector3())
+                    opts = IMGUIOptions(
+                        True,  # collision_checked
+                        1,  # grasp_selection (0 grip click, 1 provided)
+                        0,  # arm_selection (0 right, 1 left)
+                        0,  # reset_choice (reset: 0 collision, 1 attached)
+                        0,  # arm_action_choice (0 side, 1 front, 2 side handoff)
+                        0,  # arm_planner_choice (0 open-loop, 1 w/ planner)
+                        0,  # gripper_slider_position (0=closed...100=open)
+                        objs[0].graspableObject,  # selected_object
+                        [],  # moveable_obstacles
+                        adv_opt  # adv_options
                     )
-                    self.arms.start_move_to_pose(arm_state, arm_index)
-
-                    # Close hand
-                    rospy.loginfo('Closing hand')
-                    self.close_hand(arm_index)
+                    cmd = IMGUICommand(
+                        0,  # 0 pickup, 1 place, 2 planned move, etc.
+                        '',  # script_name
+                        ''  # script_group_name
+                    )
+                    goal = IMGUIGoal(opts, cmd)
+                    rospy.loginfo('Sending pickup goal')
+                    self.im_gui_action_client.send_goal(goal)
+                else:
+                    rospy.loginfo('No objects to pick up.')
 
             return [RobotSpeech.START_STATE_RECORDED, GazeGoal.NOD]
         else:
