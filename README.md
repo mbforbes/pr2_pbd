@@ -77,11 +77,11 @@ There is a lot of code in PbD that is
 
 I think profiling is the first step just to see what can be cleaned up and perhaps get a vauge handle to what's taking the most time.
 
-## branch: documentation
-### Purpose
+### branch: documentation
+#### Purpose
 Experiment with documentation tools.
 
-### Description
+#### Description
 I'm primarily trying
 - Sphinx
 	- By default, you need to write a bunch of separate documentation, and then this renders it nicely. You can use [autodoc](http://sphinx-doc.org/ext/autodoc.html) to automatically include docstrings, but it doesn't seem 'out-of-the-box' usable (you still need to write .rst files).
