@@ -37,13 +37,14 @@ from Response import Response
 class WorldObject:
     '''Class for representing objects'''
 
-    def __init__(self, pose, index, dimensions, is_recognized):
-        ''' Initialization of objects'''
+    def __init__(self, pose, index, dimensions, is_recognized,
+            graspableObject=None):
         self.index = index
         self.assigned_name = None
         self.is_recognized = is_recognized
         self.object = Object(Object.TABLE_TOP, self.get_name(),
                              pose, dimensions)
+        self.graspableObject = graspableObject
         self.menu_handler = MenuHandler()
         self.int_marker = None
         self.is_removed = False
@@ -139,7 +140,11 @@ class World:
                 self._im_server.applyChanges()
 
     def receive_object_info(self, object_list):
-        '''Callback function to receive object info'''
+        '''Callback function to receive object info.
+
+        Args:
+            object_list (GraspableObjectList)
+        '''
         self._lock.acquire()
         rospy.loginfo('Received recognized object list.')
         if (len(object_list.graspable_objects) > 0):
@@ -155,10 +160,12 @@ class World:
                     if (object_pose != None):
                         rospy.logwarn('Adding the recognized object ' +
                                       'with most confident model.')
-                        self._add_new_object(object_pose, # pose
-                            Vector3(0.2, 0.2, 0.2), # dimensions
-                            True, # is_recognized
-                            object_list.meshes[i]) # mesh
+                        self._add_new_object(
+                            object_pose,
+                            Vector3(0.2, 0.2, 0.2),
+                            True,
+                            object_list.meshes[i],
+                            object_list.graspable_objects[i])
                 else:
                     rospy.logwarn('... this is not a recognition result, ' +
                                   'it is probably just segmentation.')
@@ -166,13 +173,15 @@ class World:
                     bbox = self._bb_service(cluster)
                     cluster_pose = bbox.pose.pose
                     if (cluster_pose != None):
-                        rospy.loginfo('Adding unrecognized object with\n' +
-                            '- pose: ' + World.pose_to_string(cluster_pose) +
-                            '- dimensions: ' + str(bbox.box_dims) + 
-                            '- in ref frame: ' + str(bbox.pose.header.frame_id))
-                        self._add_new_object(cluster_pose, # pose
-                            bbox.box_dims, # dimensions
-                            False) # is_recognized
+                        rospy.loginfo('Adding unrecognized object with pose:' +
+                            World.pose_to_string(cluster_pose) + '\n' +
+                            'In ref frame' + str(bbox.pose.header.frame_id))
+                        self._add_new_object(
+                            cluster_pose,
+                            bbox.box_dims,
+                            False,
+                            None,
+                            object_list.graspable_objects[i])
         else:
             rospy.logwarn('... but the list was empty.')
         self._lock.release()
@@ -251,7 +260,8 @@ class World:
                 break
         return marker
 
-    def _add_new_object(self, pose, dimensions, is_recognized, mesh=None):
+    def _add_new_object(self, pose, dimensions, is_recognized, mesh=None,
+            graspableObject=None):
         '''Function to add new objects'''
         dist_threshold = 0.02
         to_remove = None
@@ -280,7 +290,7 @@ class World:
 
             n_objects = len(World.objects)
             World.objects.append(WorldObject(pose, n_objects,
-                                            dimensions, is_recognized))
+                    dimensions, is_recognized, graspableObject))
             int_marker = self._get_object_marker(len(World.objects) - 1, mesh)
             World.objects[-1].int_marker = int_marker
             self._im_server.insert(int_marker, self.marker_feedback_cb)
@@ -299,7 +309,7 @@ class World:
 
             n_objects = len(World.objects)
             World.objects.append(WorldObject(pose, n_objects,
-                                            dimensions, is_recognized))
+                    dimensions, is_recognized, graspableObject))
             int_marker = self._get_object_marker(len(World.objects) - 1)
             World.objects[-1].int_marker = int_marker
             self._im_server.insert(int_marker, self.marker_feedback_cb)

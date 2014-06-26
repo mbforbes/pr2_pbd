@@ -21,14 +21,15 @@
   <depend package="pr2_gripper_sensor_msgs"/>
   <depend package="pr2_interactive_manipulation"/>
   <depend package="pr2_interactive_manipulation_frontend"/>
-  <depend package="rviz"/>
   <depend package="pr2_interactive_object_detection"/>
   <depend package="pr2_mechanism_controllers"/>
   <depend package="pr2_mechanism_msgs"/>
+  <depend package="pr2_object_manipulation_msgs"/>
   <depend package="pr2_pbd_speech_recognition"/>
   <depend package="pr2_social_gaze"/>
   <depend package="rospy"/>
   <depend package="rqt_gui"/>
+  <depend package="rviz"/>
   <depend package="sound_play"/>
   <depend package="std_msgs"/>
   <depend package="tabletop_collision_map_processing"/>

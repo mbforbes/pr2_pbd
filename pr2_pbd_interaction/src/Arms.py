@@ -265,7 +265,7 @@ class Arms:
 
             # NOTE(max) Vomiting (for fun).
             r_state = action_step.armTarget.rArm
-            rospy.logwarn('')
+            rospy.logwarn('' + ('-' * 80))
             rospy.logwarn('r_state:')
             rospy.logwarn(str(r_state))
             rospy.logwarn(str(r_state.ee_pose))
