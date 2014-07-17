@@ -19,12 +19,15 @@ branches:
         - style
         - tests
         - headless
-# Before anything, set up the system as we need it. The main things
-# we're doing here are:
-# - remove mongoDB incompatibilities (Travis-CI specific)
-# - install nvidia & X11 things (specific for running Gazebo headless)
+# Before anything, set up the system as we need it.
 before_install:
+# Remove mongoDB incompatibilities (Travis-CI specific)
     - sudo apt-get --purge remove mongodb-10gen
+# Update package list and install new versions.
+    - sudo apt-get update
+    - sudo apt-get upgrade
+# Install nvidia & X11 things (specific for running Gazebo headless)
+    - yes | sudo apt-get install -y linux-headers-`uname -r`
     - yes | sudo apt-get install -y pciutils
     - yes | sudo apt-get install -y lsof
     - yes | sudo apt-get install -y gnome-session
@@ -40,9 +43,6 @@ before_install:
 # Commands to install dependencies
 # --------------------------------
 install:
-# Update package list and install new versions.
-    - sudo apt-get update
-    - sudo apt-get upgrade
 # First, move code to correct place. Also Travis-CI specific.
     - mkdir -p ~/rosbuild_ws
     - cd ..; mv pr2_pbd ~/rosbuild_ws/
