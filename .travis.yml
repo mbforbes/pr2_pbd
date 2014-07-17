@@ -27,7 +27,7 @@ before_install:
     - sudo apt-get update
     - sudo apt-get upgrade
 # Install nvidia & X11 things (specific for running Gazebo headless)
-    - yes | sudo apt-get install -y linux-headers-`uname -r`
+    - yes | sudo apt-get install -y linux-headers-`uname -r | awk -Fs '{print $1}'`
     - yes | sudo apt-get install -y pciutils
     - yes | sudo apt-get install -y lsof
     - yes | sudo apt-get install -y gnome-session
