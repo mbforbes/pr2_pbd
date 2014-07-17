@@ -19,12 +19,24 @@ branches:
         - style
         - tests
         - headless
-# Before anything, see if we can get the mongoDB troubles out of the way.
-# Note that this is a Travis-CI specific problem; this is not needed in
-# general.
+# Before anything, set up the system as we need it. The main things
+# we're doing here are:
+# - remove mongoDB incompatibilities (Travis-CI specific)
+# - install nvidia & X11 things (specific for running Gazebo headless)
 before_install:
-    - yes | sudo apt-get -y install $(< x_packages.txt)
     - sudo apt-get --purge remove mongodb-10gen
+    - yes | sudo apt-get install -y linux-headers-`uname -r`
+    - yes | sudo apt-get install -y pciutils
+    - yes | sudo apt-get install -y lsof
+    - yes | sudo apt-get install -y gnome-session
+    - yes | sudo apt-get install -y gnome-session-fallback
+    - yes | sudo apt-get install -y xserver-xorg-core
+    - yes | sudo apt-get install -y xserver-xorg
+    - yes | sudo apt-get install -y mesa-utils
+    - yes | sudo apt-get install -y lightdm
+    - yes | sudo apt-get install -y x11-xserver-utils
+    - export BUS=`nvidia-xconfig --query-gpu-info | grep BusID | head -n 1 | sed 's/PCI BusID : PCI:/PCI:/'`
+    - nvidia-xconfig --use-display-device=None --virtual=1280x1024 --busid $BUS
 
 # Commands to install dependencies
 # --------------------------------
