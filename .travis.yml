@@ -26,7 +26,7 @@ before_install:
 # Update package list and install new versions.
     - sudo apt-get update
     - sudo apt-get upgrade
-# Install nvidia & X11 things (specific for running Gazebo headless)
+# Install X11 things, setup lightdm (specific for running Gazebo headless)
     - yes | sudo apt-get install -y pciutils
     - yes | sudo apt-get install -y lsof
     - yes | sudo apt-get install -y gnome-session
@@ -36,8 +36,9 @@ before_install:
     - yes | sudo apt-get install -y mesa-utils
     - yes | sudo apt-get install -y lightdm
     - yes | sudo apt-get install -y x11-xserver-utils
-    - export BUS=`nvidia-xconfig --query-gpu-info | grep BusID | head -n 1 | sed 's/PCI BusID : PCI:/PCI:/'`
-    - nvidia-xconfig --use-display-device=None --virtual=1280x1024 --busid $BUS
+    - cat .travis_config/lightdm.conf | sudo tee /etc/lightdm/lightdm.conf
+    - initctl stop lightdm || true
+    - initctl start lightdm
 
 # Commands to install dependencies
 # --------------------------------
@@ -78,11 +79,12 @@ install:
 # Command to run tests
 # --------------------
 script:
-# Real tests: crash because of Gazebo bugs
-#    - roslaunch pr2_pbd_interaction simulated_robot.launch gui:=false
 # Debug: trying to just run gazebo's table object launch (Gazebo bugs)
-#    - rostest pr2_pbd_interaction test_endtoend.test
+#    - roslaunch pr2_pbd_interaction simulated_robot.launch gui:=false
+# Run Gazebo headless with DISPLAY=:0
+    - export DISPLAY=:0
+    - rostest pr2_pbd_interaction test_endtoend.test
 # Linter: last resort to getting *something* useful to run on Travis :-)
 # NOTE(mbforbes): Add more files to this as they're completed.
-    - roscd pr2_pbd_interaction
-    - pep8 src/interaction.py src/session.py src/arm.py src/arms.py src/action_step_marker.py test/test_endtoend.py
+    # - roscd pr2_pbd_interaction
+    # - pep8 src/interaction.py src/session.py src/arm.py src/arms.py src/action_step_marker.py test/test_endtoend.py
