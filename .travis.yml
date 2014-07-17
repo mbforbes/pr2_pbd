@@ -37,8 +37,8 @@ before_install:
     - yes | sudo apt-get install -y lightdm
     - yes | sudo apt-get install -y x11-xserver-utils
     - cat .travis_config/lightdm.conf | sudo tee /etc/lightdm/lightdm.conf
-    - initctl stop lightdm || true
-    - initctl start lightdm
+    - sudo initctl stop lightdm || true
+    - sudo initctl start lightdm
 
 # Commands to install dependencies
 # --------------------------------
