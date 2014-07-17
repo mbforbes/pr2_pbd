@@ -40,7 +40,7 @@ before_install:
 # Nvidia (stop lightdm before proceeding...)
     - sudo initctl stop lightdm || true
     - yes | sudo apt-get install nvidia-current
-    - nvidia-xconfig --use-display-device=None --virtual=1280x1024 --busid `nvidia-xconfig --query-gpu-info | grep BusID | head -n 1 | sed 's/PCI BusID : PCI:/PCI:/'`
+#    - nvidia-xconfig --use-display-device=None --virtual=1280x1024 --busid `nvidia-xconfig --query-gpu-info | grep BusID | head -n 1 | sed 's/PCI BusID : PCI:/PCI:/'`
 # Lighdm defaults / startup
     - cat .travis_config/lightdm.conf | sudo tee /etc/lightdm/lightdm.conf
     - sudo initctl stop lightdm || true
