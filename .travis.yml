@@ -25,7 +25,6 @@ branches:
 # - install nvidia & X11 things (specific for running Gazebo headless)
 before_install:
     - sudo apt-get --purge remove mongodb-10gen
-    - yes | sudo apt-get install -y linux-headers-`uname -r | awk -F- '{print $1}'`
     - yes | sudo apt-get install -y pciutils
     - yes | sudo apt-get install -y lsof
     - yes | sudo apt-get install -y gnome-session
