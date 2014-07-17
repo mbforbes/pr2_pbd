@@ -25,7 +25,7 @@ before_install:
     - sudo apt-get --purge remove mongodb-10gen
 # Update package list and install new versions.
     - sudo apt-get update
-    - sudo apt-get upgrade
+    - sudo apt-get upgrade --fix-missing
 # Install X11 things, setup lightdm (specific for running Gazebo headless)
     - yes | sudo apt-get install -y pciutils
     - yes | sudo apt-get install -y lsof
