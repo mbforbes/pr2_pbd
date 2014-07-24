@@ -35,6 +35,7 @@
 		<param name="dataRoot" value="$(arg dataRoot)" />
 		<param name="isReload" value="$(arg isReload)" />
 		<param name="experimentNumber" value="$(arg experimentNumber)" />
+		<param name="sim" value="$(arg sim)" />
 		<param name="coverage" value="$(arg coverage)" />
 	</node>
 </launch>

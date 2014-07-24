@@ -51,6 +51,12 @@ TRAJECTORY_COMPLETE_SLEEP_INTERVAL = 0.01  # seconds
 # opening/closing.
 GRIPPER_FINISH_SLEEP_INTERVAL = 0.01  # seconds
 
+# To force grippers to fully open / close during execution.
+GRIPPER_TOGGLE_TIME_SECONDS = 10.0
+
+# Whether we're running in simulation (True) or on the real robot
+# (False).
+PARAM_SIM = '/pr2_pbd_interaction/sim'
 
 # ######################################################################
 # Classes
@@ -724,9 +730,11 @@ class Arms:
                 # False.
                 return False
 
-        # If hand action, do it for both sides.
-        if (action_step.gripperAction.rGripper.state !=
-                Arms.arms[Side.RIGHT].get_gripper_state()):
+        # Open/close any necessary grippers.
+        # Right gripper.
+        right_gripper_action = (action_step.gripperAction.rGripper.state !=
+                Arms.arms[Side.RIGHT].get_gripper_state())
+        if right_gripper_action:
             # TODO(mbforbes): Make this logging better (output 'close'
             # or 'open' instead of numbers).
             rospy.loginfo(
@@ -735,8 +743,11 @@ class Arms:
             Arms.arms[Side.RIGHT].set_gripper(
                 action_step.gripperAction.rGripper.state)
             Response.perform_gaze_action(GazeGoal.FOLLOW_RIGHT_EE)
-        if (action_step.gripperAction.lGripper.state !=
-                Arms.arms[Side.LEFT].get_gripper_state()):
+
+        # Left gripper
+        left_gripper_action = (action_step.gripperAction.lGripper.state !=
+            Arms.arms[Side.LEFT].get_gripper_state())
+        if left_gripper_action:
             rospy.loginfo(
                 '\tWill perform left gripper action ' +
                 str(action_step.gripperAction.lGripper.state))
@@ -744,7 +755,17 @@ class Arms:
                 action_step.gripperAction.lGripper.state)
             Response.perform_gaze_action(GazeGoal.FOLLOW_LEFT_EE)
 
-        # Wait for grippers to be done
+        # Force wait for grippers to be done if in simulation.
+        has_sim_param = rospy.has_param(PARAM_SIM)
+        sim_param_value = rospy.get_param(PARAM_SIM, default=False)
+        in_sim = has_sim_param and sim_param_value
+        if in_sim and (right_gripper_action or left_gripper_action):
+            rospy.loginfo("\tSimulation only: waiting for grippers.")
+            rospy.sleep(GRIPPER_TOGGLE_TIME_SECONDS)
+
+        # This normal method doesn't work in simulation (it returns
+        # immediately, so doesn't hurt simulation, so we leave it in
+        # for all cases).
         while (Arms.arms[Side.RIGHT].is_gripper_moving() or
                 Arms.arms[Side.LEFT].is_gripper_moving()):
             rospy.sleep(GRIPPER_FINISH_SLEEP_INTERVAL)
