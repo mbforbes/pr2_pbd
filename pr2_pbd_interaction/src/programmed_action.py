@@ -20,7 +20,7 @@ from std_msgs.msg import Header, ColorRGBA
 from visualization_msgs.msg import MarkerArray, Marker
 
 # Local
-from action_step_marker import ActionStepMarker
+from action_step_marker import ActionStepMarker, MarkerState
 from pr2_pbd_interaction.msg import (
     ArmState, ActionStepSequence, ActionStep, ArmTarget, Side,
     GripperAction, ArmTrajectory, GripperState)
@@ -38,6 +38,9 @@ DEFAULT_FILE_EXT = '.bag'
 LINK_MARKER_LIFETIME = rospy.Duration(2)
 LINK_SCALE = Vector3(0.01, 0.03, 0.01)
 LINK_COLOR = ColorRGBA(0.8, 0.8, 0.8, 0.3)  # sort of light gray
+
+# How quickly to 'blink' between action step markers if not executing.
+BLINK_TIME_SECONDS = 0.5
 
 # ROS topics, etc.
 TOPIC_MARKERS = 'visualization_marker_array'
@@ -73,6 +76,10 @@ class ProgrammedAction:
         self.l_markers = []
         self.r_links = {}
         self.l_links = {}
+
+        # This is state for displaying blinking markers.
+        self._last_blink_time = None
+        self._last_blink_step = None
 
         # NOTE(mbforbes): It appears that this is locking manipulation
         # of the internal sequence (self.seq). There have been race
@@ -636,9 +643,16 @@ class ProgrammedAction:
             action.seq.seq.append(copy)
         return action
 
-    def update_viz(self):
-        '''Updates the visualization of the action.'''
+    def update_viz(self, executing_step=None):
+        '''Updates the visualization of the action.
+
+        Args:
+            executing_step (int): Which step, if any, the program is
+                currently executing.
+        '''
         self.lock.acquire()
+
+        # Update and publish links
         self._update_links()
         m_array = MarkerArray()
         for i in self.r_links.keys():
@@ -646,6 +660,47 @@ class ProgrammedAction:
         for i in self.l_links.keys():
             m_array.markers.append(self.l_links[i])
         self._marker_publisher.publish(m_array)
+
+        # Find which step (if any) to highlight.
+        blink_step = None
+        if executing_step is not None:
+            # Executing: highlight the step we're executing.
+            blink_step = executing_step
+        else:
+            # Not executing: blink between steps.
+            n_markers = len(self.r_markers)  # or l_markers
+            if n_markers > 0:
+                if self._last_blink_step is None:
+                    # No previous blinking: blink the first one
+                    blink_step = 0
+                else:
+                    # Previuos blinking. See if waited long enough to
+                    # switch.
+                    time_diff = (
+                        rospy.rostime.get_time() - self._last_blink_time)
+                    if time_diff < BLINK_TIME_SECONDS:
+                        # Still within timeout. Keep the same.
+                        blink_step = self._last_blink_step
+                    else:
+                        # Switch to next step to blink! (Could be same
+                        # if only one step).
+                        prev = self._last_blink_step
+                        blink_step = prev + 1 if prev + 1 < n_markers else 0
+                # Regardless of code paths above, we have a blink_step.
+                if blink_step != self._last_blink_step:
+                    self._last_blink_time = rospy.rostime.get_time()
+                    self._last_blink_step = blink_step
+
+        # Now apply any highlighting.
+        marker_lists = [self.r_markers, self.l_markers]
+        for marker_list in marker_lists:
+            for idx, marker in enumerate(marker_list):
+                if idx == blink_step:
+                    marker.state = MarkerState.HIGHLIGHT
+                else:
+                    marker.state = MarkerState.NORMAL
+        self._update_markers()
+
         self.lock.release()
 
     def clear(self):

@@ -189,7 +189,10 @@ class Interaction:
             # Update the current action if there is one.
             if self.session.n_actions() > 0:
                 action = self.session.get_current_action()
-                action.update_viz()
+                executing_step = None
+                if self.arms.status == ExecutionStatus.EXECUTING:
+                    executing_step = self.arms.executing_step
+                action.update_viz(executing_step)
 
                 # TODO(mbforbes): Do we ever have r/l target(s)? When does
                 # this happen?

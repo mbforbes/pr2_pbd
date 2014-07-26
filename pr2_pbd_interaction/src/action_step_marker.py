@@ -46,8 +46,10 @@ COLOR_TRAJ_ENDPOINT_SPHERES = ColorRGBA(1.0, 0.5, 0.0, 0.8)
 COLOR_TRAJ_STEP_SPHERES = ColorRGBA(0.8, 0.4, 0.0, 0.8)
 COLOR_OBJ_REF_ARROW = ColorRGBA(1.0, 0.8, 0.2, 0.5)
 COLOR_STEP_TEXT = ColorRGBA(0.0, 0.0, 0.0, 0.5)
-COLOR_MESH_REACHABLE = ColorRGBA(1.0, 0.5, 0.0, 0.6)
+COLOR_MESH_REACHABLE = ColorRGBA(1.0, 0.5, 0.0, 0.3)
+COLOR_MESH_REACHABLE_HIGHLIGHT = ColorRGBA(1.0, 0.5, 0.0, 0.6)
 COLOR_MESH_UNREACHABLE = ColorRGBA(0.5, 0.5, 0.5, 0.6)
+COLOR_MESH_UNREACHABLE_HIGHLIGHT = ColorRGBA(0.9, 0.5, 0.5, 0.6)
 
 # Scales
 SCALE_TRAJ_STEP_SPHERES = Vector3(0.02, 0.02, 0.02)
@@ -102,6 +104,11 @@ ARM_NAMES = ['right', 'left']
 # Classes
 # ######################################################################
 
+class MarkerState:
+    NORMAL = 0
+    HIGHLIGHT = 1
+
+
 class ActionStepMarker:
     '''Marker for visualizing the steps of an action.'''
 
@@ -140,6 +147,10 @@ class ActionStepMarker:
         self._menu_handler = None
         self._prev_is_reachable = None
         ActionStepMarker._marker_click_cb = marker_click_cb
+
+        # For visualization
+        self._is_reachable()   # So we can cache it.
+        self.state = MarkerState.NORMAL
 
     # ##################################################################
     # Static methods: Public (API)
@@ -348,6 +359,7 @@ class ActionStepMarker:
             self.has_object = True
             self._update_menu()
         self.is_edited = False
+        self._is_reachable()  # Cache reachability.
 
     def get_target(self, traj_index=None):
         '''Returns the ArmState for this action step.
@@ -399,6 +411,7 @@ class ActionStepMarker:
             self._get_name())
         self._menu_handler.reApply(ActionStepMarker._im_server)
         ActionStepMarker._im_server.applyChanges()
+        self._is_reachable()  # Cache reachability.
         self.update_viz()
 
     def marker_feedback_cb(self, feedback):
@@ -409,6 +422,7 @@ class ActionStepMarker:
         '''
         if feedback.event_type == InteractiveMarkerFeedback.POSE_UPDATE:
             self.set_new_pose(feedback.pose)
+            self._is_reachable()  # Cache reachability.
             self.update_viz()
         elif feedback.event_type == InteractiveMarkerFeedback.BUTTON_CLICK:
             # Set the visibility of the 6DOF controller.
@@ -840,15 +854,23 @@ class ActionStepMarker:
 
         A simple implementation of this will return one color for
         reachable poses, another for unreachable ones. Future
-        implementations may provide further visual cues.
+        implementations may provide furth    er visual cues.
 
         Returns:
             ColorRGBA: The color for the gripper mesh for this step.
         '''
-        if self._is_reachable():
-            return COLOR_MESH_REACHABLE
+        reachable = self._prev_is_reachable  # NOTE: use cached!
+        highlight = self.state == MarkerState.HIGHLIGHT
+        if reachable:
+            if highlight:
+                return COLOR_MESH_REACHABLE_HIGHLIGHT
+            else:
+                return COLOR_MESH_REACHABLE
         else:
-            return COLOR_MESH_UNREACHABLE
+            if highlight:
+                return COLOR_MESH_UNREACHABLE_HIGHLIGHT
+            else:
+                return COLOR_MESH_UNREACHABLE
 
     def _make_gripper_marker(self, control, is_hand_open=False):
         '''Makes a gripper marker, adds it to control, returns control.

@@ -75,6 +75,7 @@ class Arms:
         self.preempt = False
         self.z_offset = 0.0
         self.status = ExecutionStatus.NOT_EXECUTING
+        self.executing_step = None
         rospy.loginfo('Arms have been initialized.')
 
     # ##################################################################
@@ -628,6 +629,7 @@ class Arms:
                 break
             else:
                 # Try executing.
+                self.executing_step = i
                 if not self._execute_action_step(action_step):
                     break
 
