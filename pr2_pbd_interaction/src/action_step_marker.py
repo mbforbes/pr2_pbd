@@ -44,12 +44,14 @@ DEFAULT_OFFSET = 0.09
 # Colors
 COLOR_TRAJ_ENDPOINT_SPHERES = ColorRGBA(1.0, 0.5, 0.0, 0.8)
 COLOR_TRAJ_STEP_SPHERES = ColorRGBA(0.8, 0.4, 0.0, 0.8)
-COLOR_OBJ_REF_ARROW = ColorRGBA(1.0, 0.8, 0.2, 0.5)
+COLOR_OBJ_REF_ARROW = ColorRGBA(0.0, 1.0, 0.0, 0.5)
 COLOR_STEP_TEXT = ColorRGBA(0.0, 0.0, 0.0, 0.5)
 COLOR_MESH_REACHABLE = ColorRGBA(1.0, 0.5, 0.0, 0.3)
-COLOR_MESH_REACHABLE_HIGHLIGHT = ColorRGBA(1.0, 0.5, 0.0, 0.6)
-COLOR_MESH_UNREACHABLE = ColorRGBA(0.5, 0.5, 0.5, 0.6)
-COLOR_MESH_UNREACHABLE_HIGHLIGHT = ColorRGBA(0.9, 0.5, 0.5, 0.6)
+COLOR_MESH_REACHABLE_HIGHLIGHT = ColorRGBA(1.0, 0.5, 0.0, 0.8)
+COLOR_MESH_REL_REACHABLE = ColorRGBA(0.0, 1.0, 0.0, 0.3)
+COLOR_MESH_REL_REACHABLE_HIGHLIGHT = ColorRGBA(0.0, 1.0, 0.0, 0.8)
+COLOR_MESH_UNREACHABLE = ColorRGBA(0.5, 0.5, 0.5, 0.8)
+COLOR_MESH_UNREACHABLE_HIGHLIGHT = ColorRGBA(0.9, 0.2, 0.2, 0.8)
 
 # Scales
 SCALE_TRAJ_STEP_SPHERES = Vector3(0.02, 0.02, 0.02)
@@ -861,12 +863,22 @@ class ActionStepMarker:
         '''
         reachable = self._prev_is_reachable  # NOTE: use cached!
         highlight = self.state == MarkerState.HIGHLIGHT
+        relative = self.has_object
         if reachable:
-            if highlight:
-                return COLOR_MESH_REACHABLE_HIGHLIGHT
+            if relative:
+                # Relative to obj
+                if highlight:
+                    return COLOR_MESH_REL_REACHABLE_HIGHLIGHT
+                else:
+                    return COLOR_MESH_REL_REACHABLE
             else:
-                return COLOR_MESH_REACHABLE
+                # Absolute
+                if highlight:
+                    return COLOR_MESH_REACHABLE_HIGHLIGHT
+                else:
+                    return COLOR_MESH_REACHABLE
         else:
+            # Unreachable (relative, unless edited absolute)
             if highlight:
                 return COLOR_MESH_UNREACHABLE_HIGHLIGHT
             else:

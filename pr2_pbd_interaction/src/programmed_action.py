@@ -10,11 +10,13 @@ roslib.load_manifest('pr2_pbd_interaction')
 import rospy
 
 # System builtins
+import math
 import threading
+import time
 import os
 
 # ROS builtins
-from geometry_msgs.msg import Vector3, Pose
+from geometry_msgs.msg import Vector3, Pose, Point
 import rosbag
 from std_msgs.msg import Header, ColorRGBA
 from visualization_msgs.msg import MarkerArray, Marker
@@ -38,9 +40,11 @@ DEFAULT_FILE_EXT = '.bag'
 LINK_MARKER_LIFETIME = rospy.Duration(2)
 LINK_SCALE = Vector3(0.01, 0.03, 0.01)
 LINK_COLOR = ColorRGBA(0.8, 0.8, 0.8, 0.3)  # sort of light gray
+LINK_DELTA = 0.1  # How much to reduce length by for grippers.
 
 # How quickly to 'blink' between action step markers if not executing.
-BLINK_TIME_SECONDS = 0.5
+BLINK_TIME_SECONDS = 0.2
+BLINK_TIME_ENDPOINT_SECONDS = 0.5
 
 # ROS topics, etc.
 TOPIC_MARKERS = 'visualization_marker_array'
@@ -661,7 +665,10 @@ class ProgrammedAction:
             m_array.markers.append(self.l_links[i])
         self._marker_publisher.publish(m_array)
 
-        # Find which step (if any) to highlight.
+        # Find which step (if any) to highlight. Note that we purposely
+        # use "real" time (time.time()) instead of ROS time
+        # (rospy.rostime.get_time()) because ROS time slows with lag
+        # and real world time doesn't (unless we do PbD on a spaceship).
         blink_step = None
         if executing_step is not None:
             # Executing: highlight the step we're executing.
@@ -677,8 +684,16 @@ class ProgrammedAction:
                     # Previuos blinking. See if waited long enough to
                     # switch.
                     time_diff = (
-                        rospy.rostime.get_time() - self._last_blink_time)
-                    if time_diff < BLINK_TIME_SECONDS:
+                        time.time() - self._last_blink_time)
+                    # Calculate "true" blink time. Longer if first or
+                    # last.
+                    if (self._last_blink_step == 0 or
+                            self._last_blink_step == n_markers - 1):
+                        blink_time = BLINK_TIME_ENDPOINT_SECONDS
+                    else:
+                        blink_time = BLINK_TIME_SECONDS
+                    # Check whether we've exceeded blink time.
+                    if time_diff < blink_time:
                         # Still within timeout. Keep the same.
                         blink_step = self._last_blink_step
                     else:
@@ -688,7 +703,7 @@ class ProgrammedAction:
                         blink_step = prev + 1 if prev + 1 < n_markers else 0
                 # Regardless of code paths above, we have a blink_step.
                 if blink_step != self._last_blink_step:
-                    self._last_blink_time = rospy.rostime.get_time()
+                    self._last_blink_time = time.time()
                     self._last_blink_step = blink_step
 
         # Now apply any highlighting.
@@ -730,9 +745,31 @@ class ProgrammedAction:
         Returns:
             Marker
         '''
+        # Grab gripper center points
         markers = self.r_markers if arm_index == Side.RIGHT else self.l_markers
         start = markers[to_index - 1].get_absolute_position(is_start=True)
         end = markers[to_index].get_absolute_position(is_start=False)
+
+        # Math: maybe reduce length on each side by delta
+        delta = LINK_DELTA  # To account for two grippers
+        dx, dy, dz = end.x - start.x, end.y - start.y, end.z - start.z
+        d = math.sqrt(dx**2 + dy**2 + dz**2)
+        # Only reduce length if it's long enough
+        if d > LINK_DELTA * 2:
+            # Same vector direction, so ratios will be constant
+            ryx, rzx = dy / dx, dz / dx
+            # Substitute and solve
+            delta_x = math.sqrt(-(delta**2) / (ryx**2 + rzx**2 + 1))
+            # Compute other deltas from ratios
+            delta_y, delta_z = ryx * delta_x, rzx * delta_x
+            start = Point(
+                start.x + delta_x, start.y + delta_y, start.z + delta_z)
+            end = Point(
+                end.x - delta_x, end.y - delta_y, end.z - delta_z)
+
+        # Make marker. NOTE(mbforbes): We probably shouldn't make tiny
+        # ones (e.g. if we couldn't reduce the length), but that's a
+        # problem for another day.
         return Marker(
             type=Marker.ARROW,
             id=ActionStepMarker.calc_uid(arm_index, to_index),
