@@ -580,7 +580,7 @@ class ProgrammedAction:
             str
         '''
         self.lock.acquire()
-        step self.seq.seq[-1]
+        step = self.seq.seq[-1]
         # Extract reference frames.
         tp = step.type
         if tp == ActionStep.ARM_TARGET:

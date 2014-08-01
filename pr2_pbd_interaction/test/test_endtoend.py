@@ -992,7 +992,7 @@ class TestEndToEnd(unittest.TestCase):
                 to be played.
         '''
         # We only track things the robot is going to say (text).
-        if sound_request.command == SoundRequest.SAY:
+        if sound_request.command == SoundRequest.PLAY_ONCE:
             # Text is passed in arg.
             text = sound_request.arg
 

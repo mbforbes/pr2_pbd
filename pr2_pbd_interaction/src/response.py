@@ -41,8 +41,9 @@ SOUND_FILEFORMAT = '.wav'
 # Name of sound file for unrecognized sounds.
 SOUND_UNKNOWN = 'OTHER'
 
-# The ROS action for head gazes.
+# ROS topics, msgs, actions, params, etc.
 ACTION_GAZE = 'gaze_action'
+PARAM_SOUND = 'pr2_pbd_interaction/robot_sound'
 
 
 # ######################################################################
@@ -218,7 +219,7 @@ class Response:
         Args:
             requested_sound (str): One of the constants in RobotSound.*.
         '''
-        if rospy.has_param('robot_sound') and rospy.get_param('robot_sound'):
+        if rospy.has_param(PARAM_SOUND) and rospy.get_param(PARAM_SOUND):
             if requested_sound in Response.all_sounds:
                 Response._sound_client.playWave(
                     os.path.join(

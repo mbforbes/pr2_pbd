@@ -74,7 +74,7 @@ class PbDGUI(Plugin):
         self.gui_cmd_publisher = rospy.Publisher('gui_command', GuiCommand)
 
         rospy.Subscriber('experiment_state', ExperimentState, self.exp_state_cb)
-        rospy.Subscriber('robotsound', SoundRequest, self.robotSoundReceived)
+        rospy.Subscriber('/robotsound', SoundRequest, self.robotSoundReceived)
 
         QtGui.QToolTip.setFont(QtGui.QFont('SansSerif', 10))
         self.exp_state_sig.connect(self.update_state)
@@ -384,7 +384,7 @@ class PbDGUI(Plugin):
                 self.speech_cmd_publisher.publish(command)
 
     def robotSoundReceived(self, soundReq):
-        if (soundReq.command == SoundRequest.SAY):
+        if (soundReq.command == SoundRequest.PLAY_ONCE):
             PbDGUI.loginfo('Robot said: ' + soundReq.arg)
             self.speechLabel.setText('Robot sound: ' + soundReq.arg)
 

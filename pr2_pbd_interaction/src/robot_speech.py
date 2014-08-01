@@ -23,9 +23,10 @@ from sound_play.msg import SoundRequest
 # Module level constants
 # ######################################################################
 
-# ROS topics
-TOPIC_SPEECH = 'robotsound'
+# ROS topics, msgs, actions, params, etc.
+TOPIC_SPEECH = 'robotsound'  # This is for reference; SoundRequest uses.
 TOPIC_MARKER = 'visualization_marker'
+PARAM_SPEECH = 'pr2_pbd_interaction/robot_speech'
 
 # Constants for the Rviz display of "robot spoken" text.
 TEXT_MARKER_ID = 1000
@@ -106,14 +107,8 @@ class RobotSpeech:
     ALREADY_RECORDING_MOTION = 'Already recording motion.'
 
     def __init__(self):
-        # The speech publisher doesn't actually make speech happen (the
-        # SoundClient does that), but it lets us track speech in ROS
-        # (like in the GUI and tests). It might be useful to see how
-        # SoundClient does this and switch the GUI/tests to this (if
-        # it's different).
-        self.speech_publisher = rospy.Publisher(TOPIC_SPEECH, SoundRequest)
-        self.marker_publisher = rospy.Publisher(TOPIC_MARKER, Marker)
         self.soundhandle = SoundClient()
+        self.marker_publisher = rospy.Publisher(TOPIC_MARKER, Marker)
 
     def say(self, text):
         '''Send a TTS (text to speech) command.
@@ -128,12 +123,7 @@ class RobotSpeech:
                 speak the words (only if False).
         '''
         # ROS param (see backend launch file) dictates whether we speak.
-        if rospy.has_param('robot_speech') and rospy.get_param('robot_speech'):
-            # Again, this does nothing but allow us to track speech.
-            self.speech_publisher.publish(SoundRequest(
-                command=SoundRequest.SAY, arg=text))
-
-            # This really says it.
+        if rospy.has_param(PARAM_SPEECH) and rospy.get_param(PARAM_SPEECH):
             self.soundhandle.say(text)
 
         # We always display the text in RViz.
