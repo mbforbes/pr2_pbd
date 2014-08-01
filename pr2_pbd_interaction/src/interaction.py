@@ -610,9 +610,11 @@ class Interaction:
                 GripperState(self.arms.get_gripper_state(Side.LEFT))
             )
             self.session.add_step_to_action(step, self.world.get_frame_list())
+            act = self.session.get_current_action()
             return [
-                RobotSpeech.STEP_RECORDED +
-                self.session.get_current_action().get_last_step_relative_str(),
+                ' '.join([
+                    RobotSpeech.STEP_RECORDED,
+                    act.get_last_step_relative_str()]),
                 GazeGoal.NOD]
         else:
             return [RobotSpeech.ERROR_NO_SKILLS, GazeGoal.SHAKE]
