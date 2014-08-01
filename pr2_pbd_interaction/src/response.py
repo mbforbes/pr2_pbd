@@ -218,12 +218,14 @@ class Response:
         Args:
             requested_sound (str): One of the constants in RobotSound.*.
         '''
-        if requested_sound in Response.all_sounds:
-            Response._sound_client.playWave(
-                os.path.join(SOUNDS_DIR, requested_sound + SOUND_FILEFORMAT))
-        else:
-            Response._sound_client.playWave(
-                os.path.join(SOUNDS_DIR, SOUND_UNKNOWN + SOUND_FILEFORMAT))
+        if rospy.has_param('robot_sound') and rospy.get_param('robot_sound'):
+            if requested_sound in Response.all_sounds:
+                Response._sound_client.playWave(
+                    os.path.join(
+                        SOUNDS_DIR, requested_sound + SOUND_FILEFORMAT))
+            else:
+                Response._sound_client.playWave(
+                    os.path.join(SOUNDS_DIR, SOUND_UNKNOWN + SOUND_FILEFORMAT))
 
     # ##################################################################
     # Instance methods: Public (API)

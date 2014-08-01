@@ -572,6 +572,38 @@ class ProgrammedAction:
         self.lock.release()
         return is_required
 
+    def get_last_step_relative_str(self):
+        '''Returns a string that says which (if any) hands are relative
+        (to objects, instead of being absolute) for the last step.
+
+        Returns:
+            str
+        '''
+        self.lock.acquire()
+        step self.seq.seq[-1]
+        # Extract reference frames.
+        tp = step.type
+        if tp == ActionStep.ARM_TARGET:
+            r_ref = step.armTarget.rArm.refFrame
+            l_ref = step.armTarget.lArm.refFrame
+        else:
+            # tp == ActionStep.ARM_TRAJECTORY
+            r_ref = step.armTrajectory.rRefFrame
+            l_ref = step.armTrajectory.lRefFrame
+
+        # Logic: If either reference frame is to an object, we
+        # return true.
+        if r_ref == ArmState.OBJECT and l_ref == ArmState.OBJECT:
+            rel_str = 'Both hands relative.'
+        elif r_ref == ArmState.OBJECT:
+            rel_str = 'Right hand relative.'
+        elif l_ref == ArmState.OBJECT:
+            rel_str = 'Left hand relative.'
+        else:
+            rel_str = ''
+        self.lock.release()
+        return rel_str
+
     def get_gripper_states(self, arm_index):
         '''Returns the gripper states for all action steps for arm
         arm_index.
@@ -759,9 +791,13 @@ class ProgrammedAction:
             # Same vector direction, so ratios will be constant
             ryx, rzx = dy / dx, dz / dx
             # Substitute and solve
-            delta_x = math.sqrt(-(delta**2) / (ryx**2 + rzx**2 + 1))
+            delta_x = math.sqrt((delta**2) / (ryx**2 + rzx**2 + 1))
             # Compute other deltas from ratios
             delta_y, delta_z = ryx * delta_x, rzx * delta_x
+            # Fix negativeness by checking if signs agree
+            delta_x = -delta_x if delta_x * dx < 0 else delta_x
+            delta_y = -delta_y if delta_y * dy < 0 else delta_y
+            delta_z = -delta_z if delta_z * dz < 0 else delta_z
             start = Point(
                 start.x + delta_x, start.y + delta_y, start.z + delta_z)
             end = Point(

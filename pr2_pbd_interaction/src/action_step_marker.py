@@ -411,6 +411,7 @@ class ActionStepMarker:
         rospy.loginfo(
             'Switching reference frame to ' + new_ref + ' for action step ' +
             self._get_name())
+        self.has_object = new_ref != BASE_LINK
         self._menu_handler.reApply(ActionStepMarker._im_server)
         ActionStepMarker._im_server.applyChanges()
         self._is_reachable()  # Cache reachability.

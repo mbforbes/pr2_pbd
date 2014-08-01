@@ -330,8 +330,12 @@ class Interaction:
             if self.session.n_actions() > 0:
                 # If we're currently programming, save that as a step.
                 self._save_gripper_step(arm_index, GripperState.OPEN)
-                speech_response = (
-                    speech_response + ' ' + RobotSpeech.STEP_RECORDED)
+                act = self.session.get_current_action()
+                speech_response = ' '.join([
+                    speech_response,
+                    RobotSpeech.STEP_RECORDED,
+                    act.get_last_step_relative_str()
+                ])
             return [speech_response, Response.glance_actions[arm_index]]
         else:
             # Hand was already open; complain.
@@ -355,8 +359,12 @@ class Interaction:
             if self.session.n_actions() > 0:
                 # If we're currently programming, save that as a step.
                 self._save_gripper_step(arm_index, GripperState.CLOSED)
-                speech_response = (
-                    ' '.join([speech_response, RobotSpeech.STEP_RECORDED]))
+                act = self.session.get_current_action()
+                speech_response = ' '.join([
+                    speech_response,
+                    RobotSpeech.STEP_RECORDED,
+                    act.get_last_step_relative_str()
+                ])
             return [speech_response, Response.glance_actions[arm_index]]
         else:
             # Hand was already closed; complain.
@@ -602,7 +610,10 @@ class Interaction:
                 GripperState(self.arms.get_gripper_state(Side.LEFT))
             )
             self.session.add_step_to_action(step, self.world.get_frame_list())
-            return [RobotSpeech.STEP_RECORDED, GazeGoal.NOD]
+            return [
+                RobotSpeech.STEP_RECORDED +
+                self.session.get_current_action().get_last_step_relative_str(),
+                GazeGoal.NOD]
         else:
             return [RobotSpeech.ERROR_NO_SKILLS, GazeGoal.SHAKE]
 

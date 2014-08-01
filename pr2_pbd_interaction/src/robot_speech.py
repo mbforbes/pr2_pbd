@@ -15,6 +15,7 @@ from std_msgs.msg import Header, ColorRGBA
 from visualization_msgs.msg import Marker
 
 # ROS 3rd party
+from sound_play.libsoundplay import SoundClient
 from sound_play.msg import SoundRequest
 
 
@@ -70,10 +71,10 @@ class RobotSpeech:
     LEFT_ARM_ALREADY_RELEASED = 'Left arm is already relaxed.'
 
     # Open/close hands
-    RIGHT_HAND_OPENING = 'Opening right hand'
-    RIGHT_HAND_CLOSING = 'Closing right hand'
-    LEFT_HAND_OPENING = 'Opening left hand'
-    LEFT_HAND_CLOSING = 'Closing left hand'
+    RIGHT_HAND_OPENING = 'Opening right hand.'
+    RIGHT_HAND_CLOSING = 'Closing right hand.'
+    LEFT_HAND_OPENING = 'Opening left hand.'
+    LEFT_HAND_CLOSING = 'Closing left hand.'
     RIGHT_HAND_ALREADY_OPEN = 'Right hand is already open.'
     RIGHT_HAND_ALREADY_CLOSED = 'Right hand is already closed.'
     LEFT_HAND_ALREADY_OPEN = 'Left hand is already open.'
@@ -91,7 +92,7 @@ class RobotSpeech:
 
     # Executing
     START_EXECUTION = 'Starting execution of action'
-    EXECUTION_ENDED = 'Execution ended'
+    EXECUTION_ENDED = 'Execution ended.'
     ERROR_NO_EXECUTION = 'No executions in progress.'
     EXECUTION_PREEMPTED = 'Stopping execution.'
     STOPPING_EXECUTION = 'Execution stopped.'
@@ -105,10 +106,16 @@ class RobotSpeech:
     ALREADY_RECORDING_MOTION = 'Already recording motion.'
 
     def __init__(self):
+        # The speech publisher doesn't actually make speech happen (the
+        # SoundClient does that), but it lets us track speech in ROS
+        # (like in the GUI and tests). It might be useful to see how
+        # SoundClient does this and switch the GUI/tests to this (if
+        # it's different).
         self.speech_publisher = rospy.Publisher(TOPIC_SPEECH, SoundRequest)
         self.marker_publisher = rospy.Publisher(TOPIC_MARKER, Marker)
+        self.soundhandle = SoundClient()
 
-    def say(self, text, is_using_sounds=False):
+    def say(self, text):
         '''Send a TTS (text to speech) command.
 
         This will cause the robot to verbalize text if not
@@ -120,9 +127,16 @@ class RobotSpeech:
                 booping (if True), which determines whether to actually
                 speak the words (only if False).
         '''
-        if not is_using_sounds:
+        # ROS param (see backend launch file) dictates whether we speak.
+        if rospy.has_param('robot_speech') and rospy.get_param('robot_speech'):
+            # Again, this does nothing but allow us to track speech.
             self.speech_publisher.publish(SoundRequest(
                 command=SoundRequest.SAY, arg=text))
+
+            # This really says it.
+            self.soundhandle.say(text)
+
+        # We always display the text in RViz.
         self.say_in_rviz(text)
 
     def say_in_rviz(self, text):

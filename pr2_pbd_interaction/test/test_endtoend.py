@@ -92,6 +92,8 @@ RESPONSE_TRIMS = [
     RobotSpeech.LEFT_HAND_OPENING,
     RobotSpeech.LEFT_HAND_CLOSING,
     RobotSpeech.STOPPED_RECORDING_MOTION,
+    # This now has 'X hand relative' sloppily appended.
+    RobotSpeech.STEP_RECORDED,
 ]
 
 # Sides (right and left)

@@ -21,6 +21,12 @@
 	<!-- Do we want a code coverage report? -->
 	<arg name="coverage" default="false" />
 
+	<!-- Do you want the robot to speak? Probably want this OR sound. -->
+	<arg name="robot_speech" default="true" />
+
+	<!-- Do you want the robot to make beeps and boops? Probably want this OR
+	speech. -->
+	<arg name="robot_sound" default="false" />
 
 	<!-- This runs all of the prerequisite nodes for the PbD backend to
 	work, such as interactive manipulation backend and social gaze. -->
@@ -29,12 +35,14 @@
 	</include>
 
 
-	<!-- This runs the interaction node itself.	It is the main state
-	machine for interaction and PbD -->
+	<!-- This runs the interaction node itself.	It is the main state machine
+	for interaction and PbD -->
 	<node name="pr2_pbd_interaction" pkg="pr2_pbd_interaction" type="main.py" output="screen">
 		<param name="dataRoot" value="$(arg dataRoot)" />
 		<param name="isReload" value="$(arg isReload)" />
 		<param name="experimentNumber" value="$(arg experimentNumber)" />
 		<param name="coverage" value="$(arg coverage)" />
+		<param name="robot_speech" value="$(arg robot_speech)" />
+		<param name="robot_sound" value="$(arg robot_sound)" />
 	</node>
 </launch>
