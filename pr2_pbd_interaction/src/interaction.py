@@ -130,6 +130,9 @@ class Interaction:
         signal.signal(signal.SIGQUIT, self._signal_handler)
         rospy.on_shutdown(self._on_shutdown)
 
+        # Start-up hands-free system.
+        self.hf = HandsFree(self.arms, self.world)
+
         # The PbD backend is ready.
         rospy.loginfo('Interaction initialized.')
         self._ping_srv = rospy.Service(

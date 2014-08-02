@@ -68,7 +68,7 @@ DEFAULT_GRIPPER_POSITION = GRIPPER_OPEN_POSITION
 DEFAULT_GRIPPER_EFFORT = 30.0  # ~30 PSI (I think)
 # Whether to wait for the gripper to complete its movement before
 # returning.
-DEFAULT_GRIPPER_WAIT = False
+DEFAULT_GRIPPER_WAIT = True
 # Any gripper joint reading above this is considered open.
 GRIPPER_OPEN_THRESHOLD = 0.078
 
