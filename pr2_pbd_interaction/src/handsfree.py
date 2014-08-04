@@ -57,8 +57,7 @@ class FailureFeedback(Feedback):
         Args:
             speech (str, optional): What to say. Defaults to None.
         '''
-        self.speech = speech
-        self.gaze = GazeGoal.SHAKE
+        super(FailureFeedback, self).__init__(speech, GazeGoal.SHAKE)
 
 
 class Mode(object):
@@ -231,8 +230,51 @@ class Command(object):
         return cls.options.get(option_name)
 
 
+class MoveRelativePosition(Command):
+    '''Action 2: Move the robot's gripper(s) to a relative position on
+    one (or both?) side(s).
+
+    self.args should have:
+        [0] - side (right or left hand)
+        [1] - relative position
+        [2] - object (to move relative to)
+    '''
+
+    options = CommandOptions({
+    })
+
+    # def init(self):
+    #     # Initialize some of our own state for convenience.
+    #     self.arm_idx = Link.get_arm_index(args[0])
+    #     # TODO(mbforbes): Should use phrases.
+    #     self.hand_str = 'right' if self.arm_idx == Side.RIGHT else 'left'
+
+    # def pre_check(self, args, phrases):
+    #     '''Ensures closing can happen.'''
+    #     res = S.arms.get_gripper_state(self.arm_idx) != GripperState.CLOSED
+    #     fb = FailureFeedback(self.hand_str + ' is already closed.')
+    #     return res, fb
+
+    # def narrate(self, args, phrases):
+    #     '''Describes the process of closing.'''
+    #     fb = Feedback('Closing ' + self.hand_str + ' hand.')
+    #     return fb
+
+    # def core(self, args, phrases):
+    #     '''Closes whichever gripper.'''
+    #     res = S.arms.set_gripper_state(self.arm_idx, GripperState.CLOSED)
+    #     fb = FailureFeedback(self.hand_str + ' failed to close.')
+    #     return res, fb
+
+    # def post_check(self, args, phrases):
+    #     '''Checks whether opening happened.'''
+    #     res = S.arms.get_gripper_state(self.arm_idx) == GripperState.CLOSED
+    #     fb = FailureFeedback(self.hand_str + ' did not close.')
+    #     return res, fb
+
+
 class Open(Command):
-    '''Open the robot's gripper on one (or both?) side(s).
+    '''Action 11: Open the robot's gripper on one (or both?) side(s).
 
     self.args should have:
         [0] - side (right or left hand)
@@ -274,7 +316,7 @@ class Open(Command):
 
 
 class Close(Command):
-    '''Close the robot's gripper on one (or both?) side(s).
+    '''Action 12: Close the robot's gripper on one (or both?) side(s).
 
     self.args should have:
         [0] - side (right or left hand)
@@ -423,6 +465,7 @@ class HandsFree(object):
     # "Normal" commands (make robot do something).
     command_map = {
         HandsFreeCommand.OPEN: Open,
+        HandsFreeCommand.CLOSE: Close,
     }
 
     def __init__(self, arms, world):
@@ -467,7 +510,8 @@ class HandsFree(object):
             code = command.execute(Mode.PROG)
 
             # If it worked, we add it to the program.
-            self.get_program().add_command(command)
+            if code == Code.SUCCESS:
+                self.get_program().add_command(command)
 
         # Always update any state changes for the parser.
         self.broadcast_state()
