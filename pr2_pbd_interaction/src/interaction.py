@@ -21,6 +21,7 @@ from visualization_msgs.msg import MarkerArray
 # Local
 from arm import ArmMode
 from arms import Arms
+from handsfree import HandsFree
 from session import Session
 from pr2_pbd_interaction.msg import (
     ArmState, GripperState, ActionStep, ArmTarget, Object, GripperAction,

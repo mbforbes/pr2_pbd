@@ -82,10 +82,10 @@ class Options(object):
 
     defaults = {}
 
-    def __init__(self, options):
+    def __init__(self, options={}):
         '''
         Args:
-            options (dict)
+            options (dict, optional): Defaults to {}.
         '''
         self.options = options
         # Convenience check to avoid redundant specifications.
@@ -113,15 +113,15 @@ class GlobalOptions(Options):
     '''Options for the running of the system.'''
 
     # What options we can specify.
-    ABORT_PRECHECK = 'abort program execution on precheck failure'
+    ABORT_PRE_CHECK = 'abort program execution on precheck failure'
     ABORT_CORE = 'abort program execution on command execution failure'
-    ABORT_POSTCHECK = 'abort program execution on postcheck failure'
+    ABORT_POST_CHECK = 'abort program execution on postcheck failure'
 
     # TODO(mbforbes): Load from ROS params!
     defaults = {
-        ABORT_PRECHECK: True,
+        ABORT_PRE_CHECK: True,
         ABORT_CORE: True,
-        ABORT_POSTCHECK: True,
+        ABORT_POST_CHECK: True,
     }
 
 
@@ -129,19 +129,19 @@ class CommandOptions(Options):
     '''How to execute a Command.'''
 
     # What options we can specify.
-    FEEDBACK_PRECHECK_PROG = (
+    FEEDBACK_PRE_CHECK_PROG = (
         'notify user when precheck fails during programming')
-    PRECHECK_FATAL = (
+    PRE_CHECK_FATAL = (
         'whether the execution should normally be stopped if pre-check fails')
-    FEEDBACK_PRECHECK_EXEC = 'notify user when precheck fails during execution'
+    FEEDBACK_PRE_CHECK_EXEC = 'notify user when precheck fails during execution'
     NARRATE_PROG = 'narrate commands during programming'
     NARRATE_EXEC = 'narrate commands during execution'
 
     # What to do by default.
     defaults = {
-        FEEDBACK_PRECHECK_PROG: True,
-        PRECHECK_FATAL: True,
-        FEEDBACK_PRECHECK_EXEC: True,
+        FEEDBACK_PRE_CHECK_PROG: True,
+        PRE_CHECK_FATAL: True,
+        FEEDBACK_PRE_CHECK_EXEC: True,
         NARRATE_PROG: True,
         NARRATE_EXEC: False,
     }
@@ -187,10 +187,10 @@ class Command(object):
                 # Maybe issue feedback for this.
                 if ((mode == Mode.PROG and
                         self.get_option(
-                            CommandOptions.FEEDBACK_PRECHECK_PROG)) or
+                            CommandOptions.FEEDBACK_PRE_CHECK_PROG)) or
                     (mode == Mode.EXEC and
                         self.get_option(
-                            CommandOptions.FEEDBACK_PRECHECK_EXEC))):
+                            CommandOptions.FEEDBACK_PRE_CHECK_EXEC))):
                     pre_feedback.issue()
                 if self.get_option(CommandOptions.PRE_CHECK_FATAL):
                     return Code.PRE_CHECK_FAIL
@@ -281,15 +281,16 @@ class Open(Command):
     '''
 
     options = CommandOptions({
-        CommandOptions.FEEDBACK_PRECHECK_EXEC: False,
-        CommandOptions.PRECHECK_FATAL: False,
+        CommandOptions.FEEDBACK_PRE_CHECK_EXEC: False,
+        CommandOptions.PRE_CHECK_FATAL: False,
     })
 
     def init(self):
         # Initialize some of our own state for convenience.
-        self.arm_idx = Link.get_arm_index(args[0])
+        self.arm_idx = Link.get_arm_index(self.args[0])
         # TODO(mbforbes): Should use phrases.
-        self.hand_str = 'right' if self.arm_idx == Side.RIGHT else 'left'
+        self.hand_str = (
+            ('right' if self.arm_idx == Side.RIGHT else 'left') + ' hand')
 
     def pre_check(self, args, phrases):
         '''Ensures opening can happen.'''
@@ -299,7 +300,7 @@ class Open(Command):
 
     def narrate(self, args, phrases):
         '''Describes the process of opening.'''
-        fb = Feedback('Opening ' + self.hand_str + ' hand.')
+        fb = Feedback('Opening ' + self.hand_str + '.')
         return fb
 
     def core(self, args, phrases):
@@ -323,15 +324,16 @@ class Close(Command):
     '''
 
     options = CommandOptions({
-        CommandOptions.FEEDBACK_PRECHECK_EXEC: False,
-        CommandOptions.PRECHECK_FATAL: False,
+        CommandOptions.FEEDBACK_PRE_CHECK_EXEC: False,
+        CommandOptions.PRE_CHECK_FATAL: False,
     })
 
     def init(self):
         # Initialize some of our own state for convenience.
-        self.arm_idx = Link.get_arm_index(args[0])
+        self.arm_idx = Link.get_arm_index(self.args[0])
         # TODO(mbforbes): Should use phrases.
-        self.hand_str = 'right' if self.arm_idx == Side.RIGHT else 'left'
+        self.hand_str = (
+            ('right' if self.arm_idx == Side.RIGHT else 'left') + ' hand')
 
     def pre_check(self, args, phrases):
         '''Ensures closing can happen.'''
@@ -367,6 +369,7 @@ class Program(object):
         '''
         self.commands = []
         self.options = options
+        self.running = False
 
     def execute(self):
         '''
@@ -383,11 +386,11 @@ class Program(object):
 
             # Break if code bad and set to abort on that bad code.
             if ((code == Code.PRE_CHECK_FAIL and
-                    self.options.get(GlobalOptions.ABORT_PRECHECK)) or
+                    self.options.get(GlobalOptions.ABORT_PRE_CHECK)) or
                     (code == Code.EXEC_FAIL and
                     self.options.get(GlobalOptions.ABORT_CORE)) or
                     (code == Code.POST_CHECK_FAIL and
-                    self.options.get(GlobalOptions.ABORT_POSTCHECK))):
+                    self.options.get(GlobalOptions.ABORT_POST_CHECK))):
                 break
         self.running = False
 
@@ -449,13 +452,6 @@ class Link:
 
 class HandsFree(object):
     '''Sets up the hands-free system.'''
-
-    # "Admin" commands (change state of system somehow).
-    admin_commands = {
-        HandsFreeCommand.EXECUTE: self.run_program,
-        HandsFreeCommand.STOP: self.stop_program,
-    }
-
     # "Emergency" commands list a subset of "Admin" commands that can be
     # run even while the robot is executing.
     emergency_commands = [
@@ -475,6 +471,14 @@ class HandsFree(object):
         if S.world is None:
             S.world = world
 
+        # Set up admin callbacks (have to do here because requires
+        # 'self' which doesn't exist statically).
+        # "Admin" commands (change state of system somehow).
+        self.admin_commands = {
+            HandsFreeCommand.EXECUTE: self.run_program,
+            HandsFreeCommand.STOP: self.stop_program,
+        }
+
         # Set up state.
         # Eventually will have multiple programs.
         self.program = Program(GlobalOptions())
@@ -492,19 +496,22 @@ class HandsFree(object):
         '''
         # Extract vars for ease of use
         cmd, args, phrases = hf_cmd.cmd, hf_cmd.args, hf_cmd.phrases
+        rospy.loginfo('HandsFree: Received command: ' + cmd + ' ' + str(args))
 
         # First, check whether executing for emergency commands.
         if self.get_program().is_executing():
-            if cmd not in emergency_commands:
+            if cmd not in HandsFree.emergency_commands:
                 return
 
         # Check if admin or normal command.
-        if cmd in admin_commands:
+        if cmd in self.admin_commands:
             # Admin: run as function.
+            rospy.loginfo('HandsFree: Executing admin command: ' + cmd)
             admin_commands[cmd]()
-        else:
+        elif cmd in HandsFree.command_map:
             # Normal: instantiate a new Command with this data.
-            command = command_map[cmd](hf_cmd.args, hf_cmd.phrases)
+            rospy.loginfo('HandsFree: Executing normal command: ' + cmd)
+            command = HandsFree.command_map[cmd](args, phrases)
 
             # Execute on the robot
             code = command.execute(Mode.PROG)
@@ -512,6 +519,8 @@ class HandsFree(object):
             # If it worked, we add it to the program.
             if code == Code.SUCCESS:
                 self.get_program().add_command(command)
+        else:
+            rospy.logwarn('HandsFree: no implementation for command: ' + cmd)
 
         # Always update any state changes for the parser.
         self.broadcast_state()

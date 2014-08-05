@@ -27,4 +27,4 @@ string RIGHT_HAND = right_hand
 # ======================================================================
 string cmd
 string[] args
-string[][] phrases
+string[] phrases
