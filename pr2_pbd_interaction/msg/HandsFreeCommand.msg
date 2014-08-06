@@ -25,11 +25,11 @@ string LEFT_HAND = left_hand
 string RIGHT_HAND = right_hand
 
 # Which
-NEXT = next
-PREVIOUS = previous
+string NEXT = next
+string PREVIOUS = previous
 
 # Action
-ACTION = action
+string ACTION = action
 
 # Fields
 # ======================================================================
