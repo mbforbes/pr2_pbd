@@ -10,6 +10,8 @@
 # 'Admin' commands:
 string EXECUTE = execute
 string STOP = stop
+string SWITCH_TO = switch_to
+string CREATE_NEW_ACTION = create_new_action
 
 # 'Normal' Commands:
 string OPEN = open
@@ -22,6 +24,12 @@ string CLOSE = close
 string LEFT_HAND = left_hand
 string RIGHT_HAND = right_hand
 
+# Which
+NEXT = next
+PREVIOUS = previous
+
+# Action
+ACTION = action
 
 # Fields
 # ======================================================================

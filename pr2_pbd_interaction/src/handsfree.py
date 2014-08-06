@@ -10,10 +10,14 @@ import roslib
 roslib.load_manifest('pr2_pbd_interaction')
 import rospy
 
+# Builtins
+from threading import Thread
+
 # PbD (3rd party / local)
 from arms import Arms
 from pr2_pbd_interaction.msg import (
-    GripperState, HandsFreeCommand, Side)
+    GripperState, HandsFreeCommand, WorldObjects, WorldObject, RobotState,
+    Side)
 from pr2_social_gaze.msg import GazeGoal
 from response import Response
 from world import World
@@ -51,6 +55,12 @@ class Feedback(object):
 
 class FailureFeedback(Feedback):
     '''Shakes head and says whatever.'''
+
+    NO_PROGRAM = FailureFeedback('No actions to execute.')
+    NO_PROGRAM_SWITCH = FailureFeedback('No actions created to switch to.')
+    NOT_EXECUTING = FailureFeedback('Not executing action; cannot stop.')
+    NO_PREVIOUS = FailureFeedback('No previous action.')
+    NO_NEXT = FailureFeedback('No next action.')
 
     def __init__(self, speech=None):
         '''
@@ -133,7 +143,8 @@ class CommandOptions(Options):
         'notify user when precheck fails during programming')
     PRE_CHECK_FATAL = (
         'whether the execution should normally be stopped if pre-check fails')
-    FEEDBACK_PRE_CHECK_EXEC = 'notify user when precheck fails during execution'
+    FEEDBACK_PRE_CHECK_EXEC = (
+        'notify user when precheck fails during execution')
     NARRATE_PROG = 'narrate commands during programming'
     NARRATE_EXEC = 'narrate commands during execution'
 
@@ -362,19 +373,27 @@ class Close(Command):
 class Program(object):
     '''Holds what the user programs (a list of Commands).'''
 
+    world_object_pub = rospy.Publisher('handsfree_worldobjects', WorldObjects)
+
     def __init__(self, options):
         '''
         Args:
             options (GlobalOptions)
         '''
+        # Setup state
         self.commands = []
         self.options = options
         self.running = False
+
+        # Record and broadcast objects.
+        self.broadcast_world_objects()
 
     def execute(self):
         '''
         Executes the commands that have been programmed.
         '''
+        # TODO(mbforbes): Say something when you start.
+
         self.running = True
         for command in self.commands:
             # Ensure we haven't been stopped.
@@ -388,11 +407,26 @@ class Program(object):
             if ((code == Code.PRE_CHECK_FAIL and
                     self.options.get(GlobalOptions.ABORT_PRE_CHECK)) or
                     (code == Code.EXEC_FAIL and
-                    self.options.get(GlobalOptions.ABORT_CORE)) or
+                        self.options.get(GlobalOptions.ABORT_CORE)) or
                     (code == Code.POST_CHECK_FAIL and
-                    self.options.get(GlobalOptions.ABORT_POST_CHECK))):
+                        self.options.get(GlobalOptions.ABORT_POST_CHECK))):
                 break
         self.running = False
+
+        # TODO(mbforbes): Say something when you finish (depending on
+        # code).
+
+    def switch_to(self, idx_name):
+        '''
+        Called when this program is switched to.
+
+        Args:
+            idx_name (int): 1-based index of this program, purely for
+                speech.
+        '''
+        Feedback(
+            'Switched to action %d. Finding objects.' % (idx_name)).issue()
+        self.broadcast_world_objects()
 
     def add_command(self, command):
         '''
@@ -400,6 +434,21 @@ class Program(object):
             command (Command)
         '''
         self.commands += [command]
+
+    def broadcast_world_objects(self):
+        '''
+        Records and broadcasts world objects.
+        '''
+        world_object_pub.publish(self.get_world_objects())
+
+    def get_world_objects(self):
+        '''
+        Gets the world objects.
+
+        Returns:
+            WorldObjects
+        '''
+        return WorldObjects()
 
     def is_executing(self):
         '''
@@ -415,6 +464,7 @@ class Program(object):
         Stops executing, if it is.
         '''
         self.running = False
+
 
 class S:
     '''"Singletons" or "State" or whatever you want to call it.
@@ -450,8 +500,18 @@ class Link:
             Side.RIGHT if arm_str == HandsFreeCommand.RIGHT_HAND else
             Side.LEFT)
 
+
 class HandsFree(object):
     '''Sets up the hands-free system.'''
+
+    # Set up admin callbacks (change state of system somehow).
+    admin_commands = {
+        HandsFreeCommand.EXECUTE: execute_program,
+        HandsFreeCommand.STOP: stop_program,
+        HandsFreeCommand.CREATE_NEW_ACTION: create_new_action,
+        HandsFreeCommand.SWITCH_TO: switch_to_action,
+    }
+
     # "Emergency" commands list a subset of "Admin" commands that can be
     # run even while the robot is executing.
     emergency_commands = [
@@ -471,17 +531,13 @@ class HandsFree(object):
         if S.world is None:
             S.world = world
 
-        # Set up admin callbacks (have to do here because requires
-        # 'self' which doesn't exist statically).
-        # "Admin" commands (change state of system somehow).
-        self.admin_commands = {
-            HandsFreeCommand.EXECUTE: self.run_program,
-            HandsFreeCommand.STOP: self.stop_program,
-        }
-
         # Set up state.
-        # Eventually will have multiple programs.
-        self.program = Program(GlobalOptions())
+        self.programs = []
+        self.program_idx = -1
+
+        # Set up state broadcaster.
+        self.robot_state_pub = rospy.Publisher(
+            'handsfree_robotstate', RobotState)
 
         # Set up the command dispatch.
         rospy.Subscriber(
@@ -499,7 +555,7 @@ class HandsFree(object):
         rospy.loginfo('HandsFree: Received command: ' + cmd + ' ' + str(args))
 
         # First, check whether executing for emergency commands.
-        if self.get_program().is_executing():
+        if self.program_idx > -1 and self.get_program().is_executing():
             if cmd not in HandsFree.emergency_commands:
                 return
 
@@ -507,7 +563,7 @@ class HandsFree(object):
         if cmd in self.admin_commands:
             # Admin: run as function.
             rospy.loginfo('HandsFree: Executing admin command: ' + cmd)
-            admin_commands[cmd]()
+            admin_commands[cmd](self, args)
         elif cmd in HandsFree.command_map:
             # Normal: instantiate a new Command with this data.
             rospy.loginfo('HandsFree: Executing normal command: ' + cmd)
@@ -516,39 +572,108 @@ class HandsFree(object):
             # Execute on the robot
             code = command.execute(Mode.PROG)
 
-            # If it worked, we add it to the program.
-            if code == Code.SUCCESS:
+            # If it worked, and we're programming, add it to the
+            # program.
+            if code == Code.SUCCESS and self.program_idx > -1:
                 self.get_program().add_command(command)
         else:
             rospy.logwarn('HandsFree: no implementation for command: ' + cmd)
 
         # Always update any state changes for the parser.
-        self.broadcast_state()
+        self.async_broadcast_robot_state()
 
-    def broadcast_state(self):
+    def async_broadcast_robot_state(self):
+        '''
+        Broadcasts world and robot state (to the parser) asynchronously.
+        This is useful so that there's no pause while IK, etc. are
+        computed.
+        '''
+        Thread(
+            group=None,
+            target=self.broadcast_robot_state,
+            name='broadcast_robot_state_thread'
+        ).start()
+
+    def broadcast_robot_state(self):
         '''
         Broadcasts world and robot state (to the parser).
         '''
-        pass
+        self.robot_state_pub.publish(self.get_robot_state())
+
+    def get_robot_state(self):
+        '''
+        Gets the robot state.
+
+        Returns:
+            RobotState
+        '''
+        # TODO(mbforbes): Get ALL the state.
+        return RobotState()
 
     def get_program(self):
         '''Come on, get with the program!
 
         Returns:
-            Program: The current program.
+            Program|None: The current program, or None if none exists.
         '''
-        return self.program
+        return (
+            self.programs[self.program_idx] if self.program_idx > -1 else None)
 
     # 'Admin' actions just trigger functions here.
 
-    def run_program(self):
+    def execute_program(self, args):
         '''
-        Runs the current program.
-        '''
-        self.get_program.execute()
+        Executes the current program.
 
-    def stop_program(self):
+        Args:
+            args ([str]): Command args; unused here.
+        '''
+        if self.program_idx > -1:
+            self.get_program.execute()
+        else:
+            FailureFeedback.NO_PROGRAM.issue()
+
+    def stop_program(self, args):
         '''
         Stops the current program.
+
+        Args:
+            args ([str]): Command args; unused here.
         '''
-        self.get_program.stop()
+        if self.program_idx > -1 and self.get_program().is_executing():
+            self.get_program.stop()
+        else:
+            FailureFeedback.NOT_EXECUTING.issue()
+
+    def create_new_action(self, args):
+        '''
+        Creates a new program (and switches to it).
+
+        Args:
+            args ([str]): Command args; unused here.
+        '''
+
+        self.programs += [Program(GlobalOptions())]
+        self.program_idx = len(self.programs) - 1
+
+    def switch_to_action(self, args):
+        '''
+        Switches to the next or previous action.
+
+        Args:
+            args ([str]): Command args.
+                [0] HandsFreeCommand.NEXT or HandsFreeCommand.PREVIOUS
+                [1] HandsFreeCommand.ACTION
+        '''
+        if self.program_idx == -1:
+            FailureFeedback.NO_PROGRAM_SWITCH.issue()
+        elif self.program_idx == 0 and args[0] == HandsFreeCommand.PREVIOUS:
+            FailureFeedback.NO_PREVIOUS.issue()
+        elif (self.program_idx == len(self.programs) - 1 and
+                args[0] == HandsFreeCommand.NEXT):
+            FailureFeedback.NO_NEXT.issue()
+        else:
+            self.program_idx = (
+                self.program_idx - 1 if args[0] == HandsFreeCommand.PREVIOUS
+                else self.program_idx + 1)
+            self.get_program().switch_to(self.program_idx + 1)  # 1-based
