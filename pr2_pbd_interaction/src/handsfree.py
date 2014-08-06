@@ -384,9 +384,10 @@ class Program(object):
         self.commands = []
         self.options = options
         self.running = False
+        self.world_objects = []
 
         # Record and broadcast objects.
-        self.broadcast_world_objects()
+        self.record_world_objects()
 
     def execute(self):
         '''
@@ -426,7 +427,7 @@ class Program(object):
         '''
         Feedback(
             'Switched to action %d. Finding objects.' % (idx_name)).issue()
-        self.broadcast_world_objects()
+        self.record_world_objects()
 
     def add_command(self, command):
         '''
@@ -435,20 +436,46 @@ class Program(object):
         '''
         self.commands += [command]
 
-    def broadcast_world_objects(self):
+    def record_world_objects(self):
         '''
         Records and broadcasts world objects.
         '''
-        world_object_pub.publish(self.get_world_objects())
+        self._record_world_objects_internal()
+        self._broadcast()
 
-    def get_world_objects(self):
+    def update_world_objects(self):
         '''
-        Gets the world objects.
+        Updates the existing world objects by assuming they haven't
+        changed and computing reachabilities. Also broadcasts.
+        '''
+        # TODO(mbforbes): Implement.
+        # - compute properties of existing objects
+        self._update_world_objects_internal()
+        self._broadcast()
 
-        Returns:
-            WorldObjects
+    def _record_world_objects_internal(self):
         '''
-        return WorldObjects()
+        Gets the world objects (actually observes).
+        '''
+        # TODO(mbforbes): Implement.
+        # - look down, record
+        self.world_objects = WorldObjects()
+        self._update_world_objects_internal()
+
+    def _update_world_objects_internal(self):
+        '''
+        Updates reachability properties of existing WorldObjects.
+        '''
+        # TODO(mbforbes): Implement.
+        # - compute properties
+        for world_object in self.world_objects:
+            pass
+
+    def _broadcast(self):
+        '''
+        Actually publishes the WorldObjects.
+        '''
+        world_object_pub.publish(self.world_objects)
 
     def is_executing(self):
         '''
@@ -580,23 +607,36 @@ class HandsFree(object):
             rospy.logwarn('HandsFree: no implementation for command: ' + cmd)
 
         # Always update any state changes for the parser.
-        self.async_broadcast_robot_state()
+        self.async_broadcast_state()
 
-    def async_broadcast_robot_state(self):
+    def async_broadcast_state(self):
         '''
-        Broadcasts world and robot state (to the parser) asynchronously.
-        This is useful so that there's no pause while IK, etc. are
-        computed.
+        Broadcasts world objects and robot state (to the parser)
+        asynchronously. This is useful so that there's no pause while
+        IK, etc. are computed.
         '''
         Thread(
             group=None,
             target=self.broadcast_robot_state,
             name='broadcast_robot_state_thread'
         ).start()
+        Thread(
+            group=None,
+            target=self.maybe_broadcast_world_objects,
+            name='broadcast_world_objects_thread'
+        ).start()
+
+    def maybe_broadcast_world_objects(self):
+        '''
+        Broadcasts world state updates to the parser IF it has
+        previously been recorded.
+        '''
+        if self.program_idx > -1:
+            self.get_program().update_world_objects()
 
     def broadcast_robot_state(self):
         '''
-        Broadcasts world and robot state (to the parser).
+        Broadcasts robot state (to the parser).
         '''
         self.robot_state_pub.publish(self.get_robot_state())
 
