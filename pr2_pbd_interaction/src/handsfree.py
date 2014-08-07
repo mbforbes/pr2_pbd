@@ -1,6 +1,8 @@
 '''Hands-Free PbD system. Separate from PbD, living here now for
 convenience.'''
 
+__author__ = 'mbforbes'
+
 # ######################################################################
 # Imports
 # ######################################################################
@@ -10,17 +12,21 @@ import roslib
 roslib.load_manifest('pr2_pbd_interaction')
 import rospy
 
-# Builtins
+# System builtins
 from threading import Thread
+
+# ROS builtins
+from geometry_msgs.msg import Vector3, Pose, Point
 
 # PbD (3rd party / local)
 from arms import Arms
 from pr2_pbd_interaction.msg import (
     GripperState, HandsFreeCommand, WorldObjects, WorldObject, RobotState,
-    Side)
-from pr2_social_gaze.msg import GazeGoal
-from response import Response
+    Side, ArmState)
 from world import World
+
+# True local
+from feedback import Feedback, FailureFeedback
 
 # ######################################################################
 # Module level constants
@@ -30,45 +36,6 @@ from world import World
 # ######################################################################
 # Classes
 # ######################################################################
-
-class Feedback(object):
-    '''Becuase 'Response' was already taken in normal PbD.'''
-
-    def __init__(self, speech=None, gaze=None):
-        '''
-        Args:
-            speech (str, optional): What to say. Defaults to None.
-            gaze (int, optional): Head movement to do. Should be one of
-                the constants defined in GazeAction.action. Defaults to
-                None.
-        '''
-        self.speech = speech
-        self.gaze = gaze
-
-    def issue(self):
-        '''Issues the Feedback (says and/or gazes).'''
-        if self.speech is not None:
-            Response.say(self.speech)
-        if self.gaze is not None:
-            Response.perform_gaze_action(self.gaze)
-
-
-class FailureFeedback(Feedback):
-    '''Shakes head and says whatever.'''
-
-    NO_PROGRAM = FailureFeedback('No actions to execute.')
-    NO_PROGRAM_SWITCH = FailureFeedback('No actions created to switch to.')
-    NOT_EXECUTING = FailureFeedback('Not executing action; cannot stop.')
-    NO_PREVIOUS = FailureFeedback('No previous action.')
-    NO_NEXT = FailureFeedback('No next action.')
-
-    def __init__(self, speech=None):
-        '''
-        Args:
-            speech (str, optional): What to say. Defaults to None.
-        '''
-        super(FailureFeedback, self).__init__(speech, GazeGoal.SHAKE)
-
 
 class Mode(object):
     '''Modes in which a command can be executed.'''
@@ -283,6 +250,55 @@ class MoveRelativePosition(Command):
     #     fb = FailureFeedback(self.hand_str + ' did not close.')
     #     return res, fb
 
+class MoveAbsoluteDirection(Command):
+    '''Action 3: Move the robot's gripper(s) in an absolute direction on
+    one (or both?) side(s).
+
+    self.args should have:
+        [0] - side (right or left hand)
+        [1] - absolute direction
+    '''
+
+    options = CommandOptions({
+    })
+
+    def init(self):
+        # Initialize some of our own state for convenience.
+        self.arm_idx = Link.get_arm_index(self.args[0])
+        # TODO(mbforbes): Should use phrases.
+        self.hand_str = 'right' if self.arm_idx == Side.RIGHT else 'left'
+
+    def pre_check(self, args, phrases):
+        '''Ensures moving in the specified direction can happen.'''
+        res = Link.get_ik_abs_dir(self.args[0], self.args[1]) is not None
+        fb = FailureFeedback(
+            'Cannot move ' + self.hand_str + ' hand ' + self.args[1] + '.')
+        return res, fb
+
+    def narrate(self, args, phrases):
+        '''Describes the process of moving.'''
+        fb = Feedback(
+            'Moving ' + self.hand_str + ' hand ' + self.args[1] + '.')
+        return fb
+
+    def core(self, args, phrases):
+        '''Moves.'''
+        solved_joints = Link.get_ik_abs_dir(self.args[0], self.args[1])
+        if solved_joints is not None:
+            # Figure out which joints we solved for.
+            l_joints, r_joints = None, None
+            if self.args[0] == HandsFreeCommand.RIGHT_HAND:
+                r_joints = solved_joints
+            else:
+                l_joints = solved_joints
+            success = Link.move_to_joints(r_joints, l_joints)
+        else:
+            # Solving failed.
+            success = False
+        fb = FailureFeedback(
+            'Failed to move' + self.hand_str + ' hand ' + self.args[1] + '.')
+        return success, fb
+
 
 class Open(Command):
     '''Action 11: Open the robot's gripper on one (or both?) side(s).
@@ -295,7 +311,7 @@ class Open(Command):
         CommandOptions.FEEDBACK_PRE_CHECK_EXEC: False,
         CommandOptions.PRE_CHECK_FATAL: False,
     })
-
+p
     def init(self):
         # Initialize some of our own state for convenience.
         self.arm_idx = Link.get_arm_index(self.args[0])
@@ -373,28 +389,28 @@ class Close(Command):
 class Program(object):
     '''Holds what the user programs (a list of Commands).'''
 
-    world_object_pub = rospy.Publisher('handsfree_worldobjects', WorldObjects)
-
-    def __init__(self, options):
+    def __init__(self, options, idx_name):
         '''
         Args:
             options (GlobalOptions)
+            idx_name (int): 1-based index of this program, purely for
+                speech.
         '''
         # Setup state
         self.commands = []
         self.options = options
         self.running = False
-        self.world_objects = []
+        slef.idx_name = idx_name  # 1-based
 
         # Record and broadcast objects.
-        self.record_world_objects()
+        Feedback("Created action %d. Finding objects." % (idx_name)).issue()
+        ObjectsHandler.record()
 
     def execute(self):
         '''
         Executes the commands that have been programmed.
         '''
-        # TODO(mbforbes): Say something when you start.
-
+        Feedback("Executing action %d." % (self.idx_name)).issue()
         self.running = True
         for command in self.commands:
             # Ensure we haven't been stopped.
@@ -414,8 +430,12 @@ class Program(object):
                 break
         self.running = False
 
-        # TODO(mbforbes): Say something when you finish (depending on
-        # code).
+        if code == Code.SUCCESS:
+            Feedback("Completed action %d." % (self.idx_name)).issue()
+        else:
+            FailureFeedback(
+                "Problem executing action %d." % (self.idx_name)
+            ).issue()
 
     def switch_to(self, idx_name):
         '''
@@ -426,8 +446,9 @@ class Program(object):
                 speech.
         '''
         Feedback(
-            'Switched to action %d. Finding objects.' % (idx_name)).issue()
-        self.record_world_objects()
+            'Switched to action %d. Finding objects.' % (self.idx_name)
+        ).issue()
+        ObjectsHandler.record()
 
     def add_command(self, command):
         '''
@@ -435,47 +456,6 @@ class Program(object):
             command (Command)
         '''
         self.commands += [command]
-
-    def record_world_objects(self):
-        '''
-        Records and broadcasts world objects.
-        '''
-        self._record_world_objects_internal()
-        self._broadcast()
-
-    def update_world_objects(self):
-        '''
-        Updates the existing world objects by assuming they haven't
-        changed and computing reachabilities. Also broadcasts.
-        '''
-        # TODO(mbforbes): Implement.
-        # - compute properties of existing objects
-        self._update_world_objects_internal()
-        self._broadcast()
-
-    def _record_world_objects_internal(self):
-        '''
-        Gets the world objects (actually observes).
-        '''
-        # TODO(mbforbes): Implement.
-        # - look down, record
-        self.world_objects = WorldObjects()
-        self._update_world_objects_internal()
-
-    def _update_world_objects_internal(self):
-        '''
-        Updates reachability properties of existing WorldObjects.
-        '''
-        # TODO(mbforbes): Implement.
-        # - compute properties
-        for world_object in self.world_objects:
-            pass
-
-    def _broadcast(self):
-        '''
-        Actually publishes the WorldObjects.
-        '''
-        world_object_pub.publish(self.world_objects)
 
     def is_executing(self):
         '''
@@ -513,6 +493,27 @@ class Link:
     Replacing it and S would make the system PbD-independent.
     '''
 
+    # Settings.
+    # TODO(mbforbes): Make launch param?
+    movement_delta = 0.10  # in m, so 0.10 = 10cm (I think)
+
+    # Constants (computed from settings).
+    UP_VEC = Vector3(0.0, 0.0, movement_delta)
+    DOWN_VEC = Vector3(0.0, 0.0, -movement_delta)
+    LEFT_VEC = Vector3(0.0, movement_delta, 0.0)
+    RIGHT_VEC = Vector3(0.0, -movement_delta, 0.0)
+    FORWARD_VEC = Vector3(movement_delta, 0.0, 0.0)
+    BACKWARD_VEC = Vector3(-movement_delta, 0.0, 0.0)
+
+    abs_dir_map = {
+        HandsFreeCommand.UP: UP_VEC,
+        HandsFreeCommand.DOWN: DOWN_VEC,
+        HandsFreeCommand.TO_LEFT: LEFT_VEC,
+        HandsFreeCommand.TO_RIGHT: RIGHT_VEC,
+        HandsFreeCommand.FORWARD: FORWARD_VEC,
+        HandsFreeCommand.BACKWARD: BACKWARD_VEC,
+    }
+
     @staticmethod
     def get_arm_index(arm_str):
         '''
@@ -527,29 +528,160 @@ class Link:
             Side.RIGHT if arm_str == HandsFreeCommand.RIGHT_HAND else
             Side.LEFT)
 
+    @staticmethod
+    def get_ik_abs_dir(arm_str, abs_dir):
+        '''
+        Returns the joints for a a movement of arm_str in abs_dir, or
+        None if it's impossible.
+
+        Args:
+            arm_str (str): HandsFreeCommand.LEFT_HAND or
+                HandsFreeCommand.RIGHT_HAND
+            abs_dir (str): One of:
+                - HandsFreeCommand.UP
+                - HandsFreeCommand.DOWN
+                - HandsFreeCommand.TO_LEFT
+                - HandsFreeCommand.TO_RIGHT
+                - HandsFreeCommand.FORWARD
+                - HandsFreeCommand.BACKWARD
+
+        Returns:
+            [float]|None: A vector of seven floats (the joint positions
+                for the PR2's arm) or None if IK failed.
+        '''
+        arm_idx = Link.get_arm_index(arm_str)
+        seed = S.arms.arms[arm_idx].get_joint_positions()
+        add_vec = Link.abs_dir_map[abs_dir]
+        cur_pose = S.arms.arms[arm_idx].get_ee_state()
+        new_pose = Pose(
+            Point(
+                cur_pose.position.x + add_vec.x,
+                cur_pose.position.y + add_vec.y,
+                cur_pose.position.z + add_vec.z
+            ),
+            cur_pose.orientation
+        )
+        return S.arms.arms[arm_idx].get_ik_for_ee(new_pose, seed)
+
+    @staticmethod
+    def move_to_joints(r_joints=None, l_joints=None):
+        '''
+        Args:
+            r_joints ([float], optional): 7-element list of joint
+                positions for right arm. Defaults to None (in which case
+                right arm will not move).
+            l_joints ([float], optional): 7-element list of joint
+                positions for left arm. Defaults to None (in which case
+                left arm will not move).
+
+        Returns:
+            bool: Whether movement was successful.
+        '''
+        if r_joints is not None:
+            r_armstate = ArmState()
+            r_armstate.joint_pose = r_joints
+        else:
+            r_armstate = None
+        if l_joints is not None:
+            l_armstate = ArmState()
+            l_armstate.joint_pose = l_joints
+        else:
+            l_armstate = None
+
+        return S.arms.move_to_joints(r_armstate, l_armstate)
+
+
+class ObjectsHandler(object):
+    '''Manages world objects.'''
+
+    # TODO(mbforbes): Refactor into constant somewhere.
+    topic_worldobjs = 'handsfree_worldobjects'
+
+    world_object_pub = rospy.Publisher(topic_worldobjs, WorldObjects)
+    objects = []
+
+    @staticmethod
+    def record():
+        '''
+        Records and broadcasts world objects.
+        '''
+        ObjectsHandler._record_internal()
+        ObjectsHandler._broadcast()
+
+    @staticmethod
+    def update():
+        '''
+        Updates the existing world objects by assuming they haven't
+        changed and computing reachabilities. Also broadcasts.
+        '''
+        # TODO(mbforbes): Implement.
+        # - compute properties of existing objects
+        ObjectsHandler._update_internal()
+        ObjectsHandler._broadcast()
+
+    @staticmethod
+    def _record_internal():
+        '''
+        Gets the world objects (actually observes).
+        '''
+        # TODO(mbforbes): Implement.
+        # - look down, record
+        ObjectsHandler.objects = []
+        ObjectsHandler._update_internal()
+
+    @staticmethod
+    def _update_internal():
+        '''
+        Updates reachability properties of existing WorldObjects.
+        '''
+        # TODO(mbforbes): Implement.
+        # - compute properties
+        for world_object in ObjectsHandler.objects:
+            pass
+
+    @staticmethod
+    def _broadcast():
+        '''
+        Actually publishes the WorldObjects.
+        '''
+        ObjectsHandler.world_object_pub.publish(
+            WorldObjects(ObjectsHandler.objects))
+
+
+class RobotHandler(object):
+    '''Manages robot.'''
+
+    # Set up robot state broadcaster.
+    robot_state_pub = rospy.Publisher('handsfree_robotstate', RobotState)
+
+    # Where we store the state.
+    robot_state = RobotState()
+
+    @staticmethod
+    def broadcast():
+        '''
+        Updates robot state and broadcasts it (e.g. to the parser).
+        '''
+        RobotHandler._update()
+        RobotHandler.robot_state_pub.publish(RobotHandler.robot_state)
+
+    @staticmethod
+    def _update():
+        '''
+        Computes and sets the robot state.
+        '''
+        # TODO(mbforbes): Get ALL the state.
+        RobotHandler.robot_state = RobotState()
+
 
 class HandsFree(object):
     '''Sets up the hands-free system.'''
 
-    # Set up admin callbacks (change state of system somehow).
-    admin_commands = {
-        HandsFreeCommand.EXECUTE: execute_program,
-        HandsFreeCommand.STOP: stop_program,
-        HandsFreeCommand.CREATE_NEW_ACTION: create_new_action,
-        HandsFreeCommand.SWITCH_TO: switch_to_action,
-    }
-
-    # "Emergency" commands list a subset of "Admin" commands that can be
-    # run even while the robot is executing.
-    emergency_commands = [
-        HandsFreeCommand.STOP,
-    ]
-
-    # "Normal" commands (make robot do something).
-    command_map = {
-        HandsFreeCommand.OPEN: Open,
-        HandsFreeCommand.CLOSE: Close,
-    }
+    FF_NO_PROGRAM = FailureFeedback('No actions to execute.')
+    FF_NO_PROGRAM_SWITCH = FailureFeedback('No actions created to switch to.')
+    FF_NOT_EXECUTING = FailureFeedback('Not executing action; cannot stop.')
+    FF_NO_PREVIOUS = FailureFeedback('No previous action.')
+    FF_NO_NEXT = FailureFeedback('No next action.')
 
     def __init__(self, arms, world):
         # Save singletons.
@@ -561,10 +693,6 @@ class HandsFree(object):
         # Set up state.
         self.programs = []
         self.program_idx = -1
-
-        # Set up state broadcaster.
-        self.robot_state_pub = rospy.Publisher(
-            'handsfree_robotstate', RobotState)
 
         # Set up the command dispatch.
         rospy.Subscriber(
@@ -583,18 +711,18 @@ class HandsFree(object):
 
         # First, check whether executing for emergency commands.
         if self.program_idx > -1 and self.get_program().is_executing():
-            if cmd not in HandsFree.emergency_commands:
+            if cmd not in CommandRouter.emergency_commands:
                 return
 
         # Check if admin or normal command.
-        if cmd in self.admin_commands:
+        if cmd in CommandRouter.admin_commands:
             # Admin: run as function.
             rospy.loginfo('HandsFree: Executing admin command: ' + cmd)
-            admin_commands[cmd](self, args)
-        elif cmd in HandsFree.command_map:
+            CommandRouter.admin_commands[cmd](self, args)
+        elif cmd in CommandRouter.command_map:
             # Normal: instantiate a new Command with this data.
             rospy.loginfo('HandsFree: Executing normal command: ' + cmd)
-            command = HandsFree.command_map[cmd](args, phrases)
+            command = CommandRouter.command_map[cmd](args, phrases)
 
             # Execute on the robot
             code = command.execute(Mode.PROG)
@@ -617,38 +745,14 @@ class HandsFree(object):
         '''
         Thread(
             group=None,
-            target=self.broadcast_robot_state,
+            target=RobotHandler.broadcast,
             name='broadcast_robot_state_thread'
         ).start()
         Thread(
             group=None,
-            target=self.maybe_broadcast_world_objects,
-            name='broadcast_world_objects_thread'
+            target=ObjectsHandler.update,
+            name='update_world_objects_thread'
         ).start()
-
-    def maybe_broadcast_world_objects(self):
-        '''
-        Broadcasts world state updates to the parser IF it has
-        previously been recorded.
-        '''
-        if self.program_idx > -1:
-            self.get_program().update_world_objects()
-
-    def broadcast_robot_state(self):
-        '''
-        Broadcasts robot state (to the parser).
-        '''
-        self.robot_state_pub.publish(self.get_robot_state())
-
-    def get_robot_state(self):
-        '''
-        Gets the robot state.
-
-        Returns:
-            RobotState
-        '''
-        # TODO(mbforbes): Get ALL the state.
-        return RobotState()
 
     def get_program(self):
         '''Come on, get with the program!
@@ -669,9 +773,9 @@ class HandsFree(object):
             args ([str]): Command args; unused here.
         '''
         if self.program_idx > -1:
-            self.get_program.execute()
+            self.get_program().execute()
         else:
-            FailureFeedback.NO_PROGRAM.issue()
+            HandsFree.FF_NO_PROGRAM.issue()
 
     def stop_program(self, args):
         '''
@@ -681,9 +785,9 @@ class HandsFree(object):
             args ([str]): Command args; unused here.
         '''
         if self.program_idx > -1 and self.get_program().is_executing():
-            self.get_program.stop()
+            self.get_program().stop()
         else:
-            FailureFeedback.NOT_EXECUTING.issue()
+            HandsFree.FF_NOT_EXECUTING.issue()
 
     def create_new_action(self, args):
         '''
@@ -692,9 +796,14 @@ class HandsFree(object):
         Args:
             args ([str]): Command args; unused here.
         '''
-
-        self.programs += [Program(GlobalOptions())]
-        self.program_idx = len(self.programs) - 1
+        next_idx = len(self.programs)
+        self.programs += [
+            Program(
+                GlobalOptions(),
+                next_idx + 1  # 1-based index
+            )
+        ]
+        self.program_idx = next_idx
 
     def switch_to_action(self, args):
         '''
@@ -706,14 +815,38 @@ class HandsFree(object):
                 [1] HandsFreeCommand.ACTION
         '''
         if self.program_idx == -1:
-            FailureFeedback.NO_PROGRAM_SWITCH.issue()
+            HandsFree.FF_NO_PROGRAM_SWITCH.issue()
         elif self.program_idx == 0 and args[0] == HandsFreeCommand.PREVIOUS:
-            FailureFeedback.NO_PREVIOUS.issue()
+            HandsFree.FF_NO_PREVIOUS.issue()
         elif (self.program_idx == len(self.programs) - 1 and
                 args[0] == HandsFreeCommand.NEXT):
-            FailureFeedback.NO_NEXT.issue()
+            HandsFree.FF_NO_NEXT.issue()
         else:
             self.program_idx = (
                 self.program_idx - 1 if args[0] == HandsFreeCommand.PREVIOUS
                 else self.program_idx + 1)
             self.get_program().switch_to(self.program_idx + 1)  # 1-based
+
+class CommandRouter(object):
+    '''Maps commands to classes and functions.'''
+
+    # Set up admin callbacks (change state of system somehow).
+    admin_commands = {
+        HandsFreeCommand.EXECUTE: HandsFree.execute_program,
+        HandsFreeCommand.STOP: HandsFree.stop_program,
+        HandsFreeCommand.CREATE_NEW_ACTION: HandsFree.create_new_action,
+        HandsFreeCommand.SWITCH_ACTION: HandsFree.switch_to_action,
+    }
+
+    # "Emergency" commands list a subset of "Admin" commands that can be
+    # run even while the robot is executing.
+    emergency_commands = [
+        HandsFreeCommand.STOP,
+    ]
+
+    # "Normal" commands (make robot do something).
+    command_map = {
+        HandsFreeCommand.MOVE_ABSOLUTE_DIRECTION: MoveAbsoluteDirection,
+        HandsFreeCommand.OPEN: Open,
+        HandsFreeCommand.CLOSE: Close,
+    }

@@ -10,8 +10,9 @@
 # 'Admin' commands:
 string EXECUTE = execute
 string STOP = stop
-string SWITCH_TO = switch_to
+string SWITCH_ACTION = switch_action
 string CREATE_NEW_ACTION = create_new_action
+string MOVE_ABSOLUTE_DIRECTION = move_abs
 
 # 'Normal' Commands:
 string OPEN = open
@@ -23,6 +24,14 @@ string CLOSE = close
 # Side
 string LEFT_HAND = left_hand
 string RIGHT_HAND = right_hand
+
+# Absolute directions
+string UP = up
+string DOWN = down
+string TO_LEFT = to_left
+string TO_RIGHT = to_right
+string FORWARD = forward
+string BACKWARD = backward
 
 # Which
 string NEXT = next

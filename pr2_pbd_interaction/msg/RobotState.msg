@@ -27,3 +27,5 @@ bool[] can_move_up
 bool[] can_move_down
 bool[] can_move_toleft
 bool[] can_move_toright
+bool[] can_move_forward
+bool[] can_move_backward
