@@ -311,7 +311,7 @@ class Open(Command):
         CommandOptions.FEEDBACK_PRE_CHECK_EXEC: False,
         CommandOptions.PRE_CHECK_FATAL: False,
     })
-p
+
     def init(self):
         # Initialize some of our own state for convenience.
         self.arm_idx = Link.get_arm_index(self.args[0])
