@@ -121,7 +121,7 @@ class CommandOptions(Options):
         PRE_CHECK_FATAL: True,
         FEEDBACK_PRE_CHECK_EXEC: True,
         NARRATE_PROG: True,
-        NARRATE_EXEC: False,
+        NARRATE_EXEC: True,
     }
 
 
@@ -156,8 +156,15 @@ class Command(object):
             mode (str): One of Mode.*
 
         Returns:
-            str: One of Code.*.
+            str: One of Code.*
         '''
+        # Update the last-commanded side. It is an interesting choice
+        # where to put this (should it only be updated after the
+        # pre-check passes? or the command succeeds?). I think as soon
+        # as someone referrs to the command it should be updated, so
+        # it's going here for now.
+        self.update_last_side()
+
         # Do pre-check.
         if hasattr(self, 'pre_check'):
             pre_success, pre_feedback = self.pre_check(self.args, self.phrases)
@@ -201,6 +208,25 @@ class Command(object):
 
         # We succeeded!
         return Code.SUCCESS
+
+    def update_last_side(self):
+        '''
+        Updates the last-commanded side.
+        '''
+        # This is kind of a hack, because we're assuming command
+        # arguments don't overlap. But we get to choose how command
+        # arguments are represented internally, so this isn't so bad.
+        check_sides = [
+            # Note that these should match RobotState.* relevant consts.
+            HandsFreeCommand.RIGHT_HAND,
+            HandsFreeCommand.LEFT_HAND,
+            # NOTE(mbforbes); Eventually do both hands...
+        ]
+        for arg in self.args:
+            for side in check_sides:
+                if arg == side:
+                    RobotHandler.last_commanded = side
+                    return
 
     @classmethod
     def get_option(cls, option_name):
@@ -389,6 +415,8 @@ class Close(Command):
 class Program(object):
     '''Holds what the user programs (a list of Commands).'''
 
+    _executing = False
+
     def __init__(self, options, idx_name):
         '''
         Args:
@@ -399,8 +427,8 @@ class Program(object):
         # Setup state
         self.commands = []
         self.options = options
-        self.running = False
-        slef.idx_name = idx_name  # 1-based
+        self.idx_name = idx_name  # 1-based
+        self.stop_requested = False
 
         # Record and broadcast objects.
         Feedback("Created action %d. Finding objects." % (idx_name)).issue()
@@ -411,13 +439,18 @@ class Program(object):
         Executes the commands that have been programmed.
         '''
         Feedback("Executing action %d." % (self.idx_name)).issue()
-        self.running = True
-        for command in self.commands:
+        self.set_executing(True)
+        for idx, command in enumerate(self.commands):
+            idx_1based = idx + 1  # For display
+            cmd_name = type(command).__name__
+
             # Ensure we haven't been stopped.
-            if not self.running:
+            if self.stop_requested:
+                self.stop_requested = False
                 break
 
             # Execute the command.
+            rospy.loginfo("Executing step %d: %s" % (idx_1based, cmd_name))
             code = command.execute(Mode.EXEC)
 
             # Break if code bad and set to abort on that bad code.
@@ -427,8 +460,10 @@ class Program(object):
                         self.options.get(GlobalOptions.ABORT_CORE)) or
                     (code == Code.POST_CHECK_FAIL and
                         self.options.get(GlobalOptions.ABORT_POST_CHECK))):
+                rospy.loginfo("Got code %s; stopping." % (code))
                 break
-        self.running = False
+
+        self.set_executing(False)
 
         if code == Code.SUCCESS:
             Feedback("Completed action %d." % (self.idx_name)).issue()
@@ -436,6 +471,28 @@ class Program(object):
             FailureFeedback(
                 "Problem executing action %d." % (self.idx_name)
             ).issue()
+
+    @staticmethod
+    def is_executing():
+        '''
+        Returns whether the program is currently executing.
+
+        Returns:
+            bool
+        '''
+        return Program._executing
+
+    @staticmethod
+    def set_executing(val):
+        '''
+        A wrapper for the internal variable so we can broadcast state
+        changes.
+
+        Args:
+            val (bool):
+        '''
+        Program._executing = val
+        RobotHandler.async_broadcast()
 
     def switch_to(self, idx_name):
         '''
@@ -457,23 +514,15 @@ class Program(object):
         '''
         self.commands += [command]
 
-    def is_executing(self):
-        '''
-        Returns whether the program is currently executing.
-
-        Returns:
-            bool
-        '''
-        return self.running
-
     def stop(self):
         '''
         Stops executing, if it is.
         '''
-        self.running = False
+
+        self.stop_requested = True
 
 
-class S:
+class S(object):
     '''"Singletons" or "State" or whatever you want to call it.
 
     This class is to hold the global vars that commands need to access.
@@ -486,7 +535,7 @@ class S:
     world = None
 
 
-class Link:
+class Link(object):
     '''This class provides is the interface between HandsFree and the
     rest of the PbD system. It wraps variables and converts types.
 
@@ -553,6 +602,13 @@ class Link:
         seed = S.arms.arms[arm_idx].get_joint_positions()
         add_vec = Link.abs_dir_map[abs_dir]
         cur_pose = S.arms.arms[arm_idx].get_ee_state()
+
+        # We might have to fail out here if we couldn't get the EE state
+        # (this happens e.g. on system startup).
+        if cur_pose is None:
+            return None
+
+        # Else, compute the new position and try IK for it.
         new_pose = Pose(
             Point(
                 cur_pose.position.x + add_vec.x,
@@ -561,6 +617,7 @@ class Link:
             ),
             cur_pose.orientation
         )
+        rospy.loginfo('...trying to get IK for EE from arms.')
         return S.arms.arms[arm_idx].get_ik_for_ee(new_pose, seed)
 
     @staticmethod
@@ -608,11 +665,28 @@ class ObjectsHandler(object):
         ObjectsHandler._record_internal()
         ObjectsHandler._broadcast()
 
+
+    @staticmethod
+    def async_update():
+        '''
+        Updates the existing world objects by assuming they haven't
+        changed and computing reachabilities. Also broadcasts.
+
+        Non-blocking.
+        '''
+        Thread(
+            group=None,
+            target=ObjectsHandler.update,
+            name='update_world_objects_thread'
+        ).start()
+
     @staticmethod
     def update():
         '''
         Updates the existing world objects by assuming they haven't
         changed and computing reachabilities. Also broadcasts.
+
+        Blocking.
         '''
         # TODO(mbforbes): Implement.
         # - compute properties of existing objects
@@ -657,10 +731,28 @@ class RobotHandler(object):
     # Where we store the state.
     robot_state = RobotState()
 
+    # Where we store the last-commanded side. Commands sets this.
+    last_commanded = RobotState.NEITHER
+
+    @staticmethod
+    def async_broadcast():
+        '''
+        Updates robot state and broadcasts it (e.g. to the parser).
+
+        Non-blocking.
+        '''
+        Thread(
+            group=None,
+            target=RobotHandler.broadcast,
+            name='broadcast_robot_state_thread'
+        ).start()
+
     @staticmethod
     def broadcast():
         '''
         Updates robot state and broadcasts it (e.g. to the parser).
+
+        Blocking.
         '''
         RobotHandler._update()
         RobotHandler.robot_state_pub.publish(RobotHandler.robot_state)
@@ -670,8 +762,53 @@ class RobotHandler(object):
         '''
         Computes and sets the robot state.
         '''
-        # TODO(mbforbes): Get ALL the state.
-        RobotHandler.robot_state = RobotState()
+        # Set vars
+        side_names = [HandsFreeCommand.RIGHT_HAND, HandsFreeCommand.LEFT_HAND]
+
+        # Create empty
+        rs = RobotState()
+
+        # Fill in basic vals.
+        rs.last_cmd_side = RobotHandler.last_commanded
+        rs.is_executing = Program.is_executing()
+
+        # Fill in gripper states.
+        for side in [Side.RIGHT, Side.LEFT]:
+            val = S.arms.arms[side].get_gripper_joint_position()
+            # Heuristic: Judege based on how open/close the gripper is.
+            # This will fail, for example, when picking up a thin
+            # object.
+            # TODO(mbforbes): Refactor into constants.
+            if val <= 0.02:
+                state = RobotState.CLOSED_EMPTY
+            elif val >= 0.078:
+                state = RobotState.OPEN
+            else:
+                state = RobotState.HAS_OBJ
+            rs.gripper_states += [state]
+
+        # Fill in via IK.
+        rs.can_move_up = [
+            Link.get_ik_abs_dir(s, HandsFreeCommand.UP) is not None
+            for s in side_names]
+        rs.can_move_down = [
+            Link.get_ik_abs_dir(s, HandsFreeCommand.DOWN) is not None
+            for s in side_names]
+        rs.can_move_toleft = [
+            Link.get_ik_abs_dir(s, HandsFreeCommand.TO_LEFT) is not None
+            for s in side_names]
+        rs.can_move_toright = [
+            Link.get_ik_abs_dir(s, HandsFreeCommand.TO_RIGHT) is not None
+            for s in side_names]
+        rs.can_move_forward = [
+            Link.get_ik_abs_dir(s, HandsFreeCommand.FORWARD) is not None
+            for s in side_names]
+        rs.can_move_backward = [
+            Link.get_ik_abs_dir(s, HandsFreeCommand.BACKWARD) is not None
+            for s in side_names]
+
+        # Set.
+        RobotHandler.robot_state = rs
 
 
 class HandsFree(object):
@@ -698,6 +835,13 @@ class HandsFree(object):
         rospy.Subscriber(
             'handsfree_command', HandsFreeCommand, self.command_cb)
 
+        # Send off one robot state to get system started.
+        # NOTE(mbforbes): Once the system is working, it might be best
+        # to just create a new action (and look for objects) right away
+        # so people can just start programming right off the bat.
+        RobotHandler.async_broadcast()
+
+
     def command_cb(self, hf_cmd):
         '''
         Callback for when praser sends us a command.
@@ -710,7 +854,7 @@ class HandsFree(object):
         rospy.loginfo('HandsFree: Received command: ' + cmd + ' ' + str(args))
 
         # First, check whether executing for emergency commands.
-        if self.program_idx > -1 and self.get_program().is_executing():
+        if Program.is_executing():
             if cmd not in CommandRouter.emergency_commands:
                 return
 
@@ -743,16 +887,8 @@ class HandsFree(object):
         asynchronously. This is useful so that there's no pause while
         IK, etc. are computed.
         '''
-        Thread(
-            group=None,
-            target=RobotHandler.broadcast,
-            name='broadcast_robot_state_thread'
-        ).start()
-        Thread(
-            group=None,
-            target=ObjectsHandler.update,
-            name='update_world_objects_thread'
-        ).start()
+        ObjectsHandler.async_update()
+        RobotHandler.async_broadcast()
 
     def get_program(self):
         '''Come on, get with the program!
@@ -784,7 +920,7 @@ class HandsFree(object):
         Args:
             args ([str]): Command args; unused here.
         '''
-        if self.program_idx > -1 and self.get_program().is_executing():
+        if Program.is_executing():
             self.get_program().stop()
         else:
             HandsFree.FF_NOT_EXECUTING.issue()

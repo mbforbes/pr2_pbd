@@ -10,11 +10,12 @@ roslib.load_manifest('pr2_pbd_interaction')
 import rospy
 
 # System builtins
+import struct
 import threading
 import time
 
 # 3rd party
-from numpy import array
+import numpy as np
 from numpy.linalg import norm
 
 # ROS builtins
@@ -97,12 +98,13 @@ RECOGNITION_TIMEOUT_SECONDS = rospy.Duration(5.0)
 # Classes
 # ######################################################################
 
-class WorldObject:
-    '''Class for representing objects'''
+class PbdObject:
+    '''Class for representing objects interally in PbD.'''
 
-    def __init__(self, pose, index, dimensions, is_recognized):
+    def __init__(self, cluster, pose, index, dimensions, is_recognized):
         '''
         Args:
+            cluster (sensor_msgs/PointCloud)
             pose (Pose): Position of bounding box
             index (int): For naming object in world (e.g. "thing 0")
             dimensions (Vector3): Size of bounding box
@@ -116,7 +118,121 @@ class WorldObject:
         self.menu_handler = MenuHandler()
         self.int_marker = None
         self.is_removed = False
+        self.cluster = cluster
+        self.type = 'unknown'
+        self.color = self.get_color()
+        self.endpoints = self.get_endpoints()
+        self.vol = self.get_vol()
+        self.set_reachability_map()
         self.menu_handler.insert('Remove from scene', callback=self.remove)
+        self.display()
+
+    def display(self):
+        '''Display info (for debug).'''
+        rospy.loginfo('Object: ' + self.get_name())
+        rospy.loginfo('\t- color: ' + self.color)
+        rospy.loginfo('\t- type:  ' + self.type)
+        rospy.loginfo('\t- vol:   ' + str(self.vol))
+        p_descs = [
+            'rightmost',
+            'leftmost',
+            'farthest',
+            'nearest',
+            'highest',
+            'lowest',
+        ]
+        for idx, desc in enumerate(p_descs):
+            rospy.loginfo('\t- ' + desc + ' point:  ' + self.endpoints[idx])
+
+    def set_pickupable(self):
+        '''
+        Spins off a thread to compute whether this object is
+        automatically pickup-able.
+        '''
+        # TODO(mbforbes): Implement.
+        pass
+
+    def set_reachability_map(self):
+        '''
+        Spins off threads to compute whether different locations around
+        this object are reachable.
+        '''
+        locs = ['above', 'next_to']
+        # TODO(mbforbes): Implement, then put in map.
+
+    def get_endpoints(self):
+        '''
+        Returns four endpoints.
+
+        Returns:
+            [float]: Elements:
+                - rightmost val (y axis most negative)
+                - leftmost val (y axis most positive)
+                - farthest val (x axis most positive)
+                - nearest val (x axis most negative)
+                - highest val (z axis most positive)
+                - lowest val (z axis most negative)
+        '''
+        #TODO(mbforbes): Impelement.
+        return [0.0] * 6
+
+    def get_color(self):
+        '''
+        Returns color as string.
+
+        Returns:
+            str: one of:
+                - 'red'
+                - 'green'
+                - 'blue'
+                - 'unknown'
+        '''
+        for c in self.cluster.channels:
+            if c.name == 'rgb':
+                # r, g, b values packed into least significant 24 bits.
+                res = np.zeros((len(c.values), 3))
+                mask = (2 << 7) - 1
+                for idx, v in enumerate(c.values):
+                    # TODO(mbforbes): Remove 24 when done checking (if works).
+                    raw = PbdObject.ftb(v)
+                    res[idx] = [(raw >> shift) & mask for shift in [0, 8, 16]]
+                # Average down the columns.
+                # NOTE(mbforbes): This is where computer vision people
+                # cry.
+                avgs = np.average(res, 0)
+
+                # Temp logging
+                b, g, r = avgs
+                rospy.loginfo('red: ' + str(int(r)))
+                rospy.loginfo('green: ' + str(int(g)))
+                rospy.loginfo('blue: ' + str(int(b)))
+
+                # Ret!
+                return ['blue', 'green', 'red'][np.argmax(avgs)]
+
+        # No rgb channel found.
+        return 'unknown'
+
+    @staticmethod
+    def ftb(f):
+        '''
+        Float to bits (well, to int, but then we can get bits).
+
+        Args:
+            f (float)
+
+        Returns:
+            int
+        '''
+        s = struct.pack('>f', f)
+        return struct.unpack('>l', s)[0]
+
+    def get_vol(self):
+        '''
+        Returns volume.
+        '''
+        #TODO(mbforbes): Impelement. Should be easy with bounding box.
+        return 0.0
 
     def get_name(self):
         '''Return this object's name.
@@ -164,7 +280,7 @@ class World:
 
     tf_listener = None
 
-    # Type: [WorldObject]
+    # Type: [PbdObject]
     objects = []
 
     def __init__(self):
@@ -303,6 +419,16 @@ class World:
         return [w_obj.object for w_obj in World.objects]
 
     @staticmethod
+    def get_objs():
+        '''
+        Now we'll actually use the internal class for once.
+
+        Returns:
+            [PbdObject]
+        '''
+        return World.objects
+
+    @staticmethod
     def has_objects():
         '''Returns whetehr there are any objects (reference frames).
 
@@ -320,7 +446,8 @@ class World:
         '''
         d1 = obj1.dimensions
         d2 = obj2.dimensions
-        return norm(array([d1.x, d1.y, d1.z]) - array([d2.x, d2.y, d2.z]))
+        return norm(
+            np.array([d1.x, d1.y, d1.z]) - np.array([d2.x, d2.y, d2.z]))
 
     @staticmethod
     def get_ref_from_name(ref_name):
@@ -482,11 +609,11 @@ class World:
             p1p = pose1.position
             p2p = pose2.position
             if is_on_table:
-                arr1 = array([p1p.x, p1p.y])
-                arr2 = array([p2p.x, p2p.y])
+                arr1 = np.array([p1p.x, p1p.y])
+                arr2 = np.array([p2p.x, p2p.y])
             else:
-                arr1 = array([p1p.x, p1p.y, p1p.z])
-                arr2 = array([p2p.x, p2p.y, p2p.z])
+                arr1 = np.array([p1p.x, p1p.y, p1p.z])
+                arr2 = np.array([p2p.x, p2p.y, p2p.z])
             dist = norm(arr1 - arr2)
             if dist < OBJ_DIST_ZERO_CLAMP:
                 dist = 0
@@ -628,6 +755,7 @@ class World:
                             'Adding the recognized object with most ' +
                             'confident model.')
                         self._add_new_object(
+                            object_list.graspable_objects[i].cluster,
                             object_pose,
                             DIMENSIONS_OBJ,
                             True,
@@ -647,13 +775,21 @@ class World:
                             '...in ref frame ' +
                             str(bbox.pose.header.frame_id))
                         self._add_new_object(
-                            cluster_pose, bbox.box_dims, False)
+                            cluster,
+                            cluster_pose,
+                            bbox.box_dims,
+                            False
+                        )
         else:
             rospy.logwarn('... but the list was empty.')
         self._lock.release()
 
     def update_object_pose(self):
-        ''' Function to externally update an object pose.'''
+        '''Call to update object list.
+
+        Returns:
+            bool: Success?
+        '''
         # Look down at the table.
         rospy.loginfo('Head attempting to look at table.')
         Response.perform_gaze_action(GazeGoal.LOOK_DOWN)
@@ -824,7 +960,8 @@ class World:
         World.objects = []
         self._lock.release()
 
-    def _add_new_object(self, pose, dimensions, is_recognized, mesh=None):
+    def _add_new_object(
+            self, cluster, pose, dimensions, is_recognized, mesh=None):
         '''Maybe add a new object with the specified properties to our
         object list.
 
@@ -832,6 +969,7 @@ class World:
         exists (and has been added).
 
         Args:
+            cluster (sensor_msgs/PointCloud)
             pose (Pose)
             dimensions (Vector3)
             is_recognized (bool)
@@ -870,7 +1008,7 @@ class World:
 
             # # Actually add the object.
             # self._add_new_object_internal(
-            #     pose, dimensions, is_recognized, mesh)
+            #     cluster, pose, dimensions, is_recognized, mesh)
             # return True
         else:
             # Whether whether we already have an object at ~ the same
@@ -885,23 +1023,25 @@ class World:
 
             # Actually add the object.
             self._add_new_object_internal(
-                pose, dimensions, is_recognized, mesh)
+                cluster, pose, dimensions, is_recognized, mesh)
             return True
 
-    def _add_new_object_internal(self, pose, dimensions, is_recognized, mesh):
+    def _add_new_object_internal(
+        self, cluster, pose, dimensions, is_recognized, mesh):
         '''Does the 'internal' adding of an object with the passed
         properties. Call _add_new_object to do all pre-requisite checks
         first (it then calls this function).
 
         Args:
+            cluster (sensor_msgs/PointCloud)
             pose (Pose)
             dimensions (Vector3)
             is_recognized (bool)
             mesh (Mesh|None): A mesh, if it exists (can be None).
         '''
         n_objects = len(World.objects)
-        World.objects.append(WorldObject(
-            pose, n_objects, dimensions, is_recognized))
+        World.objects.append(PbdObject(
+            cluster, pose, n_objects, dimensions, is_recognized))
         int_marker = self._get_object_marker(len(World.objects) - 1)
         World.objects[-1].int_marker = int_marker
         self._im_server.insert(int_marker, self.marker_feedback_cb)

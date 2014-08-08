@@ -20,6 +20,7 @@ string HAS_OBJ = has_obj
 # ======================================================================
 
 string last_cmd_side
+bool is_executing
 
 # Arrays have two entires: right, left
 string[] gripper_states

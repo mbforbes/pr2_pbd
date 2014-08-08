@@ -289,6 +289,14 @@ class Arm:
         '''
         return self.gripper_state
 
+    def get_gripper_joint_position(self):
+        '''Returns the gripper joint position.
+
+        Returns:
+            float: 0.00 (closed) <= n <= 0.08 (open)  (approx)
+        '''
+        return self.get_joint_positions([self.gripper_joint_name])[0]
+
     def check_gripper_state(self, joint_name=None):
         '''Checks gripper state at the hardware level.
 
@@ -470,13 +478,13 @@ class Arm:
         # If our seed did not work, try once again with the default
         # seed.
         if joints is None:
-            rospy.logdebug(
+            rospy.loginfo(
                 'Could not find IK solution with preferred seed, will try ' +
                 'default seed.')
             joints = self._solve_ik(ee_pose)
 
         if joints is None:
-            rospy.logdebug('IK out of bounds, considering the seed directly.')
+            rospy.loginfo('IK out of bounds, considering the seed directly.')
             # IK failed, but let's see if FK with the passed seed will
             # give us a pose close enough to the ee_pose that it's
             # usable.
@@ -484,12 +492,12 @@ class Arm:
             if fk_pose is not None:
                 if Arm.get_distance_bw_poses(ee_pose, fk_pose) < FK_THRESHOLD:
                     joints = seed
-                    rospy.logdebug(
+                    rospy.loginfo(
                         'IK out of bounds, but FK close; using seed.')
                 # We don't report it if FK isn't close as this will
                 # happen for about all relative but unreachable poses.
             else:
-                rospy.logdebug(
+                rospy.loginfo(
                     'FK failed and returned None for seed: ' + str(seed))
         else:
             rollover = array((array(joints) - array(seed)) / pi, int)
@@ -788,7 +796,7 @@ class Arm:
 
         # Send off the IK request.
         try:
-            rospy.logdebug('Sending IK request.')
+            rospy.loginfo('Sending IK request.')
             response = self.ik_srv(self.ik_request)
             if response.error_code.val == response.error_code.SUCCESS:
                 return response.solution.joint_state.position
