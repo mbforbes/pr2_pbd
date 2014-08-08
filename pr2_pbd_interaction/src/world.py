@@ -235,7 +235,7 @@ class PbdObject:
             2D numpy Array (n_points x 3)
         '''
         # NOTE(mbforbes): Do we have to do any transforms???
-        ret = np.zeros((len(cluster.points),3))
+        ret = np.zeros((len(cluster.points), 3))
         for idx, point in enumerate(cluster.points):
             ret[idx] = point.x, point.y, point.z
         return ret
