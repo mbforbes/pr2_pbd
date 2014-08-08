@@ -121,6 +121,7 @@ class PbdObject:
         self.cluster = cluster
         self.type = 'unknown'
         self.color = self.get_color()
+        self.points = PbdObject.get_points(cluster)
         self.endpoints = self.get_endpoints()
         self.vol = self.get_vol()
         self.set_reachability_map()
@@ -173,8 +174,17 @@ class PbdObject:
                 - highest val (z axis most positive)
                 - lowest val (z axis most negative)
         '''
-        # TODO(mbforbes): Impelement.
-        return [0.0] * 6
+        # Look column-wise down the 2D points array.
+        xmax, ymax, zmax = np.max(self.points, 0)
+        xmin, ymin, zmin = np.min(self.points, 0)
+        return [
+            ymin,
+            ymax,
+            xmax,
+            xmin,
+            zmax,
+            xmin
+        ]
 
     def get_color(self):
         '''
@@ -211,6 +221,24 @@ class PbdObject:
 
         # No rgb channel found.
         return 'unknown'
+
+    @staticmethod
+    def get_points(cluster):
+        '''
+        Creates a new numpy array from a point cloud that contains the
+        points position data. This is faster to use later.
+
+        Args:
+            cluster (sensor_msgs/PointCloud)
+
+        Returns:
+            2D numpy Array (n_points x 3)
+        '''
+        # NOTE(mbforbes): Do we have to do any transforms???
+        ret = np.zeros((len(cluster.points),3))
+        for idx, point in enumerate(cluster.points):
+            ret[idx] = point.x, point.y, point.z
+        return ret
 
     @staticmethod
     def ftb(f):
