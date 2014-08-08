@@ -276,6 +276,7 @@ class MoveRelativePosition(Command):
     #     fb = FailureFeedback(self.hand_str + ' did not close.')
     #     return res, fb
 
+
 class MoveAbsoluteDirection(Command):
     '''Action 3: Move the robot's gripper(s) in an absolute direction on
     one (or both?) side(s).
@@ -665,7 +666,6 @@ class ObjectsHandler(object):
         ObjectsHandler._record_internal()
         ObjectsHandler._broadcast()
 
-
     @staticmethod
     def async_update():
         '''
@@ -841,7 +841,6 @@ class HandsFree(object):
         # so people can just start programming right off the bat.
         RobotHandler.async_broadcast()
 
-
     def command_cb(self, hf_cmd):
         '''
         Callback for when praser sends us a command.
@@ -962,6 +961,7 @@ class HandsFree(object):
                 self.program_idx - 1 if args[0] == HandsFreeCommand.PREVIOUS
                 else self.program_idx + 1)
             self.get_program().switch_to(self.program_idx + 1)  # 1-based
+
 
 class CommandRouter(object):
     '''Maps commands to classes and functions.'''

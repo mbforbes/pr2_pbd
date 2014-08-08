@@ -173,7 +173,7 @@ class PbdObject:
                 - highest val (z axis most positive)
                 - lowest val (z axis most negative)
         '''
-        #TODO(mbforbes): Impelement.
+        # TODO(mbforbes): Impelement.
         return [0.0] * 6
 
     def get_color(self):
@@ -193,7 +193,6 @@ class PbdObject:
                 res = np.zeros((len(c.values), 3))
                 mask = (2 << 7) - 1
                 for idx, v in enumerate(c.values):
-                    # TODO(mbforbes): Remove 24 when done checking (if works).
                     raw = PbdObject.ftb(v)
                     res[idx] = [(raw >> shift) & mask for shift in [0, 8, 16]]
                 # Average down the columns.
@@ -231,7 +230,7 @@ class PbdObject:
         '''
         Returns volume.
         '''
-        #TODO(mbforbes): Impelement. Should be easy with bounding box.
+        # TODO(mbforbes): Impelement. Should be easy with bounding box.
         return 0.0
 
     def get_name(self):
@@ -1027,7 +1026,7 @@ class World:
             return True
 
     def _add_new_object_internal(
-        self, cluster, pose, dimensions, is_recognized, mesh):
+            self, cluster, pose, dimensions, is_recognized, mesh):
         '''Does the 'internal' adding of an object with the passed
         properties. Call _add_new_object to do all pre-requisite checks
         first (it then calls this function).
