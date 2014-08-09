@@ -110,21 +110,31 @@ class PbdObject:
             dimensions (Vector3): Size of bounding box
             is_recognized (bool): Result of object recognition.
         '''
+        # Core attrs.
+        self.cluster = cluster
+        self.pose = pose
         self.index = index
-        self.assigned_name = None
+        self.dimensions = dimensions
         self.is_recognized = is_recognized
+
+        # Attrs computed for Hands-free.
+        self.type = 'unknown'
+        self.color = PbdObject.get_color(cluster)
+        self.points = PbdObject.get_points(cluster)
+        self.endpoints = PbdObject.get_endpoints(self.points)
+        self.vol = PbdObject.get_vol(dimensions)
+
+        # These are for hands-free, but are computed later on demand.
+        self.reachability_map = None
+        self.pickupable = None
+
+        # Object stuff
+        self.assigned_name = None
         self.object = Object(
             Object.TABLE_TOP, self.get_name(), pose, dimensions)
         self.menu_handler = MenuHandler()
         self.int_marker = None
         self.is_removed = False
-        self.cluster = cluster
-        self.type = 'unknown'
-        self.color = self.get_color()
-        self.points = PbdObject.get_points(cluster)
-        self.endpoints = self.get_endpoints()
-        self.vol = self.get_vol()
-        self.set_reachability_map()
         self.menu_handler.insert('Remove from scene', callback=self.remove)
         self.display()
 
@@ -145,25 +155,15 @@ class PbdObject:
         for idx, desc in enumerate(p_descs):
             rospy.loginfo('\t- ' + desc + ' point:  ' + self.endpoints[idx])
 
-    def set_pickupable(self):
+    @staticmethod
+    def get_endpoints(points):
         '''
-        Spins off a thread to compute whether this object is
-        automatically pickup-able.
-        '''
-        # TODO(mbforbes): Implement.
-        pass
+        Returns the farthest points in each direction.
 
-    def set_reachability_map(self):
-        '''
-        Spins off threads to compute whether different locations around
-        this object are reachable.
-        '''
-        locs = ['above', 'next_to']
-        # TODO(mbforbes): Implement, then put in map.
-
-    def get_endpoints(self):
-        '''
-        Returns four endpoints.
+        Args:
+            points (numpy Array [n_points x 3]): A numpy array of
+                dimensions n_points x 3, with the (x, y, z) coordinates
+                of each point.
 
         Returns:
             [float]: Elements:
@@ -175,8 +175,8 @@ class PbdObject:
                 - lowest val (z axis most negative)
         '''
         # Look column-wise down the 2D points array.
-        xmax, ymax, zmax = np.max(self.points, 0)
-        xmin, ymin, zmin = np.min(self.points, 0)
+        xmax, ymax, zmax = np.max(points, 0)
+        xmin, ymin, zmin = np.min(points, 0)
         return [
             ymin,
             ymax,
@@ -186,9 +186,13 @@ class PbdObject:
             xmin
         ]
 
-    def get_color(self):
+    @staticmethod
+    def get_color(cluster):
         '''
-        Returns color as string.
+        Returns color of cluster as string.
+
+        Args:
+            cluster (PointCloud)
 
         Returns:
             str: one of:
@@ -197,7 +201,7 @@ class PbdObject:
                 - 'blue'
                 - 'unknown'
         '''
-        for c in self.cluster.channels:
+        for c in cluster.channels:
             if c.name == 'rgb':
                 # r, g, b values packed into least significant 24 bits.
                 res = np.zeros((len(c.values), 3))
@@ -254,12 +258,19 @@ class PbdObject:
         s = struct.pack('>f', f)
         return struct.unpack('>l', s)[0]
 
-    def get_vol(self):
+    @staticmethod
+    def get_vol(d):
         '''
         Returns volume.
+
+        Args:
+            d (Vector3): Dimensions of the object.
+
+        Returns:
+            float
         '''
-        # TODO(mbforbes): Impelement. Should be easy with bounding box.
-        return 0.0
+        d = dimensions
+        return d.x * d.y * d.z
 
     def get_name(self):
         '''Return this object's name.

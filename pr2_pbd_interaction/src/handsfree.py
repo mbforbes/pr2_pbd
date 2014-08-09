@@ -13,7 +13,7 @@ roslib.load_manifest('pr2_pbd_interaction')
 import rospy
 
 # System builtins
-from threading import Thread
+from threading import Thread, Lock
 
 # ROS builtins
 from geometry_msgs.msg import Vector3, Pose, Point
@@ -62,7 +62,7 @@ class Options(object):
     def __init__(self, options={}):
         '''
         Args:
-            options (dict, optional): Defaults to {}.
+            options ({str: object}, optional): Defaults to {}.
         '''
         self.options = options
         # Convenience check to avoid redundant specifications.
@@ -73,6 +73,16 @@ class Options(object):
                     ', Value: ' + str(val) + '.')
 
     def get(self, option_name):
+        '''
+        Gets the set option by option_name, or the default if it wasn't
+        explicitly set.
+
+        Args:
+            option_name (str)
+
+        Returns:
+            object
+        '''
         if option_name in self.options:
             return self.options[option_name]
         else:
@@ -83,6 +93,15 @@ class Options(object):
 
     @classmethod
     def get_default(cls, option_name):
+        '''
+        Gets the default value for option_name.
+
+        Args:
+            option_name (str)
+
+        Returns:
+            object
+        '''
         return cls.defaults[option_name]
 
 
@@ -518,6 +537,10 @@ class Program(object):
     def stop(self):
         '''
         Stops executing, if it is.
+
+        This is 'lazy' in that this really just requests the progrram to
+        stop before executing the next step. For true, robot-apocalypse-
+        scale problems, hit the run-stop.
         '''
 
         self.stop_requested = True
@@ -542,6 +565,28 @@ class Link(object):
 
     Replacing it and S would make the system PbD-independent.
     '''
+    joint_positions = {
+        'side': {
+            'right': [
+                -0.75,  # shoulder_pan
+                0.20,  # shoulder_lift
+                -2.60,  # upper_arm_roll
+                0.40,  # elbow_flex
+                1.60,  # forearm_roll
+                0.60,  # wrist_flex
+                1.00  # wrist_roll
+            ],
+            'left': [
+                0.75,  # shoulder_pan
+                -0.20,  # shoulder_lift
+                2.60,  # upper_arm_roll
+                -0.40,  # elbow_flex
+                -1.60,  # forearm_roll
+                -0.60,  # wrist_flex
+                -1.00  # wrist_roll
+            ],
+        },
+    }
 
     # Settings.
     # TODO(mbforbes): Make launch param?
@@ -622,6 +667,24 @@ class Link(object):
         return S.arms.arms[arm_idx].get_ik_for_ee(new_pose, seed)
 
     @staticmethod
+    def move_to_named_position(name):
+        '''
+        Args:
+            name (str): The name of the position to move to. See
+                Link.joint_positions.
+
+        Returns:
+            bool: Whether movement was successful.
+
+        '''
+        if name not in Link.joint_positions:
+            rospy.logwarn('No pre-set joint positions for ' + str(name))
+            return False
+        mapping = Link.joint_positions[name]
+        r, l = mapping['right'], mapping['left']
+        return Link.move_to_joints(r, l)
+
+    @staticmethod
     def move_to_joints(r_joints=None, l_joints=None):
         '''
         Args:
@@ -657,6 +720,7 @@ class ObjectsHandler(object):
 
     world_object_pub = rospy.Publisher(topic_worldobjs, WorldObjects)
     objects = []
+    objects_lock = Lock()
 
     @staticmethod
     def record():
@@ -696,11 +760,21 @@ class ObjectsHandler(object):
     @staticmethod
     def _record_internal():
         '''
-        Gets the world objects (actually observes).
+        Moves hands to side, gets the world objects (actually observes).
+
+        Note that it doesn't move the hands back. This is useful because
+        now we start programming from the same location every time.
         '''
-        # TODO(mbforbes): Implement.
-        # - look down, record
-        ObjectsHandler.objects = []
+        # Move arms to side.
+        Link.move_to_named_position('side')
+
+        # Record and grab objects
+        S.world.update_object_pose()
+        ObjectsHandler.objects_lock.acquire()
+        ObjectsHandler.objects = S.world.get_objs()
+        ObjectsHandler.objects_lock.release()
+
+        # Compute properties
         ObjectsHandler._update_internal()
 
     @staticmethod
@@ -708,18 +782,32 @@ class ObjectsHandler(object):
         '''
         Updates reachability properties of existing WorldObjects.
         '''
-        # TODO(mbforbes): Implement.
-        # - compute properties
-        for world_object in ObjectsHandler.objects:
+        ObjectsHandler.objects_lock.acquire()
+        for pbd_object in ObjectsHandler.objects:
+            # TODO(mbforbes): compute properties.
             pass
+        ObjectsHandler.objects_lock.release()
+
+
+    @staticmethod
+    def make_worldobjs():
+        '''
+        Uses ObjectsHandler.objects to make a WorldObjects.
+
+        Returns:
+            WorldObjects
+        '''
+        return WorldObjects()
 
     @staticmethod
     def _broadcast():
         '''
         Actually publishes the WorldObjects.
         '''
+        ObjectsHandler.objects_lock.acquire()
         ObjectsHandler.world_object_pub.publish(
-            WorldObjects(ObjectsHandler.objects))
+            WorldObjects(ObjectsHandler.make_worldobjs()))
+        ObjectsHandler.objects_lock.release()
 
 
 class RobotHandler(object):
