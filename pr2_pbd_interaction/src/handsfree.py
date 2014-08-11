@@ -945,7 +945,7 @@ class ObjectsHandler(object):
         Records and broadcasts world objects.
         '''
         ObjectsHandler._record_internal()
-        ObjectsHandler._broadcast()
+        ObjectsHandler.broadcast()
 
     # Reachabilities don't change, so probably no need for this.
     # @staticmethod
@@ -974,7 +974,7 @@ class ObjectsHandler(object):
     #     # TODO(mbforbes): Implement.
     #     # - compute properties of existing objects
     #     ObjectsHandler._update_internal()
-    #     ObjectsHandler._broadcast()
+    #     ObjectsHandler.broadcast()
 
     @staticmethod
     def _record_internal():
@@ -1169,7 +1169,7 @@ class ObjectsHandler(object):
         return WorldObjects(wobjs)
 
     @staticmethod
-    def _broadcast():
+    def broadcast():
         '''
         Actually publishes the WorldObjects.
         '''
@@ -1343,9 +1343,9 @@ class HandsFree(object):
         asynchronously. This is useful so that there's no pause while
         IK, etc. are computed.
         '''
-        # World objects don't change, so removing!
-        # ObjectsHandler.async_update()
         RobotHandler.async_broadcast()
+        # World objects don't change, so broadcasting is fast.
+        ObjectsHandler.broadcast()
 
     def get_program(self):
         '''Come on, get with the program!
