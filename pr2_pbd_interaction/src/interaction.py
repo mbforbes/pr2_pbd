@@ -162,9 +162,20 @@ class Interaction:
             __ (PingRequest): unused
 
         Returns:
-            PingResponse: empty
+            PingResponse
         '''
-        return PingResponse()
+        # Note(mbforbes): Cheating and using this for my benefit!
+        ee_states = [None, None]
+        sides = [Side.RIGHT, Side.LEFT]
+        side_strs = ['right', 'left']
+        ret = []
+        for side in sides:
+            ee_state = self.arms.arms[side].get_ee_state()
+            if ee_state is not None:
+                ret += [side_strs[side]]
+                ret += ['\t' + str(ee_state.position)]
+                ret += ['\t' + str(ee_state.orientation)]
+        return PingResponse('\n'.join(ret))
 
     def _on_shutdown(self):
         '''This is mostly for debugging: log that the interaction node

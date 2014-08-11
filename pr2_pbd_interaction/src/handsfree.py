@@ -13,10 +13,11 @@ roslib.load_manifest('pr2_pbd_interaction')
 import rospy
 
 # System builtins
+from collections import OrderedDict
 from threading import Thread, Lock
 
-# ROS builtins
-from geometry_msgs.msg import Vector3, Pose, Point
+# ROS builtinsn
+from geometry_msgs.msg import Vector3, Pose, Point, Quaternion
 
 # PbD (3rd party / local)
 from arms import Arms
@@ -32,10 +33,33 @@ from feedback import Feedback, FailureFeedback
 # Module level constants
 # ######################################################################
 
+FLOAT_COMPARE_EPSILON = 0.01
+
 
 # ######################################################################
 # Classes
 # ######################################################################
+
+class Util(object):
+    '''Helpful and miscellaneous.'''
+
+    @staticmethod
+    def are_floats_close(a, b, epsilon=FLOAT_COMPARE_EPSILON):
+        '''Checks whether two floats are within epsilon of each other.
+
+        Args:
+            a (float): One number.
+            b (float): The other number.
+            epsilon (float): Acceptable wiggle room (+/-) between a and
+                b.
+
+        Returns:
+            bool: Whether a and b are within epsilon of each other.
+        '''
+        # We try to do this in an overflow-friendly way, though it
+        # probably isn't a big deal with our use cases and python.
+        return a - epsilon <= b if a > b else b - epsilon <= a
+
 
 class Mode(object):
     '''Modes in which a command can be executed.'''
@@ -569,9 +593,9 @@ class Link(object):
         'side': {
             'right': [
                 -0.75,  # shoulder_pan
-                0.20,  # shoulder_lift
+                -0.20,  # shoulder_lift
                 -2.60,  # upper_arm_roll
-                0.40,  # elbow_flex
+                -0.40,  # elbow_flex
                 1.60,  # forearm_roll
                 0.60,  # wrist_flex
                 1.00  # wrist_roll
@@ -582,8 +606,8 @@ class Link(object):
                 2.60,  # upper_arm_roll
                 -0.40,  # elbow_flex
                 -1.60,  # forearm_roll
-                -0.60,  # wrist_flex
-                -1.00  # wrist_roll
+                0.60,  # wrist_flex
+                1.00  # wrist_roll
             ],
         },
     }
@@ -698,26 +722,179 @@ class Link(object):
         Returns:
             bool: Whether movement was successful.
         '''
-        if r_joints is not None:
-            r_armstate = ArmState()
-            r_armstate.joint_pose = r_joints
-        else:
-            r_armstate = None
-        if l_joints is not None:
-            l_armstate = ArmState()
-            l_armstate.joint_pose = l_joints
-        else:
-            l_armstate = None
+        sides = [Side.RIGHT, Side.LEFT]
+        targets = [r_joints, l_joints]
+        arm_states = [None, None]
+        for i, side in enumerate(sides):
+            target = targets[i]
+            if target is not None:
+                cur_joints = Arms.get_joint_positions(side)
+                will_move = False
+                for j in range(len((cur_joints))):
+                    if not Util.are_floats_close(target[j], cur_joints[j]):
+                        will_move = True
+                        break
+                if will_move:
+                    arm_state = ArmState()
+                    arm_state.joint_pose = target
+                    arm_states[i] = arm_state
 
-        return S.arms.move_to_joints(r_armstate, l_armstate)
+        # If we're already in the required position, don't move.
+        if arm_states[0] is None and arm_states[1] is None:
+            rospy.loginfo('Arms already at joints; not moving.')
+            return True
+
+        # Else, try moving.
+        rospy.loginfo('Arms moving to joints...')
+        return S.arms.move_to_joints(arm_states[0], arm_states[1])
+
+
+class ReachableResult(object):
+    '''Saving reachable results.'''
+
+    def __init__(
+            self, reachable=False, loc_str=None, pose=None, joints=None):
+        '''
+        See body of method for info.
+
+        Args:
+            reachable (bool)
+            loc_str (str)
+            pose (Pose)
+        '''
+
+        # Is the location reachable? Type: bool
+        self.reachable = reachable
+
+        # What was the location used? (E.g. if 'near', then this could
+        # be 'left' or 'right'). Only set if reachable. Type: str
+        self.loc_str = loc_str
+
+        # What was the pose used? Only set if reachable. Type: Pose.
+        self.pose = pose
+
+        # What was the joints (IK solution) for pose? Only set if
+        # reachable. Type: [float] (length 7).
+        self.joints = joints
 
 
 class ObjectsHandler(object):
     '''Manages world objects.'''
 
+    # Unreachable
+    UNR = ReachableResult(reachable=False)
+
+    # Orientation options to try for computing IK towards locations. We
+    # use an OrderedDict so we know in which order we try them.
+    orientations = OrderedDict([
+        # NOTE(mbforbes): Trying all upside-down orientations for now as
+        # this actually lets the grippers more easily tilt down (the
+        # default, "rightside-up" (as I'm calling it) orientation is
+        # biased towards tilting upwards, which is less useful for us
+        # because the PR2's arms are higher up than the table, and
+        # we're only concerned here with tabletop manipulation tasks).
+        # ('flat-upwards', Quaternion(
+        #     0.0,
+        #     0.0,
+        #     0.0,
+        #     1.0
+        # )),
+        ('flat-upsidedown', Quaternion(
+            1.0,
+            0.0,
+            0.0,
+            0.0
+        )),
+        ('smalltilt-upsidedown', Quaternion(
+            0.958600311321,
+            0.0389047107548,
+            -0.280663429733,
+            -0.0282826064416
+        )),
+        ('45deg-upsidedown', Quaternion(
+            0.947183721725,
+            0.0378169124572,
+            -0.317060828047,
+            -0.029754155172
+        )),
+        ('largetilt-upsidedown', Quaternion(
+            0.84375001925,
+            0.0296645574088,
+            -0.534565233277,
+            -0.0380253917916
+        )),
+        ('vert-upsidedown', Quaternion(
+            0.710535569959,
+            0.0208582222416,
+            -0.702007727379,
+            -0.0434659532153
+        )),
+        ('45deg+righttilt-upsidedown', Quaternion(
+            0.816555509917,
+            -0.166496173679,
+            -0.388895710032,
+            0.392780154914
+        )),
+        ('45deg+right-upsidedown', Quaternion(
+            0.626434852697,
+            -0.291921804483,
+            -0.305953683145,
+            0.654792623021
+        )),
+        ('45deg+lefttilt-upsidedown', Quaternion(
+            0.83986672291,
+            0.176672428537,
+            -0.384052777203,
+            -0.34046175272
+        )),
+        ('45deg+left-upsidedown', Quaternion(
+            -0.631060356859,
+            -0.316931066071,
+            0.279972459512,
+            0.650332951091
+        )),
+    ])
+
     # TODO(mbforbes): Refactor into constant somewhere.
     topic_worldobjs = 'handsfree_worldobjects'
 
+    # Settings
+    close_delta = 0.01
+    # Might have to change for sides to account for gripper size
+    near_delta = 0.05
+
+    # Vecs. Applied to border of that object (e.g. ABOVE_VEC added to
+    # middle top of object, TO_LEFT_OF_VEC added to middle left side of
+    # object, etc.)
+    ABOVE_VEC = Vector3(0.0, 0.0, near_delta)
+    TO_LEFT_OF_VEC = Vector3(0.0, near_delta, 0.0)
+    TO_RIGHT_OF_VEC = Vector3(0.0, -near_delta, 0.0)
+    IN_FRONT_OF_VEC = Vector3(-near_delta, 0.0, 0.0)
+    BEHIND_VEC = Vector3(near_delta, 0.0, 0.0)
+    ON_TOP_OF_VEC = Vector3(0.0, 0.0, close_delta)
+
+    # Reachability spaces. (OrderedDict as we compute in oder.)
+    # Reference either a direction to apply, or one or more previous
+    # elements of the reachability space as options.
+    rel_positions = OrderedDict([
+        (HandsFreeCommand.ABOVE, ABOVE_VEC),
+        (HandsFreeCommand.TO_LEFT_OF, TO_LEFT_OF_VEC),
+        (HandsFreeCommand.TO_RIGHT_OF, TO_RIGHT_OF_VEC),
+        (HandsFreeCommand.IN_FRONT_OF, IN_FRONT_OF_VEC),
+        (HandsFreeCommand.BEHIND, BEHIND_VEC),
+        (HandsFreeCommand.ON_TOP_OF, ON_TOP_OF_VEC),
+        (HandsFreeCommand.NEXT_TO, [
+            HandsFreeCommand.TO_LEFT_OF,
+            HandsFreeCommand.TO_RIGHT_OF,
+        ]),
+        (HandsFreeCommand.NEAR, [
+            HandsFreeCommand.NEXT_TO,
+            HandsFreeCommand.IN_FRONT_OF,
+            HandsFreeCommand.BEHIND,
+        ]),
+    ])
+
+    # Class variables
     world_object_pub = rospy.Publisher(topic_worldobjs, WorldObjects)
     objects = []
     objects_lock = Lock()
@@ -730,32 +907,34 @@ class ObjectsHandler(object):
         ObjectsHandler._record_internal()
         ObjectsHandler._broadcast()
 
-    @staticmethod
-    def async_update():
-        '''
-        Updates the existing world objects by assuming they haven't
-        changed and computing reachabilities. Also broadcasts.
+    # Reachabilities don't change, so probably no need for this.
+    # @staticmethod
+    # def async_update():
+    #     '''
+    #     Updates the existing world objects by assuming they haven't
+    #     changed and computing reachabilities. Also broadcasts.
 
-        Non-blocking.
-        '''
-        Thread(
-            group=None,
-            target=ObjectsHandler.update,
-            name='update_world_objects_thread'
-        ).start()
+    #     Non-blocking.
+    #     '''
+    #     Thread(
+    #         group=None,
+    #         target=ObjectsHandler.update,
+    #         name='update_world_objects_thread'
+    #     ).start()
 
-    @staticmethod
-    def update():
-        '''
-        Updates the existing world objects by assuming they haven't
-        changed and computing reachabilities. Also broadcasts.
+    # Reachabilities don't change, so probably no need for this.
+    # @staticmethod
+    # def update():
+    #     '''
+    #     Updates the existing world objects by assuming they haven't
+    #     changed and computing reachabilities. Also broadcasts.
 
-        Blocking.
-        '''
-        # TODO(mbforbes): Implement.
-        # - compute properties of existing objects
-        ObjectsHandler._update_internal()
-        ObjectsHandler._broadcast()
+    #     Blocking.
+    #     '''
+    #     # TODO(mbforbes): Implement.
+    #     # - compute properties of existing objects
+    #     ObjectsHandler._update_internal()
+    #     ObjectsHandler._broadcast()
 
     @staticmethod
     def _record_internal():
@@ -772,22 +951,152 @@ class ObjectsHandler(object):
         S.world.update_object_pose()
         ObjectsHandler.objects_lock.acquire()
         ObjectsHandler.objects = S.world.get_objs()
-        ObjectsHandler.objects_lock.release()
 
         # Compute properties
-        ObjectsHandler._update_internal()
+        # NOTE(mbforbes); Originally, we had _update_internal() here.
+        for pbd_obj in ObjectsHandler.objects:
+            ObjectsHandler._compute_reachability_for(pbd_obj)
+        S.world.refresh_objects()
 
-    @staticmethod
-    def _update_internal():
-        '''
-        Updates reachability properties of existing WorldObjects.
-        '''
-        ObjectsHandler.objects_lock.acquire()
-        for pbd_object in ObjectsHandler.objects:
-            # TODO(mbforbes): compute properties.
-            pass
+        # TODO(mbforbes): Compute global properties (which farthest,
+        # etc.)
+
         ObjectsHandler.objects_lock.release()
 
+    @staticmethod
+    def _compute_reachability_for(pbd_obj):
+        '''
+        Args:
+            pbd_obj (PbdObject)
+        '''
+        pbd_obj.reachability_map = {}
+        for pos, val in ObjectsHandler.rel_positions.iteritems():
+            # Set defaults to unreachable.
+            pbd_obj.reachability_map[pos] = [
+                ObjectsHandler.UNR,  # r
+                ObjectsHandler.UNR,  # l
+            ]
+            for side in [Side.RIGHT, Side.LEFT]:
+                if type(val) is list:
+                    # It's referencing previously-computed locations. If
+                    # any match, it's good.
+                    for str_loc in val:
+                        rr = pbd_obj.reachability_map[str_loc][side]
+                        if rr.reachable:
+                            pbd_obj.reachability_map[pos][side] = rr
+                            break
+                else:
+                    # It's referencing a vector directly. Compute.
+                    pbd_obj.reachability_map[pos][side] = (
+                        ObjectsHandler._get_loc_reachable(
+                            pbd_obj, pos, val, side))
+
+    # Reachabilities don't change, so probably no need for this.
+    # @staticmethod
+    # def _update_internal():
+    #     '''
+    #     Updates reachability properties of existing WorldObjects.
+    #     '''
+    #     ObjectsHandler.objects_lock.acquire()
+    #     for pbd_object in ObjectsHandler.objects:
+    #         # TODO(mbforbes): compute properties.
+    #         pass
+    #     ObjectsHandler.objects_lock.release()
+
+    @staticmethod
+    def _get_loc_reachable(pbd_obj, rel_pos_str, rel_pos_vec, side):
+        '''
+        Tries several hand orientations to reach rel_pos_vec of pbd_obj
+        with side hand. Returns reachable result containing whether any
+        are possible.
+
+        Args:
+            pbd_obj (PbdObject)
+            rel_pos_str (str): One of
+                - HandsFreeCommand.ABOVE
+                - HandsFreeCommand.TO_LEFT_OF
+                - ...
+            rel_pos_vec (Vector3): One of
+                - ObjectsHandler.ABOVE_VEC
+                - ObjectsHandler.TO_LEFT_OF_VEC
+                - ...
+            side (int): Side.RIGHT or Side.LEFT
+
+
+        Returns:
+            ReachableResult
+        '''
+        # Get the required position.
+        position = ObjectsHandler._get_position_for(
+            pbd_obj, rel_pos_str, rel_pos_vec)
+
+        # Try a bunch of orientations.
+        res = ObjectsHandler.UNR
+        for o_name, orientation in ObjectsHandler.orientations.iteritems():
+            pose = Pose(position, orientation)
+            joints = S.arms.arms[side].get_ik_for_ee(pose, [0.0] * 7)
+            if joints is not None:
+                # Hooray!
+                res = ReachableResult(
+                    True,
+                    rel_pos_str,
+                    pose,
+                    joints
+                )
+
+        # Display in visualization and return.
+        pbd_obj.add_reachable_marker(rel_pos_str, position, res.reachable)
+        return res
+
+    @staticmethod
+    def _get_position_for(pbd_obj, rel_pos_str, rel_pos_vec):
+        '''
+        Returns the location (x, y, z) that is requested for the pbd_obj
+        by rel_pos_vec.
+
+        Note that this involves
+         - computing where on the object to apply rel_pos_vec
+         - applying rel_pos_vec to that point
+
+        Args:
+            pbd_obj (PbdObject)
+            rel_pos_str (str): One of
+                - HandsFreeCommand.ABOVE
+                - HandsFreeCommand.TO_LEFT_OF
+                - ...
+            rel_pos_vec (Vector3): One of
+                - ObjectsHandler.ABOVE_VEC
+                - ObjectsHandler.TO_LEFT_OF_VEC
+                - ...
+
+        Returns:
+            Point
+        '''
+        # Find the starting position based on the type of vector.
+        op = pbd_obj.pose.position
+        loc = Point(op.x, op.y, op.z)  # Don't want to modify obj pos.
+        endpoints = pbd_obj.endpoints
+        if rel_pos_str in [HandsFreeCommand.ABOVE, HandsFreeCommand.ON_TOP_OF]:
+            loc.z = endpoints[4]
+        elif rel_pos_str == HandsFreeCommand.TO_LEFT_OF:
+            loc.y = endpoints[1]
+        elif rel_pos_str == HandsFreeCommand.TO_RIGHT_OF:
+            loc.y = endpoints[0]
+        elif rel_pos_str == HandsFreeCommand.IN_FRONT_OF:
+            loc.x = endpoints[3]
+        elif rel_pos_str == HandsFreeCommand.BEHIND:
+            loc.x = endpoints[2]
+        else:
+            rospy.logwarn(
+                'Relative position ' + rel_pos_str + ' unimplemented; using ' +
+                'center of object ' + str(pbd_obj) + ' as starting point.')
+
+        # Now add the vector to get the final position.
+        return Point(
+            loc.x + rel_pos_vec.x,
+            loc.y + rel_pos_vec.y,
+            loc.z + rel_pos_vec.z,
+        )
 
     @staticmethod
     def make_worldobjs():
@@ -806,7 +1115,7 @@ class ObjectsHandler(object):
         '''
         ObjectsHandler.objects_lock.acquire()
         ObjectsHandler.world_object_pub.publish(
-            WorldObjects(ObjectsHandler.make_worldobjs()))
+            ObjectsHandler.make_worldobjs())
         ObjectsHandler.objects_lock.release()
 
 
@@ -974,7 +1283,8 @@ class HandsFree(object):
         asynchronously. This is useful so that there's no pause while
         IK, etc. are computed.
         '''
-        ObjectsHandler.async_update()
+        # World objects don't change, so removing!
+        # ObjectsHandler.async_update()
         RobotHandler.async_broadcast()
 
     def get_program(self):

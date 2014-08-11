@@ -146,6 +146,9 @@ class Arm:
     # update method for more info.
     _is_autorelease_on = DEFAULT_AUTORELEASE_SETTING
 
+    # We're having IK problems, so let's track the numbers.
+    _next_ik_request_no = 1
+
     def __init__(self, arm_index):
         '''
         Args:
@@ -222,6 +225,16 @@ class Arm:
     # ##################################################################
     # Static methods: Public (API)
     # ##################################################################
+
+    @staticmethod
+    def get_next_ik_str():
+        '''
+        Returns:
+            str
+        '''
+        num = Arm._next_ik_request_no
+        Arm._next_ik_request_no += 1
+        return str(num)
 
     @staticmethod
     def get_distance_bw_poses(pose0, pose1):
@@ -796,11 +809,14 @@ class Arm:
 
         # Send off the IK request.
         try:
-            rospy.loginfo('Sending IK request.')
+            nstr = Arm.get_next_ik_str()
+            rospy.loginfo('Sending IK request: ' + nstr + '.')
             response = self.ik_srv(self.ik_request)
             if response.error_code.val == response.error_code.SUCCESS:
+                rospy.loginfo('IK success for req: ' + nstr + '.')
                 return response.solution.joint_state.position
             else:
+                rospy.loginfo('IK failure for req: ' + nstr + '.')
                 return None
         except rospy.ServiceException:
             rospy.logerr('Exception while getting the IK solution.')

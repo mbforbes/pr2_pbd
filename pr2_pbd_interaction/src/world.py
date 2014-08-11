@@ -39,7 +39,7 @@ from visualization_msgs.msg import (
     InteractiveMarkerFeedback)
 
 # Local
-from pr2_pbd_interaction.msg import Object, ArmState
+from pr2_pbd_interaction.msg import Object, ArmState, HandsFreeCommand
 from pr2_social_gaze.msg import GazeGoal
 from response import Response
 
@@ -81,6 +81,8 @@ DIMENSIONS_OBJ = Vector3(0.2, 0.2, 0.2)
 COLOR_OBJ = ColorRGBA(0.2, 0.8, 0.0, 0.6)
 COLOR_SURFACE = ColorRGBA(0.8, 0.0, 0.4, 0.4)
 COLOR_TEXT = ColorRGBA(0.0, 0.0, 0.0, 0.5)
+COLOR_REACHABLE = ColorRGBA(0.2, 0.8, 0.0, 0.6)
+COLOR_UNREACHABLE = ColorRGBA(0.8, 0.2, 0.0, 0.6)
 
 # Frames
 BASE_LINK = 'base_link'
@@ -92,6 +94,16 @@ MARKER_DURATION = rospy.Duration(2)
 PAUSE_SECONDS = rospy.Duration(0.1)
 # How long we're willing to wait for object recognition.
 RECOGNITION_TIMEOUT_SECONDS = rospy.Duration(5.0)
+# How long we're willing to wait for the PR2 to look at the table.
+LOOK_AT_TABLE_TIMEOUT_SECONDS = rospy.Duration(5.0)
+
+
+# For ids to not clash. Assumes that we have < this many steps and
+# aren't forgetting about other offsets elsewhere in the program that
+# are taking up this range. Hmm.
+PBDOBJ_ID_BASE_OFFSET = 500
+# Must have < this many pbd obj reachability markers.
+PBDOBJ_ID_MULTIPLIER_OFFSET = 10
 
 
 # ######################################################################
@@ -100,6 +112,16 @@ RECOGNITION_TIMEOUT_SECONDS = rospy.Duration(5.0)
 
 class PbdObject:
     '''Class for representing objects interally in PbD.'''
+
+    # For making uids
+    locnames = [
+        HandsFreeCommand.ABOVE,
+        HandsFreeCommand.TO_LEFT_OF,
+        HandsFreeCommand.TO_RIGHT_OF,
+        HandsFreeCommand.IN_FRONT_OF,
+        HandsFreeCommand.BEHIND,
+        HandsFreeCommand.ON_TOP_OF,
+    ]
 
     def __init__(self, cluster, pose, index, dimensions, is_recognized):
         '''
@@ -116,6 +138,8 @@ class PbdObject:
         self.index = index
         self.dimensions = dimensions
         self.is_recognized = is_recognized
+        self.assigned_name = None
+        self.name = self.get_name()
 
         # Attrs computed for Hands-free.
         self.type = 'unknown'
@@ -125,13 +149,12 @@ class PbdObject:
         self.vol = PbdObject.get_vol(dimensions)
 
         # These are for hands-free, but are computed later on demand.
-        self.reachability_map = None
+        self.reachability_map = None  # { str: ReachableResult}
         self.pickupable = None
 
         # Object stuff
-        self.assigned_name = None
         self.object = Object(
-            Object.TABLE_TOP, self.get_name(), pose, dimensions)
+            Object.TABLE_TOP, self.name, pose, dimensions)
         self.menu_handler = MenuHandler()
         self.int_marker = None
         self.is_removed = False
@@ -153,7 +176,46 @@ class PbdObject:
             'lowest',
         ]
         for idx, desc in enumerate(p_descs):
-            rospy.loginfo('\t- ' + desc + ' point:  ' + self.endpoints[idx])
+            rospy.loginfo(
+                '\t- ' + desc + ' point:  ' + str(self.endpoints[idx]))
+
+    def __repr__(self):
+        '''
+        Returns:
+            str
+        '''
+        return self.name
+
+    def add_reachable_marker(self, loc_name, loc, reachable):
+        '''
+        Args:
+            loc_name (str)
+            loc (Point)
+            reachable (bool)
+        '''
+        uid = (
+            PBDOBJ_ID_BASE_OFFSET + self.index * PBDOBJ_ID_MULTIPLIER_OFFSET +
+            PbdObject.locnames.index(loc_name))
+        radius = 0.05
+        color = COLOR_REACHABLE if reachable else COLOR_UNREACHABLE
+        # name = self.name + 'r-' + str(PbdObject.locnames.index(loc_name))
+        marker = Marker(
+            type=Marker.SPHERE,
+            # name=name,
+            id=uid,
+            lifetime=rospy.Duration(20),
+            scale=Vector3(radius, radius, radius),
+            pose=Pose(loc, Quaternion(0, 0, 0, 1)),
+            header=Header(frame_id=BASE_LINK),
+            color=color
+        )
+        # In case it already exists, remove it.
+        # World.im_server.erase(name)
+        rospy.loginfo(
+            "Appending marker for " + self.name + ' ' + loc_name + ' ' +
+            str(reachable))
+        self.int_marker.controls[0].markers.append(marker)
+        # NOTE(mbforbes): Must apply changes elsewhere.
 
     @staticmethod
     def get_endpoints(points):
@@ -167,12 +229,12 @@ class PbdObject:
 
         Returns:
             [float]: Elements:
-                - rightmost val (y axis most negative)
-                - leftmost val (y axis most positive)
-                - farthest val (x axis most positive)
-                - nearest val (x axis most negative)
-                - highest val (z axis most positive)
-                - lowest val (z axis most negative)
+                - rightmost val (y axis most negative) [0]
+                - leftmost val (y axis most positive)  [1]
+                - farthest val (x axis most positive)  [2]
+                - nearest val (x axis most negative)   [3]
+                - highest val (z axis most positive)   [4]
+                - lowest val (z axis most negative)    [5]
         '''
         # Look column-wise down the 2D points array.
         xmax, ymax, zmax = np.max(points, 0)
@@ -269,7 +331,6 @@ class PbdObject:
         Returns:
             float
         '''
-        d = dimensions
         return d.x * d.y * d.z
 
     def get_name(self):
@@ -320,17 +381,19 @@ class World:
 
     # Type: [PbdObject]
     objects = []
+    im_server = None
 
     def __init__(self):
         # Public attributes
         if World.tf_listener is None:
             World.tf_listener = TransformListener()
         self.surface = None
+        if World.im_server is None:
+            World.im_server = InteractiveMarkerServer(TOPIC_IM_SERVER)
 
         # Private attributes
         self._lock = threading.Lock()
         self._tf_broadcaster = TransformBroadcaster()
-        self._im_server = InteractiveMarkerServer(TOPIC_IM_SERVER)
         rospy.wait_for_service(SERVICE_BB)
         self._bb_service = rospy.ServiceProxy(
             SERVICE_BB, FindClusterBoundingBox)
@@ -770,9 +833,9 @@ class World:
                 pose.position.y = pose.position.y + ymin + width / 2
                 dimensions = Vector3(depth, width, SURFACE_HEIGHT)
                 self.surface = World._get_surface_marker(pose, dimensions)
-                self._im_server.insert(
+                World.im_server.insert(
                     self.surface, self.marker_feedback_cb)
-                self._im_server.applyChanges()
+                World.im_server.applyChanges()
 
     def receive_object_info(self, object_list):
         '''Callback function to receive object info'''
@@ -828,16 +891,10 @@ class World:
         Returns:
             bool: Success?
         '''
-        # Look down at the table.
-        rospy.loginfo('Head attempting to look at table.')
-        Response.perform_gaze_action(GazeGoal.LOOK_DOWN)
-        while (Response.gaze_client.get_state() == GoalStatus.PENDING or
-               Response.gaze_client.get_state() == GoalStatus.ACTIVE):
-            rospy.sleep(PAUSE_SECONDS)
-        if Response.gaze_client.get_state() != GoalStatus.SUCCEEDED:
-            rospy.logerr('Could not look down to take table snapshot')
-            return False
-        rospy.loginfo('Head is now (successfully) stairing at table.')
+        # Look at the table.
+        # NOTE(mbforbes): Ignoring results of this call as it's been
+        # returning failure constantly even when it succeeds.
+        self._look_at_table()
 
         # Reset object recognition.
         rospy.loginfo('About to attempt to reset object recognition.')
@@ -985,16 +1042,37 @@ class World:
     # Instance methods: Internal ("private")
     # ##################################################################
 
+    def _look_at_table(self):
+        '''
+        A step in update_object_pose(...).
+        '''
+        rospy.loginfo('Head attempting to look at table.')
+        Response.perform_gaze_action(GazeGoal.LOOK_DOWN)
+        wait_time = rospy.Duration(0.0)
+        while ((Response.gaze_client.get_state() == GoalStatus.PENDING or
+                Response.gaze_client.get_state() == GoalStatus.ACTIVE) and
+                wait_time < LOOK_AT_TABLE_TIMEOUT_SECONDS):
+            rospy.sleep(PAUSE_SECONDS)
+            wait_time += PAUSE_SECONDS
+        # TODO(mbforbes): Let's do a more complicated check of the head
+        # angle, as it often "fails" here, but the head actually
+        # successfully went where we wanted it to.
+        if Response.gaze_client.get_state() != GoalStatus.SUCCEEDED:
+            rospy.logerr('Could not look down to take table snapshot')
+            return False
+        rospy.loginfo('Head is now (successfully) stairing at table.')
+        return True
+
     def _reset_objects(self):
         '''Removes all objects.'''
         self._lock.acquire()
         for wobj in World.objects:
-            self._im_server.erase(wobj.int_marker.name)
-            self._im_server.applyChanges()
+            World.im_server.erase(wobj.int_marker.name)
+            World.im_server.applyChanges()
         if self.surface is not None:
             self._remove_surface()
-        self._im_server.clear()
-        self._im_server.applyChanges()
+        World.im_server.clear()
+        World.im_server.applyChanges()
         World.objects = []
         self._lock.release()
 
@@ -1082,11 +1160,22 @@ class World:
             cluster, pose, n_objects, dimensions, is_recognized))
         int_marker = self._get_object_marker(len(World.objects) - 1)
         World.objects[-1].int_marker = int_marker
-        self._im_server.insert(int_marker, self.marker_feedback_cb)
-        self._im_server.applyChanges()
+        World.im_server.insert(int_marker, self.marker_feedback_cb)
+        World.im_server.applyChanges()
         World.objects[-1].menu_handler.apply(
-            self._im_server, int_marker.name)
-        self._im_server.applyChanges()
+            World.im_server, int_marker.name)
+        World.im_server.applyChanges()
+
+    def refresh_objects(self):
+        '''TODO(mbforbes): Document.
+        '''
+        for obj in World.objects:
+            World.im_server.erase(obj.int_marker.name)
+        World.im_server.applyChanges()
+        for obj in World.objects:
+            World.im_server.insert(obj.int_marker, self.marker_feedback_cb)
+            obj.menu_handler.apply(World.im_server, obj.int_marker.name)
+        World.im_server.applyChanges()
 
     def _remove_object(self, to_remove):
         '''Remove an object by index.
@@ -1097,8 +1186,8 @@ class World:
         '''
         obj = World.objects.pop(to_remove)
         rospy.loginfo('Removing object ' + obj.int_marker.name)
-        self._im_server.erase(obj.int_marker.name)
-        self._im_server.applyChanges()
+        World.im_server.erase(obj.int_marker.name)
+        World.im_server.applyChanges()
         # TODO(mbforbes): Re-implement object recognition or remove
         # this dead code.
         # if (obj.is_recognized):
@@ -1117,8 +1206,8 @@ class World:
     def _remove_surface(self):
         '''Function to request removing surface (from IM).'''
         rospy.loginfo('Removing surface')
-        self._im_server.erase('surface')
-        self._im_server.applyChanges()
+        World.im_server.erase('surface')
+        World.im_server.applyChanges()
         self.surface = None
 
     def _get_object_marker(self, index, mesh=None):

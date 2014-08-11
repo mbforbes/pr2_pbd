@@ -33,6 +33,16 @@ string TO_RIGHT = to_right
 string FORWARD = forward
 string BACKWARD = backward
 
+# Relative positions
+string ABOVE = above
+string NEXT_TO = next_to
+string TO_LEFT_OF = to_left_of
+string TO_RIGHT_OF = to_right_of
+string IN_FRONT_OF = in_front_of
+string BEHIND = behind
+string ON_TOP_OF = on_top_of
+string NEAR = near
+
 # Which
 string NEXT = next
 string PREVIOUS = previous
