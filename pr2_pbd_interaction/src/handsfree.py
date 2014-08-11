@@ -290,29 +290,41 @@ class MoveRelativePosition(Command):
     options = CommandOptions({
     })
 
-    # def init(self):
-    #     # Initialize some of our own state for convenience.
-    #     self.arm_idx = Link.get_arm_index(args[0])
-    #     # TODO(mbforbes): Should use phrases.
-    #     self.hand_str = 'right' if self.arm_idx == Side.RIGHT else 'left'
+    def init(self):
+        # Initialize some of our own state for convenience.
+        self.arm_idx = Link.get_arm_index(self.args[0])
+        # TODO(mbforbes): Should use phrases.
+        self.hand_str = 'right' if self.arm_idx == Side.RIGHT else 'left'
+        self.pbdobj = ObjectsHandler.get_obj_by_name(self.args[2])
+        if self.pbdobj is not None:
+            self.rr = self.pbdobj.reachability_map[self.args[1]][self.arm_idx]
+    def pre_check(self, args, phrases):
+        '''Ensures reaching can happen.'''
+        if self.pbdobj is None:
+            return False, FailureFeedback('No object named ' + self.args[2])
+        elif not self.rr.reachable:
+            return False, FailureFeedback(self.args[2] + ' is not reachable.')
+        else:
+            return True, FailureFeedback()
 
-    # def pre_check(self, args, phrases):
-    #     '''Ensures closing can happen.'''
-    #     res = S.arms.get_gripper_state(self.arm_idx) != GripperState.CLOSED
-    #     fb = FailureFeedback(self.hand_str + ' is already closed.')
-    #     return res, fb
+    def narrate(self, args, phrases):
+        '''Describes the process of moving relative position.'''
+        fb = Feedback(
+            'Moving ' + self.hand_str + ' hand ' + self.args[1] + ' ' +
+            self.args[2] + '.')
+        return fb
 
-    # def narrate(self, args, phrases):
-    #     '''Describes the process of closing.'''
-    #     fb = Feedback('Closing ' + self.hand_str + ' hand.')
-    #     return fb
+    def core(self, args, phrases):
+        '''Does the movement.'''
+        joints = [None, None]
+        joints[self.arm_idx] = self.rr.joints
+        res = Link.move_to_joints(joints[0], joints[1])
+        fb = FailureFeedback(
+            'Failed to move ' + self.hand_str + ' hand ' + self.args[1] + ' ' +
+            self.args[2] + '.')
+        return res, fb
 
-    # def core(self, args, phrases):
-    #     '''Closes whichever gripper.'''
-    #     res = S.arms.set_gripper_state(self.arm_idx, GripperState.CLOSED)
-    #     fb = FailureFeedback(self.hand_str + ' failed to close.')
-    #     return res, fb
-
+    # TODO(mbforbes): Check joints for this.
     # def post_check(self, args, phrases):
     #     '''Checks whether opening happened.'''
     #     res = S.arms.get_gripper_state(self.arm_idx) == GripperState.CLOSED
@@ -730,6 +742,7 @@ class Link(object):
             if target is not None:
                 cur_joints = Arms.get_joint_positions(side)
                 will_move = False
+                # TODO(mbforbes): Debug, this isn't actually working.
                 for j in range(len((cur_joints))):
                     if not Util.are_floats_close(target[j], cur_joints[j]):
                         will_move = True
@@ -873,6 +886,19 @@ class ObjectsHandler(object):
     BEHIND_VEC = Vector3(near_delta, 0.0, 0.0)
     ON_TOP_OF_VEC = Vector3(0.0, 0.0, close_delta)
 
+    # Reachability mapping from pbdobj names to ROS object fields.
+    rm_name_map = {
+        HandsFreeCommand.ABOVE: 'is_above_reachable',
+        HandsFreeCommand.TO_LEFT_OF: 'is_leftof_reachable',
+        HandsFreeCommand.TO_RIGHT_OF: 'is_rightof_reachable',
+        HandsFreeCommand.IN_FRONT_OF: 'is_frontof_reachable',
+        HandsFreeCommand.BEHIND: 'is_behind_reachable',
+        HandsFreeCommand.ON_TOP_OF: 'is_topof_reachable',
+        HandsFreeCommand.NEXT_TO: 'is_nextto_reachable',
+        HandsFreeCommand.NEAR: 'is_near_reachable',
+    }
+
+
     # Reachability spaces. (OrderedDict as we compute in oder.)
     # Reference either a direction to apply, or one or more previous
     # elements of the reachability space as options.
@@ -898,6 +924,20 @@ class ObjectsHandler(object):
     world_object_pub = rospy.Publisher(topic_worldobjs, WorldObjects)
     objects = []
     objects_lock = Lock()
+
+    @staticmethod
+    def get_obj_by_name(objname):
+        '''
+        Args:
+            objname (str)
+
+        Returns:
+            PbdObject|None: None if not found.
+        '''
+        for pbdobj in World.objects:
+            if pbdobj.name == objname:
+                return pbdobj
+        return None
 
     @staticmethod
     def record():
@@ -1106,7 +1146,27 @@ class ObjectsHandler(object):
         Returns:
             WorldObjects
         '''
-        return WorldObjects()
+        wobjs = []
+        for pbd_obj in ObjectsHandler.objects:
+            wo = WorldObject()
+
+            # Basic properties
+            wo.name = pbd_obj.name
+            wo.color = pbd_obj.color
+            wo.type = pbd_obj.type
+
+            # Reachability
+            rm = pbd_obj.reachability_map
+            for pbdname, rosname in ObjectsHandler.rm_name_map.iteritems():
+                bool_arr = [rr.reachable for rr in rm[pbdname]]
+                setattr(wo, rosname, bool_arr)
+
+            # TODO(mbforbes): Add multi-object properties.
+
+            # Slap it on.
+            wobjs += [wo]
+
+        return WorldObjects(wobjs)
 
     @staticmethod
     def _broadcast():
@@ -1381,6 +1441,7 @@ class CommandRouter(object):
     # "Normal" commands (make robot do something).
     command_map = {
         HandsFreeCommand.MOVE_ABSOLUTE_DIRECTION: MoveAbsoluteDirection,
+        HandsFreeCommand.MOVE_RELATIVE_POSITION: MoveRelativePosition,
         HandsFreeCommand.OPEN: Open,
         HandsFreeCommand.CLOSE: Close,
     }

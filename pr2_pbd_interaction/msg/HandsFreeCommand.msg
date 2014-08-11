@@ -12,11 +12,16 @@ string EXECUTE = execute
 string STOP = stop
 string SWITCH_ACTION = switch_action
 string CREATE_NEW_ACTION = create_new_action
-string MOVE_ABSOLUTE_DIRECTION = move_abs
+
 
 # 'Normal' Commands:
 string OPEN = open
 string CLOSE = close
+string PICKUP = pickup
+string PLACE = place
+string LOOK_AT = look_at
+string MOVE_ABSOLUTE_DIRECTION = move_abs
+string MOVE_RELATIVE_POSITION = move_rel
 
 
 # Different argument options that can appear in the field 'args'

@@ -9,26 +9,35 @@
 string RED = red
 string BLUE = blue
 string GREEN = green
+string UNKNOWN = unknown
 
 # Object types:
 string BOX = box
 string CUP = cup
-string UNKNOWN = unknown
+# UNKNOWN also applies here
 
 
 # Fields
 # ======================================================================
 
+# Basic info
 string name
+string color
+string type
 
 # Reachability arrays have two entires: right, left
 bool[] is_pickupable
-bool[] is_above_reachable
-bool[] is_nextto_reachable
 
-# Color, type, location.
-string color
-string type
+bool[] is_above_reachable
+bool[] is_leftof_reachable
+bool[] is_rightof_reachable
+bool[] is_frontof_reachable
+bool[] is_behind_reachable
+bool[] is_topof_reachable
+bool[] is_nextto_reachable
+bool[] is_near_reachable
+
+# Computed w.r.t other objects
 bool is_leftmost
 bool is_rightmost
 bool is_farthest
