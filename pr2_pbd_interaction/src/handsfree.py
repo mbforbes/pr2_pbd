@@ -298,6 +298,7 @@ class MoveRelativePosition(Command):
         self.pbdobj = ObjectsHandler.get_obj_by_name(self.args[2])
         if self.pbdobj is not None:
             self.rr = self.pbdobj.reachability_map[self.args[1]][self.arm_idx]
+
     def pre_check(self, args, phrases):
         '''Ensures reaching can happen.'''
         if self.pbdobj is None:
@@ -897,7 +898,6 @@ class ObjectsHandler(object):
         HandsFreeCommand.NEXT_TO: 'is_nextto_reachable',
         HandsFreeCommand.NEAR: 'is_near_reachable',
     }
-
 
     # Reachability spaces. (OrderedDict as we compute in oder.)
     # Reference either a direction to apply, or one or more previous
