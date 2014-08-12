@@ -744,7 +744,7 @@ class Link(object):
                 cur_joints = Arms.get_joint_positions(side)
                 will_move = False
                 # TODO(mbforbes): Debug, this isn't actually working.
-                for j in range(len((cur_joints))):
+                for j in range(len(cur_joints)):
                     if not Util.are_floats_close(target[j], cur_joints[j]):
                         will_move = True
                         break
@@ -1358,6 +1358,23 @@ class HandsFree(object):
 
     # 'Admin' actions just trigger functions here.
 
+    def clarify(self, args):
+        '''
+        Ask user to clarify intent.
+
+        Args:
+            args ([str]): Contains arguments that need to be clarified,
+                if the top-scoring commands are all of the same
+                template. Otherwise, blank (is this best?).
+        '''
+        # TODO(mbforbes): Be helpful.
+        if len(args) > 0:
+            arg_clar = ' and'.join(args)
+            fb = Feedback('Please clarify ' + arg_clar)
+        else:
+            fb = Feedback('Please rephrase command.')
+        fb.issue()
+
     def execute_program(self, args):
         '''
         Executes the current program.
@@ -1430,6 +1447,7 @@ class CommandRouter(object):
         HandsFreeCommand.STOP: HandsFree.stop_program,
         HandsFreeCommand.CREATE_NEW_ACTION: HandsFree.create_new_action,
         HandsFreeCommand.SWITCH_ACTION: HandsFree.switch_to_action,
+        HandsFreeCommand.CLARIFY: HandsFree.clarify,
     }
 
     # "Emergency" commands list a subset of "Admin" commands that can be

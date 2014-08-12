@@ -12,7 +12,7 @@ string EXECUTE = execute
 string STOP = stop
 string SWITCH_ACTION = switch_action
 string CREATE_NEW_ACTION = create_new_action
-
+string CLARIFY = clarify
 
 # 'Normal' Commands:
 string OPEN = open
