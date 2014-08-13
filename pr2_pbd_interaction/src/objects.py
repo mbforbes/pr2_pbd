@@ -227,7 +227,6 @@ class ObjectsHandler(object):
             objs_str = '%d objecs.' % (n_objs)
         Feedback('Found ' + objs_str).issue()
 
-
     # Reachabilities don't change, so probably no need for this.
     # @staticmethod
     # def async_update():
