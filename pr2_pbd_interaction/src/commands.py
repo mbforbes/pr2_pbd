@@ -194,9 +194,7 @@ class MoveRelativePosition(Command):
 
     def core(self, args, phrases):
         '''Does the movement.'''
-        joints = [None, None]
-        joints[self.arm_idx] = self.rr.joints
-        res = Link.move_to_joints(joints[0], joints[1])
+        res = Link.move_to_computed_pose(self.arm_idx, self.rr.pose)
         fb = FailureFeedback(
             'Failed to move ' + self.hand_str + ' hand ' + self.args[1] + ' ' +
             self.args[2] + '.')
@@ -230,7 +228,7 @@ class MoveAbsoluteDirection(Command):
 
     def pre_check(self, args, phrases):
         '''Ensures moving in the specified direction can happen.'''
-        res = Link.get_ik_abs_dir(self.args[0], self.args[1]) is not None
+        res = Link.get_abs_dir_possible(self.args[0], self.args[1])
         fb = FailureFeedback(
             'Cannot move ' + self.hand_str + ' hand ' + self.args[1] + '.')
         return res, fb
@@ -243,18 +241,7 @@ class MoveAbsoluteDirection(Command):
 
     def core(self, args, phrases):
         '''Moves.'''
-        solved_joints = Link.get_ik_abs_dir(self.args[0], self.args[1])
-        if solved_joints is not None:
-            # Figure out which joints we solved for.
-            l_joints, r_joints = None, None
-            if self.args[0] == HandsFreeCommand.RIGHT_HAND:
-                r_joints = solved_joints
-            else:
-                l_joints = solved_joints
-            success = Link.move_to_joints(r_joints, l_joints)
-        else:
-            # Solving failed.
-            success = False
+        success = Link.move_abs_dir(self.args[0], self.args[1])
         fb = FailureFeedback(
             'Failed to move' + self.hand_str + ' hand ' + self.args[1] + '.')
         return success, fb

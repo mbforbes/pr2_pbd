@@ -97,22 +97,22 @@ class RobotHandler(object):
 
         # Fill in via IK.
         rs.can_move_up = [
-            Link.get_ik_abs_dir(s, HandsFreeCommand.UP) is not None
+            Link.get_abs_dir_possible(s, HandsFreeCommand.UP)
             for s in side_names]
         rs.can_move_down = [
-            Link.get_ik_abs_dir(s, HandsFreeCommand.DOWN) is not None
+            Link.get_abs_dir_possible(s, HandsFreeCommand.DOWN)
             for s in side_names]
         rs.can_move_toleft = [
-            Link.get_ik_abs_dir(s, HandsFreeCommand.TO_LEFT) is not None
+            Link.get_abs_dir_possible(s, HandsFreeCommand.TO_LEFT)
             for s in side_names]
         rs.can_move_toright = [
-            Link.get_ik_abs_dir(s, HandsFreeCommand.TO_RIGHT) is not None
+            Link.get_abs_dir_possible(s, HandsFreeCommand.TO_RIGHT)
             for s in side_names]
         rs.can_move_forward = [
-            Link.get_ik_abs_dir(s, HandsFreeCommand.FORWARD) is not None
+            Link.get_abs_dir_possible(s, HandsFreeCommand.FORWARD)
             for s in side_names]
         rs.can_move_backward = [
-            Link.get_ik_abs_dir(s, HandsFreeCommand.BACKWARD) is not None
+            Link.get_abs_dir_possible(s, HandsFreeCommand.BACKWARD)
             for s in side_names]
 
         # Set.

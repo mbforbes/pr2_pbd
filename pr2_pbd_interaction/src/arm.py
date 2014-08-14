@@ -94,7 +94,7 @@ TRAJECTORY_ALLOWED_TIME = rospy.Duration(20.0)  # seconds
 # between trajectory steps.
 # NOTE(mbforbes): This is set to 0, but they still move fine. There must
 # be some limits / defaults that are activated when 0 is passed.
-MOVE_TO_JOINTS_VELOCITY = 0.2
+MOVE_TO_JOINTS_VELOCITY = 0.0
 TRAJ_VELOCITY = 0
 
 # Joint / part names

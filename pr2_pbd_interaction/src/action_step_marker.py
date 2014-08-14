@@ -203,13 +203,13 @@ class ActionStepMarker:
         )
 
     @staticmethod
-    def _offset_pose(pose, constant=1):
+    def _offset_pose(pose, constant=1.0):
         '''Offsets the world pose for visualization.
 
         Args:
             pose (Pose): The pose to offset.
-            constant (int, optional): How much to scale the set offset
-                by (scales ActionStepMarker._offset). Defaults to 1.
+            constant (float, optional): How much to scale the set offset
+                by (scales ActionStepMarker._offset). Defaults to 1.0.
 
         Returns:
             Pose: The offset pose.

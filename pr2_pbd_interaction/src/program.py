@@ -92,7 +92,7 @@ class Program(object):
                 "Problem executing action %d." % (self.idx_name)
             ).issue()
 
-    @staticmethodp
+    @staticmethod
     def is_executing():
         '''
         Returns whether the program is currently executing.

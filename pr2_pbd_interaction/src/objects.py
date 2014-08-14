@@ -36,10 +36,12 @@ from robotlink import Link
 class ReachableResult(object):
     '''Saving reachable results.'''
 
-    def __init__(
-            self, reachable=False, loc_str=None, pose=None, joints=None):
+    def __init__(self, reachable=False, loc_str=None, pose=None):
         '''
         See body of method for info.
+
+        NOTE(mbforbes): Previously had joints ([float]) cached here, but
+        this is implementation-specific (i.e. using IK).
 
         Args:
             reachable (bool)
@@ -56,10 +58,6 @@ class ReachableResult(object):
 
         # What was the pose used? Only set if reachable. Type: Pose.
         self.pose = pose
-
-        # What was the joints (IK solution) for pose? Only set if
-        # reachable. Type: [float] (length 7).
-        self.joints = joints
 
 
 class ObjectsHandler(object):
@@ -354,15 +352,14 @@ class ObjectsHandler(object):
         res = ObjectsHandler.UNR
         for o_name, orientation in ObjectsHandler.orientations.iteritems():
             pose = Pose(position, orientation)
-            joints = Link.get_ik_for_ee(side, pose, [0.0] * 7)
-            if joints is not None:
+            if Link.get_computed_pose_possible(side, pose):
                 # Hooray!
                 res = ReachableResult(
                     True,
                     rel_pos_str,
                     pose,
-                    joints
                 )
+                break
 
         # Display in visualization and return.
         pbd_obj.add_reachable_marker(rel_pos_str, position, res.reachable)

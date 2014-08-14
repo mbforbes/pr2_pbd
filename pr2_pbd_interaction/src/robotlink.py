@@ -22,10 +22,12 @@ import rospy
 
 # ROS Builtins
 from geometry_msgs.msg import Vector3, Pose, Point
+import tf
 
 # PbD
 from pr2_pbd_interaction.msg import HandsFreeCommand, Side, ArmState
 from arms import Arms
+from world import World
 from util import Numbers
 
 
@@ -96,6 +98,10 @@ class Link(object):
         HandsFreeCommand.BACKWARD: BACKWARD_VEC,
     }
 
+    # ##################################################################
+    # Public static methods (should hide IK vs MoveIt! implementation)
+    # ##################################################################
+
     @staticmethod
     def init(arms, world):
         if S.arms is None:
@@ -132,19 +138,6 @@ class Link(object):
             [PbdObject]
         '''
         return S.world.get_objs()
-
-    @staticmethod
-    def get_ik_for_ee(side, pose, seed):
-        '''
-        Args:
-            side (int): Side.RIGHT or Side.LEFT
-            pose (Pose): EE-position
-            seed ([float]): 7-elemnt joint positions
-
-        Returns:
-            [float]|None
-        '''
-        return S.arms.arms[side].get_ik_for_ee(pose, seed)
 
     @staticmethod
     def get_gripper_state(arm_idx):
@@ -185,10 +178,45 @@ class Link(object):
             Side.LEFT)
 
     @staticmethod
-    def get_ik_abs_dir(arm_str, abs_dir):
+    def get_computed_pose_possible(side, pose):
         '''
-        Returns the joints for a a movement of arm_str in abs_dir, or
-        None if it's impossible.
+        Returns whether a pose that was determined programmatically
+        (i.e. NOT relative to known robot EE-pose) is reachable.
+
+        Args:
+            side (int): Side.RIGHT or Side.LEFT
+            pose (Pose)
+
+        Returns:
+            bool
+        '''
+        return Link._get_ik_for_ee_computed(side, pose) is not None
+
+    @staticmethod
+    def move_to_computed_pose(side, pose):
+        '''
+        Args:
+            side (int): Side.RIGHT or Side.LEFT
+            pose (Pose)
+
+        Returns:
+            bool: Whether movement was successful.
+        '''
+        side_joints = Link._get_ik_for_ee_computed(side, pose)
+
+        # Check whether possible
+        if side_joints is None:
+            return False
+
+        # Possible; return movement success.
+        joints = [None, None]
+        joints[side] = side_joints
+        return Link._move_to_joints(joints[0], joints[1])
+
+    @staticmethod
+    def get_abs_dir_possible(arm_str, abs_dir):
+        '''
+        Returns whether a movement of arm_str in abs_dir is possible.
 
         Args:
             arm_str (str): HandsFreeCommand.LEFT_HAND or
@@ -202,30 +230,46 @@ class Link(object):
                 - HandsFreeCommand.BACKWARD
 
         Returns:
-            [float]|None: A vector of seven floats (the joint positions
-                for the PR2's arm) or None if IK failed.
+            bool
         '''
+        new_pose = Link._get_pose_abs_dir(arm_str, abs_dir)
         arm_idx = Link.get_arm_index(arm_str)
         seed = S.arms.arms[arm_idx].get_joint_positions()
-        add_vec = Link.abs_dir_map[abs_dir]
-        cur_pose = S.arms.arms[arm_idx].get_ee_state()
+        return Link._get_ik_for_ee_raw(arm_idx, new_pose, seed) is not None
 
-        # We might have to fail out here if we couldn't get the EE state
-        # (this happens e.g. on system startup).
-        if cur_pose is None:
-            return None
+    @staticmethod
+    def move_abs_dir(arm_str, abs_dir):
+        '''
+        Attempts movement of arm_str in abs_dir, and returns whether
+        this was successful.
 
-        # Else, compute the new position and try IK for it.
-        new_pose = Pose(
-            Point(
-                cur_pose.position.x + add_vec.x,
-                cur_pose.position.y + add_vec.y,
-                cur_pose.position.z + add_vec.z
-            ),
-            cur_pose.orientation
-        )
-        rospy.loginfo('...trying to get IK for EE from arms.')
-        return S.arms.arms[arm_idx].get_ik_for_ee(new_pose, seed)
+        Args:
+            arm_str (str): HandsFreeCommand.LEFT_HAND or
+                HandsFreeCommand.RIGHT_HAND
+            abs_dir (str): One of:
+                - HandsFreeCommand.UP
+                - HandsFreeCommand.DOWN
+                - HandsFreeCommand.TO_LEFT
+                - HandsFreeCommand.TO_RIGHT
+                - HandsFreeCommand.FORWARD
+                - HandsFreeCommand.BACKWARD
+
+        Returns:
+            bool
+        '''
+        new_pose = Link._get_pose_abs_dir(arm_str, abs_dir)
+        arm_idx = Link.get_arm_index(arm_str)
+        seed = S.arms.arms[arm_idx].get_joint_positions()
+        side_joints = Link._get_ik_for_ee_raw(arm_idx, new_pose, seed)
+
+        # If movement isn't possible, return false.
+        if side_joints is None:
+            return False
+
+        # Else, try movement and returns its success val.
+        joints = [None, None]
+        joints[arm_idx] = side_joints
+        return Link._move_to_joints(joints[0], joints[1])
 
     @staticmethod
     def move_to_named_position(name):
@@ -243,10 +287,112 @@ class Link(object):
             return False
         mapping = Link.joint_positions[name]
         r, l = mapping['right'], mapping['left']
-        return Link.move_to_joints(r, l)
+        return Link._move_to_joints(r, l)
+
+    # ##################################################################
+    # Private static methods (implementation-specific)
+    # ##################################################################
 
     @staticmethod
-    def move_to_joints(r_joints=None, l_joints=None):
+    def _get_ik_for_ee_raw(side, wrist_pose, seed):
+        '''
+        Gets IK for a raw EE pose (i.e. desired Pose determined based on
+        known EE pose).
+
+        Args:
+            side (int): Side.RIGHT or Side.LEFT
+            wrist_pose (Pose): EE-position of wrist link
+            seed ([float]): 7-elemnt joint positions
+
+        Returns:
+            [float]|None
+        '''
+        return S.arms.arms[side].get_ik_for_ee(wrist_pose, seed)
+
+    @staticmethod
+    def _get_ik_for_ee_computed(side, finger_tip_pose):
+        '''
+        Gets IK for a computed EE pose (i.e. desired Pose in 3-space
+        determined programmatically).
+
+        Args:
+            side (int): Side.RIGHT or Side.LEFT
+            finger_tip_pose (Pose): EE-position of finger tip
+
+        Returns:
+            [float]|None
+        '''
+        # We are elsewhere computing where we want the finger tips to
+        # go; here, we want to compute where we want the wrist link to
+        # go, as that is what IK solves for.
+        wrist_pose = Link._offset_pose(finger_tip_pose)
+        # TODO(mbforbes): Be smarter about seed. We could cache IK
+        # results and do a nearest neighbor. Note that we don't have
+        # to do any of this if we move to MoveIt!
+        seed = [0.0] * 7  # "Default" position (arms forward).
+        return Link._get_ik_for_ee_raw(side, wrist_pose, seed)
+
+    @staticmethod
+    def _offset_pose(pose, offset=-0.18):
+        '''Offsets pose by offset.
+
+        Args:
+            pose (Pose): The pose to offset.
+            constant (float, optional): How much to offset by. Defaults
+                to -0.18 (reverse length of gripper).
+
+        Returns:
+            Pose: The offset pose.
+        '''
+        transform = World.get_matrix_from_pose(pose)
+        offset_array = [offset, 0, 0]
+        offset_transform = tf.transformations.translation_matrix(offset_array)
+        hand_transform = tf.transformations.concatenate_matrices(
+            transform, offset_transform)
+        return World.get_pose_from_transform(hand_transform)
+
+    @staticmethod
+    def _get_pose_abs_dir(arm_str, abs_dir):
+        '''
+        Returns the pose for a movement of arm_str in abs_dir.
+
+        Args:
+            arm_str (str): HandsFreeCommand.LEFT_HAND or
+                HandsFreeCommand.RIGHT_HAND
+            abs_dir (str): One of:
+                - HandsFreeCommand.UP
+                - HandsFreeCommand.DOWN
+                - HandsFreeCommand.TO_LEFT
+                - HandsFreeCommand.TO_RIGHT
+                - HandsFreeCommand.FORWARD
+                - HandsFreeCommand.BACKWARD
+
+        Returns:
+            Pose|None: None if EE state can't be found as system not yet
+                fully initialized.
+        '''
+        arm_idx = Link.get_arm_index(arm_str)
+        add_vec = Link.abs_dir_map[abs_dir]
+        cur_pose = S.arms.arms[arm_idx].get_ee_state()
+
+        # We might have to fail out here if we couldn't get the EE state
+        # (this happens e.g. on system startup).
+        if cur_pose is None:
+            return None
+
+        # Compute the new pose.
+        new_pose = Pose(
+            Point(
+                cur_pose.position.x + add_vec.x,
+                cur_pose.position.y + add_vec.y,
+                cur_pose.position.z + add_vec.z
+            ),
+            cur_pose.orientation
+        )
+        return new_pose
+
+    @staticmethod
+    def _move_to_joints(r_joints=None, l_joints=None):
         '''
         Args:
             r_joints ([float], optional): 7-element list of joint
