@@ -241,7 +241,7 @@ class Link(object):
         opts = IMGUIOptions(
             True,  # collision_checked
             1,  # grasp_selection (0 grip click, 1 provided)
-            0,  # arm_selection (0 right, 1 left)
+            side,  # arm_selection (0 right, 1 left)
             0,  # reset_choice (reset: 0 collision, 1 attached)
             0,  # arm_action_choice (0 side, 1 front, 2 side handoff)
             0,  # arm_planner_choice (0 open-loop, 1 w/ planner)

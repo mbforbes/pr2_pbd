@@ -249,7 +249,7 @@ class PbdObject(object):
             xmax,
             xmin,
             zmax,
-            xmin
+            zmin
         ]
 
     @staticmethod

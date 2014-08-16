@@ -15,6 +15,7 @@ import rospy
 
 # System builtins
 from collections import OrderedDict
+import operator
 from threading import Lock
 
 # ROS builtins
@@ -60,11 +61,115 @@ class ReachableResult(object):
         self.pose = pose
 
 
+class UniqueProperty(object):
+    '''For tracking biggest/smallest/shortest/leftmost/etc.'''
+
+    # These are starting values that are supposted to be so 'absurdly'
+    # low / high that any object's property will be > / < these values.
+    low_start = -1000
+    high_start = 1000
+
+    def __init__(self, name, prop_name, val, attr_get_fn, cmp_op):
+        '''
+        Args:
+            name (str): Internal use.
+            prop_name (str): For setting object property.
+            val (float): The current max/min val of this property.
+            attr_get_fn (function): The function to get the desired
+                attribute from an object for comparison to val.
+            cmp_op (function): The operator function to determine
+                whether "beats" the current val and becomes special.
+                Appled as cmp_op(obj_val, val).
+        '''
+        self.name = name
+        self.prop_name = prop_name
+        self.val = val
+        self.attr_get_fn = attr_get_fn
+        self.cmp_op = cmp_op
+        self.special = None
+
+    def check(self, pbd_obj):
+        '''
+        Checks pbd_obj to see if it "beats" val and gets to be special.
+
+        Args:
+            pbd_obj (PbdObject)
+        '''
+        obj_val = self.attr_get_fn(pbd_obj)
+        if self.cmp_op(obj_val, self.val):
+            self.val = obj_val
+            self.special = pbd_obj
+
+
 class ObjectsHandler(object):
-    '''Manages world objects.'''
+    '''Manages:
+        - PbdObject's (though they live in World)
+        - WorldObject's (they are created for returning to parser)
+        - WorldObjects (it is created for returning to parser)
+    '''
 
     # Unreachable
     UNR = ReachableResult(reachable=False)
+
+    # Unite properties.
+    unique_properties = [
+        UniqueProperty(
+            'rightmost',
+            'is_rightmost',
+            UniqueProperty.high_start,
+            lambda o: o.endpoints[0],
+            operator.lt
+        ),
+        UniqueProperty(
+            'leftmost',
+            'is_leftmost',
+            UniqueProperty.low_start,
+            lambda o: o.endpoints[1],
+            operator.gt
+        ),
+        UniqueProperty(
+            'farthest',
+            'is_farthest',
+            UniqueProperty.low_start,
+            lambda o: o.endpoints[2],
+            operator.gt
+        ),
+        UniqueProperty(
+            'nearest',
+            'is_nearest',
+            UniqueProperty.high_start,
+            lambda o: o.endpoints[3],
+            operator.lt
+        ),
+        UniqueProperty(
+            'tallest',
+            'is_tallest',
+            UniqueProperty.low_start,
+            lambda o: o.endpoints[4],
+            operator.gt
+        ),
+        UniqueProperty(
+            'shortest',
+            'is_shortest',
+            UniqueProperty.high_start,
+            lambda o: o.endpoints[5],
+            operator.lt
+        ),
+        UniqueProperty(
+            'biggest',
+            'is_biggest',
+            UniqueProperty.low_start,
+            lambda o: o.vol,
+            operator.gt
+        ),
+        UniqueProperty(
+            'smallest',
+            'is_smallest',
+            UniqueProperty.high_start,
+            lambda o: o.vol,
+            operator.lt
+        ),
+    ]
 
     # Orientation options to try for computing IK towards locations. We
     # use an OrderedDict so we know in which order we try them.
@@ -435,6 +540,13 @@ class ObjectsHandler(object):
             WorldObjects
         '''
         wobjs = []
+
+        # Compute unique properties (if more than one obj).
+        if len(ObjectsHandler.objects) > 1:
+            for pbd_obj in ObjectsHandler.objects:
+                for prop in ObjectsHandler.unique_properties:
+                    prop.check(pbd_obj)
+
         for pbd_obj in ObjectsHandler.objects:
             wo = WorldObject()
 
@@ -449,7 +561,10 @@ class ObjectsHandler(object):
                 bool_arr = [rr.reachable for rr in rm[pbdname]]
                 setattr(wo, rosname, bool_arr)
 
-            # TODO(mbforbes): Add multi-object properties.
+            # Add any unique properties.
+            for prop in ObjectsHandler.unique_properties:
+                if prop.special == pbd_obj:
+                    setattr(wo, prop.prop_name, True)
 
             # Slap it on.
             wobjs += [wo]
