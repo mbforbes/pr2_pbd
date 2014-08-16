@@ -372,7 +372,7 @@ class Close(Command):
 
     def narrate(self, args, phrases):
         '''Describes the process of closing.'''
-        fb = Feedback('Closing ' + self.hand_str + ' hand.')
+        fb = Feedback('Closing ' + self.hand_str + '.')
         return fb
 
     def core(self, args, phrases):

@@ -57,7 +57,6 @@ class Program(object):
         # TODO(mbforbes): Step pre-checks should ensure given objects
         # exist.
         # Look for objects
-        ObjectsHandler.clear()
         ObjectsHandler.record()
 
         # Execute steps in order.
