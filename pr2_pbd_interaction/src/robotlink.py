@@ -146,6 +146,13 @@ class Link(object):
         S.world.refresh_objects()
 
     @staticmethod
+    def clear_objects():
+        '''
+        Clears objects from backend (PbD).
+        '''
+        S.world.clear_all_objects()
+
+    @staticmethod
     def get_objs():
         '''
         Returns:

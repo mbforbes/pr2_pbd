@@ -212,6 +212,7 @@ class ObjectsHandler(object):
         '''
         Records and broadcasts world objects.
         '''
+        ObjectsHandler._clear()
         ObjectsHandler._record_internal()
         ObjectsHandler.broadcast()
 
@@ -224,6 +225,16 @@ class ObjectsHandler(object):
         else:
             objs_str = '%d objecs.' % (n_objs)
         Feedback('Found ' + objs_str).issue()
+
+    @staticmethod
+    def _clear():
+        '''
+        Clears all objects.
+        '''
+        ObjectsHandler.objects_lock.acquire()
+        ObjectsHandler.objects = []
+        Link.clear_objects()
+        ObjectsHandler.objects_lock.release()
 
     # Reachabilities don't change, so probably no need for this.
     # @staticmethod
