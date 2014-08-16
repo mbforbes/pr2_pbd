@@ -21,8 +21,15 @@ roslib.load_manifest('pr2_pbd_interaction')
 import rospy
 
 # ROS Builtins
+from actionlib import SimpleActionClient
 from geometry_msgs.msg import Vector3, Pose, Point
 import tf
+
+# ROS 3rd party
+from pr2_object_manipulation_msgs.msg import (
+    IMGUIAction, IMGUIActionGoal, IMGUIActionResult, IMGUIGoal, IMGUIOptions,
+    IMGUICommand, IMGUIAdvancedOptions)
+from object_manipulation_msgs.msg import ManipulationResult
 
 # PbD
 from pr2_pbd_interaction.msg import HandsFreeCommand, Side, ArmState
@@ -46,6 +53,7 @@ class S(object):
     '''
     arms = None
     world = None
+    imgui_action_client = None
 
 
 class Link(object):
@@ -108,6 +116,12 @@ class Link(object):
             S.arms = arms
         if S.world is None:
             S.world = world
+        if S.imgui_action_client is None:
+            S.imgui_action_client = SimpleActionClient(
+                'imgui_action',  # namespace
+                IMGUIAction  # action message type
+            )
+
 
     @staticmethod
     def get_gripper_joint_position(side):
@@ -193,6 +207,57 @@ class Link(object):
         return Link._get_ik_for_ee_computed(side, pose) is not None
 
     @staticmethod
+    def pick_up(obj, side):
+        '''
+        Args:
+            obj (PbdObject)
+            side (int): Side.RIGHT or Side.LEFT
+        '''
+        # See the following for documentation of these
+        # objects (and links to their spec).
+        # https://docs.google.com/document/d/
+        #     10Pqi5M2aKWgubR7UMSLoYJhApbD3fhWq-9C7yrxvdpA/
+        #     edit#
+        adv_opt = IMGUIAdvancedOptions(
+            False,  # reactive_grasping
+            False,  # reactive_force
+            False,  # reactive_place
+            10,  # lift_steps
+            10,  # retreat_steps
+            0,  # lift_direction_choice
+            0,  # desired_approach
+            0,  # min_approach
+            0.0,  # max_contact_force # TODO(max): 30?
+            False,  # find_alternatives
+            False,  # always_plan_grasps
+            False  # cycle_gripper_opening
+        )
+        opts = IMGUIOptions(
+            True,  # collision_checked
+            1,  # grasp_selection (0 grip click, 1 provided)
+            0,  # arm_selection (0 right, 1 left)
+            0,  # reset_choice (reset: 0 collision, 1 attached)
+            0,  # arm_action_choice (0 side, 1 front, 2 side handoff)
+            0,  # arm_planner_choice (0 open-loop, 1 w/ planner)
+            0,  # gripper_slider_position (0=closed...100=open)
+            obj.gobj,  # selected_object (GraspableObject)
+            [],  # moveable_obstacles
+            adv_opt  # adv_options
+        )
+        cmd = IMGUICommand(
+            0,  # 0 pickup, 1 place, 2 planned move, etc.
+            '',  # script_name
+            ''  # script_group_name
+        )
+        goal = IMGUIGoal(opts, cmd)
+        rospy.loginfo('Sending pickup goal')
+        S.imgui_action_client.send_goal(goal)
+        S.imgui_action_client.wait_for_result()
+        return (
+            S.imgui_action_client.get_result().result.value ==
+            ManipulationResult.SUCCESS)
+
+    @staticmethod
     def move_to_computed_pose(side, pose):
         '''
         Args:
@@ -233,6 +298,13 @@ class Link(object):
             bool
         '''
         new_pose = Link._get_pose_abs_dir(arm_str, abs_dir)
+
+        # If we're not initialized yet (early in startup of system),
+        # then we must just return false.
+        if new_pose is None:
+            return False
+
+        # Else, give it a shot.
         arm_idx = Link.get_arm_index(arm_str)
         seed = S.arms.arms[arm_idx].get_joint_positions()
         return Link._get_ik_for_ee_raw(arm_idx, new_pose, seed) is not None

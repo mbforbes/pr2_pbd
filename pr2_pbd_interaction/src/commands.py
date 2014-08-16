@@ -247,6 +247,61 @@ class MoveAbsoluteDirection(Command):
         return success, fb
 
 
+class PickUp(Command):
+    '''Action 7: Pick up an object with one (or both?) hand(s).
+
+    self.args should have:
+        [0] - object name
+        [1] - side (right or left hand)
+    '''
+
+    options = CommandOptions({
+    })
+
+    def init(self):
+        # Initialize some of our own state for convenience.
+        self.arm_idx = Link.get_arm_index(self.args[0])
+        # TODO(mbforbes): Should use phrases.
+        self.hand_str = 'right' if self.arm_idx == Side.RIGHT else 'left'
+        self.obj_str = self.args[0]
+
+    def pre_check(self, args, phrases):
+        '''Ensures picking up can happen.'''
+        # NOTE(mbforbes): Not sure of a way to conveniently check this
+        # with the current implementation. That's not to say it isn't
+        # possible.
+        pbdobj = ObjectsHandler.get_obj_by_name(self.args[0])
+        res = True
+        # This would be the 'default' failure mode (but we never do a
+        # real check so it never happens.)
+        fb = FailureFeedback(
+            'Cannot pick up ' + self.obj_str + ' with ' + self.hand_str +
+            'hand.')
+        if pbdobj is None:
+            res = False
+            fb = FailureFeedback(
+                'No object named ' + self.obj_str + ' to pick up.')
+        return res, fb
+
+    def narrate(self, args, phrases):
+        '''Describes the process of picking up.'''
+        fb = Feedback(
+            'Picking up ' + self.obj_str + ' with ' + self.hand_str +
+            'hand.')
+        return fb
+
+    def core(self, args, phrases):
+        '''Picks up object.'''
+        pbdobj = ObjectsHandler.get_obj_by_name(self.args[0])
+        success = False
+        fb = FailureFeedback(
+            'Failed to pick up ' + self.obj_str + ' with ' + self.hand_str +
+            ' hand. ')
+        if pbdobj is not None:
+            success = Link.pick_up(pbdobj, self.arm_idx)
+        return success, fb
+
+
 class Open(Command):
     '''Action 11: Open the robot's gripper on one (or both?) side(s).
 
@@ -355,6 +410,7 @@ class CommandRouter(object):
     command_map = {
         HandsFreeCommand.MOVE_ABSOLUTE_DIRECTION: MoveAbsoluteDirection,
         HandsFreeCommand.MOVE_RELATIVE_POSITION: MoveRelativePosition,
+        HandsFreeCommand.PICKUP: PickUp,
         HandsFreeCommand.OPEN: Open,
         HandsFreeCommand.CLOSE: Close,
     }

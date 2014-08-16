@@ -14,14 +14,31 @@ string SWITCH_ACTION = switch_action
 string CREATE_NEW_ACTION = create_new_action
 string CLARIFY = clarify
 
-# 'Normal' Commands:
-string OPEN = open
-string CLOSE = close
-string PICKUP = pickup
-string PLACE = place
-string LOOK_AT = look_at
-string MOVE_ABSOLUTE_DIRECTION = move_abs
+# 'Programming' Commands:
+# Action 1
+string MOVE_ABSOLUTE_POSE = move_abs_pos
+# Action 2
 string MOVE_RELATIVE_POSITION = move_rel
+# Action 3
+string MOVE_ABSOLUTE_DIRECTION = move_abs
+# Action 4
+string MOVE_RELATIVE_DIRECTION = move_rel_dir
+# Action 5
+string PLACE_AT_LOCATION = place_loc
+# Action 6
+string PLACE_RELATIVE = place
+# Action 7
+string PICKUP = pick_up
+# Action 8
+string POINT_TO = point_to
+# Action 9
+string ROTATE = rotate
+# Action 10
+string LOOK_AT = look_at
+# Action 11
+string OPEN = open
+# Action 12
+string CLOSE = close
 
 
 # Different argument options that can appear in the field 'args'

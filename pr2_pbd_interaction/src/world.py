@@ -110,7 +110,7 @@ PBDOBJ_ID_MULTIPLIER_OFFSET = 10
 # Classes
 # ######################################################################
 
-class PbdObject:
+class PbdObject(object):
     '''Class for representing objects interally in PbD.'''
 
     # For making uids
@@ -123,9 +123,12 @@ class PbdObject:
         HandsFreeCommand.ON_TOP_OF,
     ]
 
-    def __init__(self, cluster, pose, index, dimensions, is_recognized):
+    def __init__(
+        self, graspable_object, cluster, pose, index, dimensions,
+        is_recognized):
         '''
         Args:
+            graspable_object (GraspableObject)
             cluster (sensor_msgs/PointCloud)
             pose (Pose): Position of bounding box
             index (int): For naming object in world (e.g. "thing 0")
@@ -133,6 +136,7 @@ class PbdObject:
             is_recognized (bool): Result of object recognition.
         '''
         # Core attrs.
+        self.gobj = graspable_object
         self.cluster = cluster
         self.pose = pose
         self.index = index
@@ -842,21 +846,22 @@ class World:
         self._lock.acquire()
         rospy.loginfo('Received recognized object list.')
         if len(object_list.graspable_objects) > 0:
-            for i in range(len(object_list.graspable_objects)):
-                models = object_list.graspable_objects[i].potential_models
+            for gobj in object_list.graspable_objects:
+                models = gobj.potential_models
                 if len(models) > 0:
                     object_pose = None
                     best_confidence = 0.0
-                    for j in range(len(models)):
-                        if best_confidence < models[j].confidence:
-                            object_pose = models[j].pose.pose
-                            best_confidence = models[j].confidence
+                    for model in models:
+                        if best_confidence < model.confidence:
+                            object_pose = model.pose.pose
+                            best_confidence = model.confidence
                     if object_pose is not None:
                         rospy.logwarn(
                             'Adding the recognized object with most ' +
                             'confident model.')
                         self._add_new_object(
-                            object_list.graspable_objects[i].cluster,
+                            gobj,
+                            gobj.cluster,
                             object_pose,
                             DIMENSIONS_OBJ,
                             True,
@@ -866,7 +871,7 @@ class World:
                     rospy.logwarn(
                         '... this is not a recognition result, it is ' +
                         'probably just segmentation.')
-                    cluster = object_list.graspable_objects[i].cluster
+                    cluster = gobj.cluster
                     bbox = self._bb_service(cluster)
                     cluster_pose = bbox.pose.pose
                     if cluster_pose is not None:
@@ -876,6 +881,7 @@ class World:
                             '...in ref frame ' +
                             str(bbox.pose.header.frame_id))
                         self._add_new_object(
+                            gobj,
                             cluster,
                             cluster_pose,
                             bbox.box_dims,
@@ -1077,7 +1083,8 @@ class World:
         self._lock.release()
 
     def _add_new_object(
-            self, cluster, pose, dimensions, is_recognized, mesh=None):
+            self, graspable_object, cluster, pose, dimensions, is_recognized,
+            mesh=None):
         '''Maybe add a new object with the specified properties to our
         object list.
 
@@ -1139,11 +1146,13 @@ class World:
 
             # Actually add the object.
             self._add_new_object_internal(
-                cluster, pose, dimensions, is_recognized, mesh)
+                graspable_object, cluster, pose, dimensions, is_recognized,
+                mesh)
             return True
 
     def _add_new_object_internal(
-            self, cluster, pose, dimensions, is_recognized, mesh):
+            self, graspable_object, cluster, pose, dimensions, is_recognized,
+            mesh):
         '''Does the 'internal' adding of an object with the passed
         properties. Call _add_new_object to do all pre-requisite checks
         first (it then calls this function).
@@ -1157,7 +1166,8 @@ class World:
         '''
         n_objects = len(World.objects)
         World.objects.append(PbdObject(
-            cluster, pose, n_objects, dimensions, is_recognized))
+            graspable_object, cluster, pose, n_objects, dimensions,
+            is_recognized))
         int_marker = self._get_object_marker(len(World.objects) - 1)
         World.objects[-1].int_marker = int_marker
         World.im_server.insert(int_marker, self.marker_feedback_cb)
