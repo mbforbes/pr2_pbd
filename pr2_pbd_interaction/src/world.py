@@ -972,7 +972,7 @@ class World:
                       self._object_action_client.get_goal_status_text())
         if self._object_action_client.get_state() == GoalStatus.SUCCEEDED:
             rospy.loginfo('Successfully reset object localization pipeline.')
-            self._reset_objects()
+        self._reset_objects()
         self._remove_surface()
 
     def get_nearest_object(self, arm_pose):

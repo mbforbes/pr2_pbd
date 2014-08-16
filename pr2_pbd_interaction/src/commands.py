@@ -260,7 +260,7 @@ class PickUp(Command):
 
     def init(self):
         # Initialize some of our own state for convenience.
-        self.arm_idx = Link.get_arm_index(self.args[0])
+        self.arm_idx = Link.get_arm_index(self.args[1])
         # TODO(mbforbes): Should use phrases.
         self.hand_str = 'right' if self.arm_idx == Side.RIGHT else 'left'
         self.obj_str = self.args[0]
