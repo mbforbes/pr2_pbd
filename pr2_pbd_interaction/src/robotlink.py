@@ -122,7 +122,6 @@ class Link(object):
                 IMGUIAction  # action message type
             )
 
-
     @staticmethod
     def get_gripper_joint_position(side):
         '''

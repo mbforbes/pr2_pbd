@@ -725,7 +725,7 @@ class Arm:
         ik_srv_name = PR2_SERVICE_PREFIX + side + SERVICE_IK_POSTFIX
         rospy.wait_for_service(ik_srv_name)
         self.ik_srv = rospy.ServiceProxy(
-            ik_srv_name, GetPositionIK, persistent=True)
+            ik_srv_name, GetPositionIK)  # , persistent=True)
         rospy.loginfo('IK service has responded for ' + side + ' arm.')
 
         # Set up common parts of an IK request.
@@ -757,7 +757,7 @@ class Arm:
         fk_srv_name = PR2_SERVICE_PREFIX + side + SERVICE_FK_POSTFIX
         rospy.wait_for_service(fk_srv_name)
         self.fk_srv = rospy.ServiceProxy(
-            fk_srv_name, GetPositionFK, persistent=True)
+            fk_srv_name, GetPositionFK)  # , persistent=True)
         rospy.loginfo('FK service has responded for ' + side + ' arm.')
 
         # Set up common parts of an FK request.

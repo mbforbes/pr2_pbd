@@ -124,8 +124,8 @@ class PbdObject(object):
     ]
 
     def __init__(
-        self, graspable_object, cluster, pose, index, dimensions,
-        is_recognized):
+            self, graspable_object, cluster, pose, index, dimensions,
+            is_recognized):
         '''
         Args:
             graspable_object (GraspableObject)
