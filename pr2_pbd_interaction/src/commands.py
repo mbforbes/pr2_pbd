@@ -64,10 +64,26 @@ class Command(object):
         '''
         self.args = args
         self.phrases = phrases
+        self.phrases_processed = Command.process_phrases(phrases)
+        self.phrases_processed_str = (
+            ' '.join(self.phrases_processed).capitalize() + '.')
 
         # Initialize any command-specific code.
         if hasattr(self, 'init'):
             self.init()
+
+    @staticmethod
+    def process_phrases(phrases):
+        '''
+        Removes speech-recognition-helping hyphens from phrases.
+
+        Args:
+            phrases ([str])
+
+        Returns:
+            [str]
+        '''
+        return [p.replace('-', ' ') for p in phrases]
 
     def execute(self, mode):
         '''Executes this command in mode.
@@ -87,7 +103,7 @@ class Command(object):
 
         # Do pre-check.
         if hasattr(self, 'pre_check'):
-            pre_success, pre_feedback = self.pre_check(self.args, self.phrases)
+            pre_success, pre_feedback = self.pre_check()
             if not pre_success:
                 # Maybe issue feedback for this.
                 if ((mode == Mode.PROG and
@@ -103,25 +119,26 @@ class Command(object):
                     return Code.PRE_CHECK_NO_OP
 
         # About to do the action; narrate if necessary.
+        # NOTE(mbforbes): We now have a default narrate function, so
+        # this hasattr(...) check will always return true.
         if hasattr(self, 'narrate'):
             if ((mode == Mode.EXEC and
                     self.get_option(CommandOptions.NARRATE_EXEC)) or
                     mode == Mode.PROG and
                     self.get_option(CommandOptions.NARRATE_PROG)):
-                narrate_feedback = self.narrate(self.args, self.phrases)
+                narrate_feedback = self.narrate()
                 narrate_feedback.issue()
 
         # Do the action.
         if hasattr(self, 'core'):
-            exec_success, exec_feedback = self.core(self.args, self.phrases)
+            exec_success, exec_feedback = self.core()
             if not exec_success:
                 exec_feedback.issue()
                 return Code.EXEC_FAIL
 
         # Do post-check.
         if hasattr(self, 'post_check'):
-            post_success, post_feedback = self.post_check(
-                self.args, self.phrases)
+            post_success, post_feedback = self.post_check()
             if not post_success:
                 post_feedback.issue()
                 return Code.POST_CHECK_FAIL
@@ -148,6 +165,41 @@ class Command(object):
                     RobotHandler.last_commanded = side
                     return
 
+    def narrate(self):
+        '''
+        Default narration; uses processed phrases.
+
+        Returns:
+            Feedback
+        '''
+        # Got to remove hyphens and underscores for speaking.
+        return Feedback(self.phrases_processed_str)
+
+    # Helpers
+    def default_pre_feedback(self):
+        '''
+        Default feedback for a failed pre-check.
+
+        NOTE(mbforbes): This is not used automatically, as you still
+        must implement an actual pre_check function. However, this may
+        be used in pre_check functions as an easy default response.
+
+        Returns: FailureFeedback
+        '''
+        return FailureFeedback('Cannot ' + self.phrases_processed_str)
+
+    def default_core_feedback(self):
+        '''
+        Default feedback for a failed core (actual execution).
+
+        NOTE(mbforbes): This is not used automatically, as you still
+        must implement an core function. However, this may be used in
+        core functions as an easy default response.
+
+        Returns: FailureFeedback
+        '''
+        return FailureFeedback('Failed to ' + self.phrases_processed_str)
+
     @classmethod
     def get_option(cls, option_name):
         '''Gets the option that is set as a class variable.'''
@@ -162,6 +214,12 @@ class MoveRelativePosition(Command):
         [0] - side (right or left hand)
         [1] - relative position
         [2] - object (to move relative to)
+
+    self.phrases should indicate:
+        [0] - this verb (~move)
+        [1] - side
+        [2] - relative position
+        [3] - object (to move relative to)
     '''
 
     options = CommandOptions({
@@ -170,42 +228,30 @@ class MoveRelativePosition(Command):
     def init(self):
         # Initialize some of our own state for convenience.
         self.arm_idx = Link.get_arm_index(self.args[0])
-        # TODO(mbforbes): Should use phrases.
-        self.hand_str = 'right' if self.arm_idx == Side.RIGHT else 'left'
         self.pbdobj = ObjectsHandler.get_obj_by_name(self.args[2])
         if self.pbdobj is not None:
             self.rr = self.pbdobj.reachability_map[self.args[1]][self.arm_idx]
 
-    def pre_check(self, args, phrases):
+    def pre_check(self):
         '''Ensures reaching can happen.'''
         if self.pbdobj is None:
-            return False, FailureFeedback('No object named ' + self.args[2])
+            return False, FailureFeedback(
+                'Cannot find ' + self.phrases_processed[3])
         elif not self.rr.reachable:
-            return False, FailureFeedback(self.args[2] + ' is not reachable.')
+            return False, FailureFeedback(' '.join([
+                self.phrases_processed[2],
+                self.phrases_processed[3],
+                'is not reachable.']))
         else:
-            return True, FailureFeedback()
+            return True, self.default_pre_feedback()
 
-    def narrate(self, args, phrases):
-        '''Describes the process of moving relative position.'''
-        fb = Feedback(
-            'Moving ' + self.hand_str + ' hand ' + self.args[1] + ' ' +
-            self.args[2] + '.')
-        return fb
-
-    def core(self, args, phrases):
+    def core(self):
         '''Does the movement.'''
         res = Link.move_to_computed_pose(self.arm_idx, self.rr.pose)
-        fb = FailureFeedback(
-            'Failed to move ' + self.hand_str + ' hand ' + self.args[1] + ' ' +
-            self.args[2] + '.')
+        fb = self.default_core_feedback()
         return res, fb
 
-    # TODO(mbforbes): Check joints for this.
-    # def post_check(self, args, phrases):
-    #     '''Checks whether opening happened.'''
-    #     res = S.arms.get_gripper_state(self.arm_idx) == GripperState.CLOSED
-    #     fb = FailureFeedback(self.hand_str + ' did not close.')
-    #     return res, fb
+    # TODO(mbforbes): Post-check that relative move worked.
 
 
 class MoveAbsoluteDirection(Command):
@@ -215,6 +261,11 @@ class MoveAbsoluteDirection(Command):
     self.args should have:
         [0] - side (right or left hand)
         [1] - absolute direction
+
+    self.phrases should indicate:
+        [0] - this verb (~move)
+        [1] - side
+        [2] - absolute direction
     '''
 
     options = CommandOptions({
@@ -223,27 +274,17 @@ class MoveAbsoluteDirection(Command):
     def init(self):
         # Initialize some of our own state for convenience.
         self.arm_idx = Link.get_arm_index(self.args[0])
-        # TODO(mbforbes): Should use phrases.
-        self.hand_str = 'right' if self.arm_idx == Side.RIGHT else 'left'
 
-    def pre_check(self, args, phrases):
+    def pre_check(self):
         '''Ensures moving in the specified direction can happen.'''
         res = Link.get_abs_dir_possible(self.args[0], self.args[1])
-        fb = FailureFeedback(
-            'Cannot move ' + self.hand_str + ' hand ' + self.args[1] + '.')
+        fb = self.default_pre_feedback()
         return res, fb
 
-    def narrate(self, args, phrases):
-        '''Describes the process of moving.'''
-        fb = Feedback(
-            'Moving ' + self.hand_str + ' hand ' + self.args[1] + '.')
-        return fb
-
-    def core(self, args, phrases):
+    def core(self):
         '''Moves.'''
         success = Link.move_abs_dir(self.args[0], self.args[1])
-        fb = FailureFeedback(
-            'Failed to move' + self.hand_str + ' hand ' + self.args[1] + '.')
+        fb = self.default_core_feedback()
         return success, fb
 
 
@@ -253,6 +294,11 @@ class PickUp(Command):
     self.args should have:
         [0] - object name
         [1] - side (right or left hand)
+
+    self.phrases should indicate:
+        [0] - this verb (~pick up)
+        [1] - object referring phrase
+        [2] - side
     '''
 
     options = CommandOptions({
@@ -261,11 +307,15 @@ class PickUp(Command):
     def init(self):
         # Initialize some of our own state for convenience.
         self.arm_idx = Link.get_arm_index(self.args[1])
-        # TODO(mbforbes): Should use phrases.
-        self.hand_str = 'right' if self.arm_idx == Side.RIGHT else 'left'
         self.obj_str = self.args[0]
+        self.narration = ' '.join([
+            self.phrases_processed[0],
+            self.phrases_processed[1],
+            'with',
+            self.phrases_processed[2]
+        ])
 
-    def pre_check(self, args, phrases):
+    def pre_check(self):
         '''Ensures picking up can happen.'''
         # NOTE(mbforbes): Not sure of a way to conveniently check this
         # with the current implementation. That's not to say it isn't
@@ -274,29 +324,22 @@ class PickUp(Command):
         res = True
         # This would be the 'default' failure mode (but we never do a
         # real check so it never happens.)
-        fb = FailureFeedback(
-            'Cannot pick up ' + self.obj_str + ' with ' + self.hand_str +
-            'hand.')
+        fb = FailureFeedback(' '.join(['Cannot', self.narration]))
+
         if pbdobj is None:
             res = False
-            fb = FailureFeedback(
-                'No object named ' + self.obj_str + ' to pick up.')
+            fb = FailureFeedback('Cannot find ' + self.phrases_processed[1])
         return res, fb
 
-    def narrate(self, args, phrases):
+    def narrate(self):
         '''Describes the process of picking up.'''
-        fb = Feedback(
-            'Picking up ' + self.obj_str + ' with ' + self.hand_str +
-            'hand.')
-        return fb
+        return Feedback(self.narration)
 
-    def core(self, args, phrases):
+    def core(self):
         '''Picks up object.'''
         pbdobj = ObjectsHandler.get_obj_by_name(self.args[0])
         success = False
-        fb = FailureFeedback(
-            'Failed to pick up ' + self.obj_str + ' with ' + self.hand_str +
-            ' hand. ')
+        fb = FailureFeedback(' '.join(['Failed to ' + self.narration]))
         if pbdobj is not None:
             success = Link.pick_up(pbdobj, self.arm_idx)
         return success, fb
@@ -307,6 +350,10 @@ class Open(Command):
 
     self.args should have:
         [0] - side (right or left hand)
+
+    self.phrases should indicate:
+        [0] - this verb (~open)
+        [1] - side
     '''
 
     options = CommandOptions({
@@ -317,31 +364,27 @@ class Open(Command):
     def init(self):
         # Initialize some of our own state for convenience.
         self.arm_idx = Link.get_arm_index(self.args[0])
-        # TODO(mbforbes): Should use phrases.
-        self.hand_str = (
-            ('right' if self.arm_idx == Side.RIGHT else 'left') + ' hand')
 
-    def pre_check(self, args, phrases):
+    def pre_check(self):
         '''Ensures opening can happen.'''
         res = Link.get_gripper_state(self.arm_idx) != GripperState.OPEN
-        fb = FailureFeedback(self.hand_str + ' is already open.')
+        fb = FailureFeedback(self.phrases_processed[1] + ' is already open.')
         return res, fb
 
-    def narrate(self, args, phrases):
-        '''Describes the process of opening.'''
-        fb = Feedback('Opening ' + self.hand_str + '.')
-        return fb
-
-    def core(self, args, phrases):
+    def core(self):
         '''Opens whichever gripper.'''
         res = Link.set_gripper_state(self.arm_idx, GripperState.OPEN)
-        fb = FailureFeedback(self.hand_str + ' failed to open.')
+        fb = self.default_core_feedback()
         return res, fb
 
-    def post_check(self, args, phrases):
+    def post_check(self):
         '''Checks whether opening happened.'''
         res = Link.get_gripper_state(self.arm_idx) == GripperState.OPEN
-        fb = FailureFeedback(self.hand_str + ' did not open.')
+        fb = FailureFeedback(' '.join([
+            self.phrases_processed[1],
+            'did not',
+            self.phrases_processed[0]
+        ]))
         return res, fb
 
 
@@ -350,6 +393,10 @@ class Close(Command):
 
     self.args should have:
         [0] - side (right or left hand)
+
+    self.phrases should indicate:
+        [0] - this verb (~close)
+        [1] - side
     '''
 
     options = CommandOptions({
@@ -360,31 +407,27 @@ class Close(Command):
     def init(self):
         # Initialize some of our own state for convenience.
         self.arm_idx = Link.get_arm_index(self.args[0])
-        # TODO(mbforbes): Should use phrases.
-        self.hand_str = (
-            ('right' if self.arm_idx == Side.RIGHT else 'left') + ' hand')
 
-    def pre_check(self, args, phrases):
+    def pre_check(self):
         '''Ensures closing can happen.'''
         res = Link.get_gripper_state(self.arm_idx) != GripperState.CLOSED
-        fb = FailureFeedback(self.hand_str + ' is already closed.')
+        fb = FailureFeedback(self.phrases_processed[1] + ' is already closed.')
         return res, fb
 
-    def narrate(self, args, phrases):
-        '''Describes the process of closing.'''
-        fb = Feedback('Closing ' + self.hand_str + '.')
-        return fb
-
-    def core(self, args, phrases):
+    def core(self):
         '''Closes whichever gripper.'''
         res = Link.set_gripper_state(self.arm_idx, GripperState.CLOSED)
-        fb = FailureFeedback(self.hand_str + ' failed to close.')
+        fb = self.default_core_feedback()
         return res, fb
 
-    def post_check(self, args, phrases):
+    def post_check(self):
         '''Checks whether opening happened.'''
         res = Link.get_gripper_state(self.arm_idx) == GripperState.CLOSED
-        fb = FailureFeedback(self.hand_str + ' did not close.')
+        fb = FailureFeedback(' '.join([
+            self.phrases_processed[1],
+            'did not',
+            self.phrases_processed[0]
+        ]))
         return res, fb
 
 
