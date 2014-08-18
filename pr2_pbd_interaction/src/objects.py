@@ -379,7 +379,7 @@ class ObjectsHandler(object):
         now we start programming from the same location every time.
         '''
         # Move arms to side.
-        Link.move_to_named_position('side')
+        Link.move_to_named_position('to_side')
 
         # Record and grab objects
         Link.update_object_pose()

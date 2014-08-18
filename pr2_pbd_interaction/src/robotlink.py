@@ -20,6 +20,9 @@ import roslib
 roslib.load_manifest('pr2_pbd_interaction')
 import rospy
 
+# System builtins
+import math
+
 # ROS Builtins
 from actionlib import SimpleActionClient
 from geometry_msgs.msg import Vector3, Pose, Point
@@ -36,6 +39,15 @@ from pr2_pbd_interaction.msg import HandsFreeCommand, Side, ArmState
 from arms import Arms
 from world import World
 from util import Numbers
+
+
+# ######################################################################
+# Module-level constants
+# ######################################################################
+
+# Approximate distance from wrist_roll_link to finger tip (haven't
+# actually measured).
+GRIPPER_LENGTH = 0.18  # in m, so 0.18 = 18cm (I think)
 
 
 # ######################################################################
@@ -63,14 +75,14 @@ class Link(object):
     Replacing it and S would make the system PbD-independent.
     '''
     joint_positions = {
-        'side': {
+        'to_side': {
             'right': [
                 -0.75,  # shoulder_pan
                 -0.20,  # shoulder_lift
                 -2.60,  # upper_arm_roll
                 -0.40,  # elbow_flex
                 1.60,  # forearm_roll
-                0.60,  # wrist_flex
+                -0.10,  # wrist_flex
                 1.00  # wrist_roll
             ],
             'left': [
@@ -79,14 +91,14 @@ class Link(object):
                 2.60,  # upper_arm_roll
                 -0.40,  # elbow_flex
                 -1.60,  # forearm_roll
-                0.60,  # wrist_flex
+                -0.10,  # wrist_flex
                 1.00  # wrist_roll
             ],
         },
     }
 
     # Settings.
-    # TODO(mbforbes): Make launch param?
+    # How far to move on a 'move' command (if it specifies a direction).
     movement_delta = 0.10  # in m, so 0.10 = 10cm (I think)
 
     # Constants (computed from settings).
@@ -285,6 +297,31 @@ class Link(object):
         return Link._move_to_joints(joints[0], joints[1])
 
     @staticmethod
+    def get_rel_dir_possible(arm_str, pbd_obj, rel_dir):
+        '''
+        Returns whether a movement of arm_str in rel_dir of pbd_obj is
+        possible.
+
+        Args:
+            arm_str (str): HandsFreeCommand.LEFT_HAND or
+                HandsFreeCommand.RIGHT_HAND
+            pbd_obj (PbdObject)
+            rel_dir: HandsFreeCommand.AWAY or HandsFreeCommand.TOWARDS
+
+        Returns:
+            bool
+        '''
+        new_pose = Link._get_pose_rel_dir(arm_str, pbd_obj, rel_dir)
+
+        # If we're not initialized yet (early in startup of system),
+        # then we must just return false.
+        if new_pose is None:
+            return False
+
+        arm_idx = Link.get_arm_index(arm_str)
+        return Link._get_ik_for_ee_computed(arm_idx, new_pose) is not None
+
+    @staticmethod
     def get_abs_dir_possible(arm_str, abs_dir):
         '''
         Returns whether a movement of arm_str in abs_dir is possible.
@@ -350,11 +387,43 @@ class Link(object):
         return Link._move_to_joints(joints[0], joints[1])
 
     @staticmethod
-    def move_to_named_position(name):
+    def move_rel_dir(arm_str, pbd_obj, rel_dir):
+        '''
+        Args:
+            arm_str (str): HandsFreeCommand.LEFT_HAND or
+                HandsFreeCommand.RIGHT_HAND
+            pbd_obj (PbdObject)
+            rel_dir: HandsFreeCommand.AWAY or HandsFreeCommand.TOWARDS
+
+        Returns:
+            bool: Success?
+        '''
+        new_pose = Link._get_pose_rel_dir(arm_str, pbd_obj, rel_dir)
+
+        # If we're not initialized yet (early in startup of system),
+        # then we must just return false.
+        if new_pose is None:
+            return False
+
+        arm_idx = Link.get_arm_index(arm_str)
+        side_joints = Link._get_ik_for_ee_computed(arm_idx, new_pose)
+
+        # If movement isn't possible, return false.
+        if side_joints is None:
+            return False
+
+        # Else, try movement and returns its success val.
+        joints = [None, None]
+        joints[arm_idx] = side_joints
+        return Link._move_to_joints(joints[0], joints[1])
+
+    @staticmethod
+    def move_to_named_position(name, arm_idx=Side.BOTH):
         '''
         Args:
             name (str): The name of the position to move to. See
                 Link.joint_positions.
+            arm_idx (int): Side.RIGHT, Side.LEFT, or Side.BOTH
 
         Returns:
             bool: Whether movement was successful.
@@ -364,7 +433,11 @@ class Link(object):
             rospy.logwarn('No pre-set joint positions for ' + str(name))
             return False
         mapping = Link.joint_positions[name]
-        r, l = mapping['right'], mapping['left']
+        r, l = None, None
+        if arm_idx == Side.RIGHT or arm_idx == Side.BOTH:
+            r = mapping['right']
+        if arm_idx == Side.LEFT or arm_idx == Side.BOTH:
+            l = mapping['left']
         return Link._move_to_joints(r, l)
 
     # ##################################################################
@@ -411,13 +484,13 @@ class Link(object):
         return Link._get_ik_for_ee_raw(side, wrist_pose, seed)
 
     @staticmethod
-    def _offset_pose(pose, offset=-0.18):
+    def _offset_pose(pose, offset=-GRIPPER_LENGTH):
         '''Offsets pose by offset.
 
         Args:
             pose (Pose): The pose to offset.
             constant (float, optional): How much to offset by. Defaults
-                to -0.18 (reverse length of gripper).
+                to -GRIPPER_LENGTH (negative length of gripper).
 
         Returns:
             Pose: The offset pose.
@@ -470,6 +543,62 @@ class Link(object):
         return new_pose
 
     @staticmethod
+    def _get_pose_rel_dir(arm_str, pbd_obj, rel_dir):
+        '''
+        Returns the pose for a movement of arm_str in rel_dir of
+        pbd_obj.
+
+        Args:
+            arm_str (str): HandsFreeCommand.LEFT_HAND or
+                HandsFreeCommand.RIGHT_HAND
+            pbd_obj (PbdObject)
+            rel_dir: HandsFreeCommand.AWAY or HandsFreeCommand.TOWARDS
+
+        Returns:
+            Pose|None: None if system isn't fully initialized and can't
+                retrieve EE state. Else, Pose in finger-tip (computed)
+                space.
+        '''
+        arm_idx = Link.get_arm_index(arm_str)
+        wrist_pose = S.arms.arms[arm_idx].get_ee_state()
+
+        if wrist_pose is None:
+            return None
+        # Need to offset current pose so that we think about it in
+        # "finger tip" and not "gripper" space.
+        finger_tip_pose = Link._offset_pose(wrist_pose, GRIPPER_LENGTH)
+
+        # Calculate movement vector
+        op = pbd_obj.pose.position
+        cp = finger_tip_pose.position
+        d_full = Vector3(op.x - cp.x, op.y - cp.y, op.z - cp.z)
+        mag = math.sqrt(d_full.x**2 + d_full.y**2 + d_full.z**2)
+
+        # If the difference is up to the movement delta (how far we
+        # would normally move), and we're moving towards the object,
+        # just move all the way to the object.
+        if rel_dir == HandsFreeCommand.TOWARDS and mag <= Link.movement_delta:
+            return op
+
+        direction = 1.0 if rel_dir == HandsFreeCommand.TOWARDS else -1.0
+
+        # Otherwise, we scale to only move delta.
+        scale = (Link.movement_delta * direction) / mag
+        d_scaled = Vector3(
+            d_full.x * scale,
+            d_full.y * scale,
+            d_full.z * scale
+        )
+        return Pose(
+            Point(
+                cp.x + d_scaled.x,
+                cp.y + d_scaled.y,
+                cp.z + d_scaled.z
+            ),
+            finger_tip_pose.orientation
+        )
+
+    @staticmethod
     def _move_to_joints(r_joints=None, l_joints=None):
         '''
         Args:
@@ -487,14 +616,18 @@ class Link(object):
         targets = [r_joints, l_joints]
         arm_states = [None, None]
         for i, side in enumerate(sides):
+            rospy.loginfo('Side: %d' % (side))
             target = targets[i]
             if target is not None:
                 cur_joints = Arms.get_joint_positions(side)
                 will_move = False
                 # TODO(mbforbes): Debug, this isn't actually working.
+                rospy.loginfo('Cur joints:    %s' % (str(cur_joints)))
+                rospy.loginfo('Target joints: %s' % (str(target)))
                 for j in range(len(cur_joints)):
                     if not Numbers.are_floats_close(target[j], cur_joints[j]):
                         will_move = True
+                        rospy.loginfo('Joint idx %d not close enough.' % (j))
                         break
                 if will_move:
                     arm_state = ArmState()

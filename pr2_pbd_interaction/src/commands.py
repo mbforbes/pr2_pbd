@@ -206,6 +206,34 @@ class Command(object):
         return cls.options.get(option_name)
 
 
+class MoveAbsolutePose(Command):
+    '''Action 1: Move the robot's gripper(s) to an absolute pose on one
+    (or both?) side(s).
+
+    self.args should have:
+        [0] - side (right or left hand)
+        [1] - absolute pose
+
+    self.phrases should indicate:
+        [0] - this verb (~move)
+        [1] - side
+        [2] - absolute pose
+    '''
+
+    options = CommandOptions({
+    })
+
+    def init(self):
+        # Initialize some of our own state for convenience.
+        self.arm_idx = Link.get_arm_index(self.args[0])
+
+    def core(self):
+        '''Does the movement.'''
+        fb = self.default_core_feedback()
+        success = Link.move_to_named_position(self.args[1], self.arm_idx)
+        return success, fb
+
+
 class MoveRelativePosition(Command):
     '''Action 2: Move the robot's gripper(s) to a relative position on
     one (or both?) side(s).
@@ -286,6 +314,51 @@ class MoveAbsoluteDirection(Command):
         success = Link.move_abs_dir(self.args[0], self.args[1])
         fb = self.default_core_feedback()
         return success, fb
+
+
+class MoveRelativeDirection(Command):
+    '''Action 4: Move the robot's gripper(s) in a relative direction to
+    an object on one (or both?) side(s).
+
+    self.args should have:
+        [0] - side (right or left hand)
+        [1] - relative direction (towards, away)
+        [2] - object
+
+
+    self.phrases should indicate:
+        [0] - this verb (~move)
+        [1] - side (right or left hand)
+        [2] - relative direction (towards, away)
+        [3] - object
+    '''
+
+    options = CommandOptions({
+    })
+
+    def init(self):
+        # Initialize some of our own state for convenience.
+        self.pbdobj = ObjectsHandler.get_obj_by_name(self.args[2])
+
+    def pre_check(self):
+        # Check 1: does obj exist?
+        if self.pbdobj is None:
+            return (
+                False,
+                FailureFeedback('Cannot find ' + self.phrases_processed[3]))
+
+        # Check 2: Can we move to the requested position?
+        # TODO(mbforbes): Might be useful to check if we can do this
+        # without colliding with other objects...
+        res = Link.get_rel_dir_possible(
+            self.args[0], self.pbdobj, self.args[1])
+        return res, self.default_pre_feedback()
+
+    def core(self):
+        '''Do the movement.'''
+        fb = self.default_core_feedback()
+        suc = Link.move_rel_dir(self.args[0], self.pbdobj, self.args[1])
+        return suc, fb
 
 
 class PickUp(Command):
@@ -451,9 +524,18 @@ class CommandRouter(object):
 
     # "Normal" commands (make robot do something).
     command_map = {
-        HandsFreeCommand.MOVE_ABSOLUTE_DIRECTION: MoveAbsoluteDirection,
+        # Action 1
+        HandsFreeCommand.MOVE_ABSOLUTE_POSE: MoveAbsolutePose,
+        # Action 2
         HandsFreeCommand.MOVE_RELATIVE_POSITION: MoveRelativePosition,
+        # Action 3
+        HandsFreeCommand.MOVE_ABSOLUTE_DIRECTION: MoveAbsoluteDirection,
+        # Action 4
+        HandsFreeCommand.MOVE_RELATIVE_DIRECTION: MoveRelativeDirection,
+        # Action 7
         HandsFreeCommand.PICKUP: PickUp,
+        # Action 11
         HandsFreeCommand.OPEN: Open,
+        # Action 12
         HandsFreeCommand.CLOSE: Close,
     }

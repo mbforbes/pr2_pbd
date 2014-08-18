@@ -46,6 +46,10 @@ string CLOSE = close
 # Side
 string LEFT_HAND = left_hand
 string RIGHT_HAND = right_hand
+string BOTH_HANDS = both_hands
+
+# Absolute poses
+string TO_SIDE = to_side
 
 # Absolute directions
 string UP = up
@@ -64,6 +68,10 @@ string IN_FRONT_OF = in_front_of
 string BEHIND = behind
 string ON_TOP_OF = on_top_of
 string NEAR = near
+
+# Relative directions
+string AWAY = away
+string TOWARDS = towards
 
 # Which
 string NEXT = next
