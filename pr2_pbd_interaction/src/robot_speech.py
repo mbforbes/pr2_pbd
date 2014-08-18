@@ -109,6 +109,7 @@ class RobotSpeech:
     def __init__(self):
         self.soundhandle = SoundClient()
         self.marker_publisher = rospy.Publisher(TOPIC_MARKER, Marker)
+        self.using_speech = None
 
     def say(self, text):
         '''Send a TTS (text to speech) command.
@@ -122,12 +123,31 @@ class RobotSpeech:
                 booping (if True), which determines whether to actually
                 speak the words (only if False).
         '''
-        # ROS param (see backend launch file) dictates whether we speak.
-        if rospy.has_param(PARAM_SPEECH) and rospy.get_param(PARAM_SPEECH):
+        # Maybe speak (if set to).
+        if self.get_using_speech()
             self.soundhandle.say(text)
 
         # We always display the text in RViz.
         self.say_in_rviz(text)
+
+    def get_using_speech(self):
+        '''
+        Return whether we are using speech.
+
+        I'm only caching this because on the PR2 getting these
+        parameters several times was causing ROS crashes. Very strange.
+        ROS bug? Maybe. This should avoid it, whatever it is.
+
+        Returns:
+            bool
+        '''
+        if self.using_speech is None:
+            # ROS param (see backend launch file) dictates whether we
+            # speak.
+            self.using_speech = (
+                rospy.has_param(PARAM_SPEECH) and
+                rospy.get_param(PARAM_SPEECH))
+        return self.using_speech
 
     def say_in_rviz(self, text):
         ''' Displays text in Rviz, in a position to imply the robot said

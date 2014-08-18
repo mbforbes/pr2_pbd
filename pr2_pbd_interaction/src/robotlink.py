@@ -275,7 +275,14 @@ class Link(object):
         Returns:
             int: GripperState.OPEN or GripperState.CLOSED
         '''
-        return S.arms.get_gripper_state(arm_idx)
+        # NOTE(mbforbes): We can't use PbD's gripper tracking because
+        # it doesn't track changes due to pr2_object_manipulation's
+        # automatic pick-up.
+        joint_val = Link.get_gripper_joint_position(arm_idx)
+        if joint_val < 0.078:
+            return GripperState.CLOSED
+        else:
+            return GripperState.OPEN
 
     @staticmethod
     def set_gripper_state(arm_idx, gripper_state):
@@ -288,7 +295,15 @@ class Link(object):
         Returns:
             bool: Success?
         '''
-        return S.arms.set_gripper_state(arm_idx, gripper_state)
+        # NOTE(mbforbes): Because this operation is robust we just
+        # return whether we ended up in the correct state, not if a
+        # state change happened.
+        if gripper_state == GripperState.OPEN:
+            S.arms.arms[arm_idx].open_gripper()
+        else:
+            S.arms.arms[arm_idx].close_gripper()
+        post_state = Link.get_gripper_state(arm_idx)
+        return post_state == gripper_state
 
     @staticmethod
     def get_arm_index(arm_str):
