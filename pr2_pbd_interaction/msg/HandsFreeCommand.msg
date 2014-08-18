@@ -73,6 +73,10 @@ string NEAR = near
 string AWAY = away
 string TOWARDS = towards
 
+# Rotation directions
+string CW = cw
+string CCW = ccw
+
 # Which
 string NEXT = next
 string PREVIOUS = previous

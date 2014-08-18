@@ -451,7 +451,6 @@ class PlaceRelativeLocation(Command):
             self.phrases_processed[3]
         ])
 
-
     def pre_check(self):
         '''Ensures reaching can happen.'''
         if self.pbdobj is None:
@@ -576,7 +575,6 @@ class PointTo(Command):
             self.phrases_processed[2]
         ])
 
-
     def pre_check(self):
         '''Ensures pointing can happen.'''
         # Only check for existance of object; any pointing failure is
@@ -587,7 +585,6 @@ class PointTo(Command):
                 'Cannot find ' + self.phrases_processed[2])
         return True, self.default_pre_feedback()
 
-
     def narrate(self):
         '''Describes the process of pointing.'''
         return Feedback(self.narration)
@@ -596,6 +593,34 @@ class PointTo(Command):
         '''Points to an object.'''
         fb = FailureFeedback(' '.join(['Failed to ' + self.narration]))
         return Link.point_to(self.pbdobj, self.arm_idx), fb
+
+
+class Rotate(Command):
+    '''Action 9: Rotate one of the robot's joints (currently just
+    gripper roll joint).
+
+    self.args should have:
+        [0] - side (right or left hand)
+        [1] - rot_dir (clockwise / counterclockwise)
+
+    self.phrases should indicate:
+        [0] - this verb (~rotate)
+        [1] - side (right or left hand)
+        [2] - rot_dir (clockwise / counterclockwise)
+    '''
+
+    options = CommandOptions({
+    })
+
+    def init(self):
+        # Initialize some of our own state for convenience.
+        self.arm_idx = Link.get_arm_index(self.args[0])
+
+    def core(self):
+        '''Rotates whichever gripper in whichever direction.'''
+        res = Link.rotate(self.arm_idx, self.args[1])
+        fb = self.default_core_feedback()
+        return res, fb
 
 
 class Open(Command):
@@ -720,6 +745,8 @@ class CommandRouter(object):
         HandsFreeCommand.PICKUP: PickUp,
         # Action 8
         HandsFreeCommand.POINT_TO: PointTo,
+        # Action 9
+        HandsFreeCommand.ROTATE: Rotate,
         # Action 11
         HandsFreeCommand.OPEN: Open,
         # Action 12

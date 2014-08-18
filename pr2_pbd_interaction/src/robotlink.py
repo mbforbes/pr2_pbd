@@ -179,6 +179,9 @@ class Link(object):
     # How far to move on a 'move' command (if it specifies a direction).
     movement_delta = 0.10  # in m, so 0.10 = 10cm (I think)
 
+    # How far to rotate on a 'rotate' command.
+    rotate_delta = 1.6  # I think this is roughly a quarter turn.
+
     # Constants (computed from settings).
     UP_VEC = Vector3(0.0, 0.0, movement_delta)
     DOWN_VEC = Vector3(0.0, 0.0, -movement_delta)
@@ -560,6 +563,28 @@ class Link(object):
             return False
 
         # Else, try movement and returns its success val.
+        joints = [None, None]
+        joints[arm_idx] = side_joints
+        return Link._move_to_joints(joints[0], joints[1])
+
+    @staticmethod
+    def rotate(arm_idx, direction):
+        '''
+        Rotates final joint in robot's arm_idx arm (wrist roll joint) in
+        direction.
+
+        Args:
+            arm_idx (int): Side.RIGHT or Side.LEFT
+            direction (str): HandsFreeCommand.CW or HandsFreeCommand.CCW
+
+        Returns:
+            bool: Success?
+        '''
+        modifier = 1.0 if direction == HandsFreeCommand.CCW else -1.0
+        side_joints = S.arms.arms[arm_idx].get_joint_positions()
+        side_joints[-1] = side_joints[-1] + Link.rotate_delta * modifier
+
+        # Try movement and returns its success val.
         joints = [None, None]
         joints[arm_idx] = side_joints
         return Link._move_to_joints(joints[0], joints[1])
