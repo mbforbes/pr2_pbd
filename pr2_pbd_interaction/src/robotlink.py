@@ -21,11 +21,12 @@ roslib.load_manifest('pr2_pbd_interaction')
 import rospy
 
 # System builtins
+from collections import OrderedDict
 import math
 
 # ROS Builtins
 from actionlib import SimpleActionClient
-from geometry_msgs.msg import Vector3, Pose, Point
+from geometry_msgs.msg import Vector3, Pose, Point, Quaternion
 import tf
 
 # ROS 3rd party
@@ -48,6 +49,11 @@ from util import Numbers
 # Approximate distance from wrist_roll_link to finger tip (haven't
 # actually measured).
 GRIPPER_LENGTH = 0.18  # in m, so 0.18 = 18cm (I think)
+
+# How high above table to go? Using ROS packages we wouldn't need to use
+# these horrible hacks, but they all don't work, so we're doing this for
+# now.
+ABOVE_TABLE_Z = 0.08  # in m, so 0.08 = 8cm (I think)
 
 
 # ######################################################################
@@ -74,6 +80,78 @@ class Link(object):
 
     Replacing it and S would make the system PbD-independent.
     '''
+
+    # Orientation options to try for computing IK towards locations. We
+    # use an OrderedDict so we know in which order we try them.
+    orientations = OrderedDict([
+        # NOTE(mbforbes): Trying all upside-down orientations for now as
+        # this actually lets the grippers more easily tilt down (the
+        # default, "rightside-up" (as I'm calling it) orientation is
+        # biased towards tilting upwards, which is less useful for us
+        # because the PR2's arms are higher up than the table, and
+        # we're only concerned here with tabletop manipulation tasks).
+        # ('flat-upwards', Quaternion(
+        #     0.0,
+        #     0.0,
+        #     0.0,
+        #     1.0
+        # )),
+        ('flat-upsidedown', Quaternion(
+            1.0,
+            0.0,
+            0.0,
+            0.0
+        )),
+        ('smalltilt-upsidedown', Quaternion(
+            0.958600311321,
+            0.0389047107548,
+            -0.280663429733,
+            -0.0282826064416
+        )),
+        ('45deg-upsidedown', Quaternion(
+            0.947183721725,
+            0.0378169124572,
+            -0.317060828047,
+            -0.029754155172
+        )),
+        ('largetilt-upsidedown', Quaternion(
+            0.84375001925,
+            0.0296645574088,
+            -0.534565233277,
+            -0.0380253917916
+        )),
+        ('vert-upsidedown', Quaternion(
+            0.710535569959,
+            0.0208582222416,
+            -0.702007727379,
+            -0.0434659532153
+        )),
+        ('45deg+righttilt-upsidedown', Quaternion(
+            0.816555509917,
+            -0.166496173679,
+            -0.388895710032,
+            0.392780154914
+        )),
+        ('45deg+right-upsidedown', Quaternion(
+            0.626434852697,
+            -0.291921804483,
+            -0.305953683145,
+            0.654792623021
+        )),
+        ('45deg+lefttilt-upsidedown', Quaternion(
+            0.83986672291,
+            0.176672428537,
+            -0.384052777203,
+            -0.34046175272
+        )),
+        ('45deg+left-upsidedown', Quaternion(
+            -0.631060356859,
+            -0.316931066071,
+            0.279972459512,
+            0.650332951091
+        )),
+    ])
+
     joint_positions = {
         'to_side': {
             'right': [
@@ -322,6 +400,43 @@ class Link(object):
         return Link._get_ik_for_ee_computed(arm_idx, new_pose) is not None
 
     @staticmethod
+    def point_to(pbd_obj, arm_idx):
+        '''
+        This should not fail if the object exists; if it does,
+        implementation needs to be more robust.
+
+        Args:
+            pbd_obj (PbdObject): What to point to
+            arm_idx (int): Side.RIGHT or Side.LEFT; which arm to use.
+
+        Returns:
+            bool: Success?
+        '''
+        # Calculate desired pose.
+        displacement = Vector3(
+            Link.BACKWARD_VEC.x + Link.UP_VEC.x,
+            Link.BACKWARD_VEC.y + Link.UP_VEC.y,
+            Link.BACKWARD_VEC.z + Link.UP_VEC.z,
+        )
+        obj_pos = pbd_obj.pose.position
+        position = Point(
+            obj_pos.x + displacement.x,
+            obj_pos.y + displacement.y,
+            obj_pos.z + displacement.z,
+        )
+        orientation = Link.orientations['45deg-upsidedown']
+        target_fingertip_pose = Pose(position, orientation)
+
+        # Solve IK, go.
+        side_joints = Link._get_ik_for_ee_computed(
+            arm_idx, target_fingertip_pose)
+        if side_joints is None:
+            return False
+        joints = [None, None]
+        joints[arm_idx] = side_joints
+        return Link._move_to_joints(joints[0], joints[1])
+
+    @staticmethod
     def get_abs_dir_possible(arm_str, abs_dir):
         '''
         Returns whether a movement of arm_str in abs_dir is possible.
@@ -351,6 +466,38 @@ class Link(object):
         arm_idx = Link.get_arm_index(arm_str)
         seed = S.arms.arms[arm_idx].get_joint_positions()
         return Link._get_ik_for_ee_raw(arm_idx, new_pose, seed) is not None
+
+    @staticmethod
+    def move_above_table(arm_idx):
+        '''
+        Moves arm arm_idx to an 'above table' height. Doesn't try to
+        move to valid x, y position above table (because we only detect
+        part of where the table is, so we don't actually know where it
+        ends without looking).
+
+        Args:
+            arm_idx (int): Side.RIGHT or Side.LEFT
+
+        Returns:
+            bool: Sucess?
+        '''
+        # Our heuristic.
+        if S.world.last_known_table_height is None:
+            return False
+
+        # Solve IK.
+        wrist_pose = S.arms.arms[arm_idx].get_ee_state()
+        finger_tip_pose = Link._offset_pose(wrist_pose, GRIPPER_LENGTH)
+        finger_tip_pose.position.z = (
+            S.world.last_known_table_height + ABOVE_TABLE_Z)
+        side_joints = Link._get_ik_for_ee_computed(arm_idx, finger_tip_pose)
+        if side_joints is None:
+            return False
+
+        # Move.
+        joints = [None, None]
+        joints[arm_idx] = side_joints
+        return Link._move_to_joints(joints[0], joints[1])
 
     @staticmethod
     def move_abs_dir(arm_str, abs_dir):

@@ -269,7 +269,10 @@ class MoveRelativePosition(Command):
             return False, FailureFeedback(' '.join([
                 self.phrases_processed[2],
                 self.phrases_processed[3],
-                'is not reachable.']))
+                'is not reachable with',
+                self.phrases_processed[1],
+                '.'
+            ]))
         else:
             return True, self.default_pre_feedback()
 
@@ -361,6 +364,135 @@ class MoveRelativeDirection(Command):
         return suc, fb
 
 
+class PlaceAbsoluteLocation(Command):
+    '''Action 5: Place at an absolute location.
+
+    self.args should have:
+        [0] - absolute location, currently only on table / there (same)
+        [1] - side (right, left hand)
+
+    self.phrases should indicate:
+        [0] - this verb (~place)
+        [1] - absolute location
+        [2] - side (right or left hand)
+    '''
+
+    options = CommandOptions({
+    })
+
+    def init(self):
+        # Initialize some of our own state for convenience.
+        self.arm_idx = Link.get_arm_index(self.args[1])
+        self.narration = ' '.join([
+            self.phrases_processed[0],
+            self.phrases_processed[1],
+            'with',
+            self.phrases_processed[2]
+        ])
+
+    def pre_check(self):
+        '''Ensures placing can happen.'''
+        # NOTE(mbforbes): We don't have good enough 'has object'
+        # detection yet because of thin objects (though haven't
+        # measured). So, we just check for 'open.'
+        res = True
+        fb = FailureFeedback(
+            "Can't " + self.phrases_processed[0] + ' as ' +
+            self.phrases_processed[2] + ' is empty.')
+        if Link.get_gripper_state(self.arm_idx) == GripperState.OPEN:
+            res = False
+        return res, fb
+
+    def narrate(self):
+        '''Describes the process of placing.'''
+        return Feedback(self.narration)
+
+    def core(self):
+        '''Places an object.'''
+        fb = FailureFeedback(' '.join(['Failed to ' + self.narration]))
+
+        # Move above table, but don't worry if it fails.
+        Link.move_above_table(self.arm_idx)
+
+        # Drop it.
+        success = Link.set_gripper_state(self.arm_idx, GripperState.OPEN)
+        return success, fb
+
+
+class PlaceRelativeLocation(Command):
+    '''Action 6: Place at a relative location.
+
+    self.args should have:
+        [0] - relative position
+        [1] - object name
+        [2] - side (right, left hand)
+
+    self.phrases should indicate:
+        [0] - this verb (~place)
+        [1] - relative position
+        [2] - object name
+        [3] - side (right, left hand)
+    '''
+
+    options = CommandOptions({
+    })
+
+    def init(self):
+        # Initialize some of our own state for convenience.
+        self.arm_idx = Link.get_arm_index(self.args[2])
+        self.pbdobj = ObjectsHandler.get_obj_by_name(self.args[1])
+        if self.pbdobj is not None:
+            self.rr = self.pbdobj.reachability_map[self.args[0]][self.arm_idx]
+        self.narration = ' '.join([
+            self.phrases_processed[0],
+            self.phrases_processed[1],
+            self.phrases_processed[2],
+            'with',
+            self.phrases_processed[3]
+        ])
+
+
+    def pre_check(self):
+        '''Ensures reaching can happen.'''
+        if self.pbdobj is None:
+            # No such object.
+            return False, FailureFeedback(
+                'Cannot find ' + self.phrases_processed[2])
+        elif not self.rr.reachable:
+            # Can't reach location.
+            return False, FailureFeedback(' '.join([
+                self.phrases_processed[1],
+                self.phrases_processed[2],
+                'is not reachable with',
+                self.phrases_processed[3],
+                '.'
+            ]))
+        elif Link.get_gripper_state(self.arm_idx) == GripperState.OPEN:
+            # Open; can't place.
+            return False, FailureFeedback(
+                "Can't " + self.phrases_processed[0] + ' as ' +
+                self.phrases_processed[2] + ' is empty.')
+        else:
+            # OK
+            return True, self.default_pre_feedback()
+
+    def narrate(self):
+        '''Describes the process of placing.'''
+        return Feedback(self.narration)
+
+    def core(self):
+        '''Places an object.'''
+        fb = FailureFeedback(' '.join(['Failed to ' + self.narration]))
+
+        # Move
+        if not Link.move_to_computed_pose(self.arm_idx, self.rr.pose):
+            return False, fb
+
+        # Open
+        success = Link.set_gripper_state(self.arm_idx, GripperState.OPEN)
+        return success, fb
+
+
 class PickUp(Command):
     '''Action 7: Pick up an object with one (or both?) hand(s).
 
@@ -380,7 +512,6 @@ class PickUp(Command):
     def init(self):
         # Initialize some of our own state for convenience.
         self.arm_idx = Link.get_arm_index(self.args[1])
-        self.obj_str = self.args[0]
         self.narration = ' '.join([
             self.phrases_processed[0],
             self.phrases_processed[1],
@@ -416,6 +547,55 @@ class PickUp(Command):
         if pbdobj is not None:
             success = Link.pick_up(pbdobj, self.arm_idx)
         return success, fb
+
+
+class PointTo(Command):
+    '''Action 8: Point to an object with a hand.
+
+    self.args should have:
+        [0] - object name
+        [1] - side (right or left hand)
+
+    self.phrases should indicate:
+        [0] - this verb (~point to)
+        [1] - object referring phrase
+        [2] - side
+    '''
+
+    options = CommandOptions({
+    })
+
+    def init(self):
+        # Initialize some of our own state for convenience.
+        self.pbdobj = ObjectsHandler.get_obj_by_name(self.args[0])
+        self.arm_idx = Link.get_arm_index(self.args[1])
+        self.narration = ' '.join([
+            self.phrases_processed[0],
+            self.phrases_processed[1],
+            'with',
+            self.phrases_processed[2]
+        ])
+
+
+    def pre_check(self):
+        '''Ensures pointing can happen.'''
+        # Only check for existance of object; any pointing failure is
+        # an implementation failure.
+        if self.pbdobj is None:
+            # No such object.
+            return False, FailureFeedback(
+                'Cannot find ' + self.phrases_processed[2])
+        return True, self.default_pre_feedback()
+
+
+    def narrate(self):
+        '''Describes the process of pointing.'''
+        return Feedback(self.narration)
+
+    def core(self):
+        '''Points to an object.'''
+        fb = FailureFeedback(' '.join(['Failed to ' + self.narration]))
+        return Link.point_to(self.pbdobj, self.arm_idx), fb
 
 
 class Open(Command):
@@ -532,8 +712,14 @@ class CommandRouter(object):
         HandsFreeCommand.MOVE_ABSOLUTE_DIRECTION: MoveAbsoluteDirection,
         # Action 4
         HandsFreeCommand.MOVE_RELATIVE_DIRECTION: MoveRelativeDirection,
+        # Action 5
+        HandsFreeCommand.PLACE_AT_LOCATION: PlaceAbsoluteLocation,
+        # Action 6
+        HandsFreeCommand.PLACE_RELATIVE: PlaceRelativeLocation,
         # Action 7
         HandsFreeCommand.PICKUP: PickUp,
+        # Action 8
+        HandsFreeCommand.POINT_TO: PointTo,
         # Action 11
         HandsFreeCommand.OPEN: Open,
         # Action 12

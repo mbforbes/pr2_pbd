@@ -392,6 +392,7 @@ class World:
         if World.tf_listener is None:
             World.tf_listener = TransformListener()
         self.surface = None
+        self.last_known_table_height = None
         if World.im_server is None:
             World.im_server = InteractiveMarkerServer(TOPIC_IM_SERVER)
 
@@ -840,6 +841,13 @@ class World:
                 World.im_server.insert(
                     self.surface, self.marker_feedback_cb)
                 World.im_server.applyChanges()
+
+                # Saving last known table height.
+                # NOTE(mbforbes); This might not be quite accurate. It's
+                # not totally clear from the code what this should be.
+                # Experimenting...
+                self.last_known_table_height = (
+                    pose.position.z + SURFACE_HEIGHT / 2.0)
 
     def receive_object_info(self, object_list):
         '''Callback function to receive object info'''

@@ -19,7 +19,7 @@ import operator
 from threading import Lock
 
 # ROS builtins
-from geometry_msgs.msg import Quaternion, Vector3, Pose, Point
+from geometry_msgs.msg import Vector3, Pose, Point
 
 # Pbd (3rd party / local)
 from pr2_pbd_interaction.msg import (
@@ -170,77 +170,6 @@ class ObjectsHandler(object):
             operator.lt
         ),
     ]
-
-    # Orientation options to try for computing IK towards locations. We
-    # use an OrderedDict so we know in which order we try them.
-    orientations = OrderedDict([
-        # NOTE(mbforbes): Trying all upside-down orientations for now as
-        # this actually lets the grippers more easily tilt down (the
-        # default, "rightside-up" (as I'm calling it) orientation is
-        # biased towards tilting upwards, which is less useful for us
-        # because the PR2's arms are higher up than the table, and
-        # we're only concerned here with tabletop manipulation tasks).
-        # ('flat-upwards', Quaternion(
-        #     0.0,
-        #     0.0,
-        #     0.0,
-        #     1.0
-        # )),
-        ('flat-upsidedown', Quaternion(
-            1.0,
-            0.0,
-            0.0,
-            0.0
-        )),
-        ('smalltilt-upsidedown', Quaternion(
-            0.958600311321,
-            0.0389047107548,
-            -0.280663429733,
-            -0.0282826064416
-        )),
-        ('45deg-upsidedown', Quaternion(
-            0.947183721725,
-            0.0378169124572,
-            -0.317060828047,
-            -0.029754155172
-        )),
-        ('largetilt-upsidedown', Quaternion(
-            0.84375001925,
-            0.0296645574088,
-            -0.534565233277,
-            -0.0380253917916
-        )),
-        ('vert-upsidedown', Quaternion(
-            0.710535569959,
-            0.0208582222416,
-            -0.702007727379,
-            -0.0434659532153
-        )),
-        ('45deg+righttilt-upsidedown', Quaternion(
-            0.816555509917,
-            -0.166496173679,
-            -0.388895710032,
-            0.392780154914
-        )),
-        ('45deg+right-upsidedown', Quaternion(
-            0.626434852697,
-            -0.291921804483,
-            -0.305953683145,
-            0.654792623021
-        )),
-        ('45deg+lefttilt-upsidedown', Quaternion(
-            0.83986672291,
-            0.176672428537,
-            -0.384052777203,
-            -0.34046175272
-        )),
-        ('45deg+left-upsidedown', Quaternion(
-            -0.631060356859,
-            -0.316931066071,
-            0.279972459512,
-            0.650332951091
-        )),
-    ])
 
     # TODO(mbforbes): Refactor into constant somewhere.
     topic_worldobjs = 'handsfree_worldobjects'
@@ -466,7 +395,7 @@ class ObjectsHandler(object):
 
         # Try a bunch of orientations.
         res = ObjectsHandler.UNR
-        for o_name, orientation in ObjectsHandler.orientations.iteritems():
+        for o_name, orientation in Link.orientations.iteritems():
             pose = Pose(position, orientation)
             if Link.get_computed_pose_possible(side, pose):
                 # Hooray!
