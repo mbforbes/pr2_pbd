@@ -124,7 +124,7 @@ class RobotSpeech:
                 speak the words (only if False).
         '''
         # Maybe speak (if set to).
-        if self.get_using_speech()
+        if self.get_using_speech():
             self.soundhandle.say(text)
 
         # We always display the text in RViz.
