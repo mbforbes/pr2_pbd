@@ -1,5 +1,9 @@
 # TODO
-0. rest of actions (shouldn't be too hard)
-0. have parser generate most likely phrases for each object
-0. referring expressions test (will the above do it? or need addl. channel?)
-0. all movement w/ `pr2_object_manipulation` for collision avoidance
+0. [Parser is prereq] Store / resolve obj referring phrases.
+0. [Parser is prereq] 'Turn hand' functionality
+0. [Parser is prereq] Movement parameters (how far)
+0. [Parser is prereq] Record objects command.
+0. Any addl. meta-programming? May arise after using system more. (Then -> parser.)
+0. Fix gaze if still broken?
+0. Both hands. This is a huge thing (to implement), not to be taken lightly. (Then -> parser.)
+0. all movement w/ `pr2_object_manipulation` or MoveIt! for collision avoidance, modeling grasped object, moving faster than glacier speed, etc. Maybe want cartesian control (e.g. without collision detection) still as override??
