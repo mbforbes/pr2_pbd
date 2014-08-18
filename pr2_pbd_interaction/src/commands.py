@@ -623,6 +623,39 @@ class Rotate(Command):
         return res, fb
 
 
+class LookAt(Command):
+    '''Action 10: Look at an object.
+
+    self.args should have:
+        [0] - object name
+
+    self.phrases should indicate:
+        [0] - this verb (~look at)
+        [1] - object referring phrase
+    '''
+
+    options = CommandOptions({
+    })
+
+    def init(self):
+        # Initialize some of our own state for convenience.
+        self.pbdobj = ObjectsHandler.get_obj_by_name(self.args[0])
+
+    def pre_check(self):
+        '''Ensures looking at can happen.'''
+        res = True
+        fb = FailureFeedback('Cannot find ' + self.phrases_processed[1])
+        if self.pbdobj is None:
+            res = False
+        return res, fb
+
+    def core(self):
+        '''Looks at the object.'''
+        res = Link.look_at_object(self.pbdobj)
+        fb = self.default_core_feedback()
+        return res, fb
+
+
 class Open(Command):
     '''Action 11: Open the robot's gripper on one (or both?) side(s).
 
@@ -747,6 +780,8 @@ class CommandRouter(object):
         HandsFreeCommand.POINT_TO: PointTo,
         # Action 9
         HandsFreeCommand.ROTATE: Rotate,
+        # Action 10
+        HandsFreeCommand.LOOK_AT: LookAt,
         # Action 11
         HandsFreeCommand.OPEN: Open,
         # Action 12

@@ -95,8 +95,7 @@ PAUSE_SECONDS = rospy.Duration(0.1)
 # How long we're willing to wait for object recognition.
 RECOGNITION_TIMEOUT_SECONDS = rospy.Duration(5.0)
 # How long we're willing to wait for the PR2 to look at the table.
-LOOK_AT_TABLE_TIMEOUT_SECONDS = rospy.Duration(5.0)
-
+LOOK_AT_TABLE_TIMEOUT_SECONDS = rospy.Duration(2.0)
 
 # For ids to not clash. Assumes that we have < this many steps and
 # aren't forgetting about other offsets elsewhere in the program that
@@ -949,6 +948,9 @@ class World:
         rospy.loginfo('Objects on the table have been recognized.')
         rospy.loginfo(
             'STATUS: ' + self._object_action_client.get_goal_status_text())
+
+        # Look up at this point.
+        Response.perform_gaze_action(GazeGoal.LOOK_FORWARD)
 
         # Record the result
         if self._object_action_client.get_state() == GoalStatus.SUCCEEDED:

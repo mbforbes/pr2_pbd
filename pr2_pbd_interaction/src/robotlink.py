@@ -37,8 +37,11 @@ from object_manipulation_msgs.msg import ManipulationResult
 
 # PbD
 from pr2_pbd_interaction.msg import HandsFreeCommand, Side, ArmState
+from pr2_social_gaze.msg import GazeGoal, GazeAction
 from arms import Arms
 from world import World
+
+# Local (hands-free PbD).
 from util import Numbers
 
 
@@ -54,6 +57,9 @@ GRIPPER_LENGTH = 0.18  # in m, so 0.18 = 18cm (I think)
 # these horrible hacks, but they all don't work, so we're doing this for
 # now.
 ABOVE_TABLE_Z = 0.08  # in m, so 0.08 = 8cm (I think)
+
+# Maximum time to wait for the head to look at something.
+MAX_GAZE_WAIT_TIME = rospy.Duration(2.0)
 
 
 # ######################################################################
@@ -72,6 +78,7 @@ class S(object):
     arms = None
     world = None
     imgui_action_client = None
+    gaze_client = None
 
 
 class Link(object):
@@ -214,6 +221,13 @@ class Link(object):
                 'imgui_action',  # namespace
                 IMGUIAction  # action message type
             )
+            S.imgui_action_client.wait_for_server()
+        if S.gaze_client is None:
+            S.gaze_client = SimpleActionClient(
+                'gaze_action',
+                GazeAction
+            )
+            S.gaze_client.wait_for_server()
 
     @staticmethod
     def get_gripper_joint_position(side):
@@ -611,6 +625,29 @@ class Link(object):
         if arm_idx == Side.LEFT or arm_idx == Side.BOTH:
             l = mapping['left']
         return Link._move_to_joints(r, l)
+
+    @staticmethod
+    def look_at_object(pbd_obj):
+        '''
+        Args:
+            pbd_obj (PbdObject)
+
+        Returns:
+            bool: Success?
+        '''
+        S.gaze_client.send_goal(GazeGoal(
+            GazeGoal.LOOK_AT_POINT,
+            pbd_obj.pose.position
+        ))
+
+        # We just wait for it to finish for consistency with other
+        # actions (so we don't return before this is done).
+        S.gaze_client.wait_for_result(MAX_GAZE_WAIT_TIME)
+
+        # NOTE(mbforbes): There have been troubles with gaze actions
+        # 'never completing', but really being fine. We just always
+        # return true.
+        return True
 
     # ##################################################################
     # Private static methods (implementation-specific)
