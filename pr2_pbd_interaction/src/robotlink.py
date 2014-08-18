@@ -36,7 +36,8 @@ from pr2_object_manipulation_msgs.msg import (
 from object_manipulation_msgs.msg import ManipulationResult
 
 # PbD
-from pr2_pbd_interaction.msg import HandsFreeCommand, Side, ArmState
+from pr2_pbd_interaction.msg import (
+    HandsFreeCommand, Side, ArmState, GripperState)
 from pr2_social_gaze.msg import GazeGoal, GazeAction
 from arms import Arms
 from world import World
