@@ -14,7 +14,7 @@ roslib.load_manifest('pr2_pbd_interaction')
 import rospy
 
 # PbD (3rd party / local)
-from pr2_pbd_interaction.msg import HandsFreeCommand
+from pr2_pbd_interaction.msg import HandsFreeCommand, Description
 
 # True local
 from feedback import Feedback, FailureFeedback
@@ -47,15 +47,34 @@ class HandsFree(object):
         self.programs = []
         self.program_idx = -1
 
-        # Set up the command dispatch.
+        # Set up the command and description dispatch.
         rospy.Subscriber(
             'handsfree_command', HandsFreeCommand, self.command_cb)
+        rospy.Subscriber(
+            'handsfree_description', Description, self.description_cb)
 
         # Send off one robot state to get system started.
         # NOTE(mbforbes): Once the system is working, it might be best
         # to just create a new action (and look for objects) right away
         # so people can just start programming right off the bat.
         RobotHandler.async_broadcast()
+
+    def description_cb(self, desc):
+        '''
+        Callback for when praser sends us a description of the world's
+        objects.
+
+        Args:
+            desc (Description)
+        '''
+        names, descs = desc.object_names, desc.descriptions
+
+        # TODO(mbforbes): Save image?
+        rospy.loginfo('Description:')
+        for i in range(len(names)):
+            Feedback(descs[i]).issue()
+            rospy.loginfo('\t' + names[i] + '\t' + descs[i])
+            rospy.sleep(2.0)
 
     def command_cb(self, hf_cmd):
         '''
