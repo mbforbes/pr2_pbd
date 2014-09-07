@@ -1,4 +1,12 @@
 # TODO
+
+## Test 1
+- fix property calculation (at least one of leftmost, biggets, etc. should always be true)
+- implement screenshotting & logging (simple)
+- plan tests
+- run tests
+
+## Original list
 0. [Parser is prereq] Store / resolve obj referring phrases.
 0. [Parser is prereq] 'Turn hand' functionality
 0. [Parser is prereq] Movement parameters (how far)
