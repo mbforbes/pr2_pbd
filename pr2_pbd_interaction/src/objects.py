@@ -84,6 +84,7 @@ class UniqueProperty(object):
         self.name = name
         self.prop_name = prop_name
         self.val = val
+        self.orig_val = val  # For resetting.
         self.attr_get_fn = attr_get_fn
         self.cmp_op = cmp_op
         self.special = None
@@ -99,6 +100,13 @@ class UniqueProperty(object):
         if self.cmp_op(obj_val, self.val):
             self.val = obj_val
             self.special = pbd_obj
+
+    def reset(self):
+        '''
+        Resets the unique property so that it can be computed anew.
+        '''
+        self.val = self.orig_val
+        self.special = None
 
 
 class ObjectsHandler(object):
@@ -497,6 +505,11 @@ class ObjectsHandler(object):
 
             # Slap it on.
             wobjs += [wo]
+
+        # Reset the unique properties themselves so they can be computed
+        # again next time.
+        for prop in ObjectsHandler.unique_properties:
+            prop.reset()
 
         return WorldObjects(wobjs)
 
