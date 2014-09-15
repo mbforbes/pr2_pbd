@@ -6,6 +6,10 @@
 - plan tests
 - run tests
 
+Extra credit:
+
+- 'Middle' is a very natural thing to want to say in many situations. We're probably not doing it because it's harder to do automatically. However, it is occasionally very useful (e.g. with three similar objects).
+
 ## Original list
 0. [Parser is prereq] Store / resolve obj referring phrases.
 0. [Parser is prereq] 'Turn hand' functionality
