@@ -403,7 +403,7 @@ class Link(object):
             arm_idx (int): Side.RIGHT or Side.LEFT
 
         Returns:
-            int: GripperState.OPEN or GripperState.CLOSED
+            int: GripperState.OPEN, CLOSED, or HOLDING
         '''
         # NOTE(mbforbes): We can't use PbD's gripper tracking because
         # it doesn't track changes due to pr2_object_manipulation's
@@ -411,8 +411,12 @@ class Link(object):
         joint_val = Link.get_gripper_joint_position(arm_idx)
         arm = 'Right' if arm_idx == Side.RIGHT else 'Left'
         rospy.loginfo(arm + ' gripper joint position: ' + str(joint_val))
-        if joint_val < 0.078:
+        # TODO(mbforbes): Refactor these numbers into constants if they
+        # work.
+        if joint_val < 0.0025:
             return GripperState.CLOSED
+        elif joint_val < 0.078:
+            return GripperState.HOLDING
         else:
             return GripperState.OPEN
 
@@ -436,16 +440,22 @@ class Link(object):
         Returns:
             bool: Whether the arm reached the desired gripper_state.
         '''
-        # NOTE(mbforbes): Because this operation is robust we just
-        # return whether we ended up in the correct state, not if a
-        # state change happened. Furthermore, we pause before doing so.
         if gripper_state == GripperState.OPEN:
             S.arms.arms[arm_idx].open_gripper()
         else:
             S.arms.arms[arm_idx].close_gripper()
+
+        # Pause because the action returns before it's complete.
         rospy.sleep(GRIPPER_TOGGLE_WAIT_TIME)
+
+        # Check success. Opening is only successful if it actually gets
+        # open. Closing is successful if it's closed or holding (i.e.
+        # anything NOT open).
         post_state = Link.get_gripper_state(arm_idx)
-        return post_state == gripper_state
+        if gripper_state == GripperState.OPEN:
+            return post_state == GripperState.OPEN
+        else:
+            return post_state != GripperState.OPEN
 
     @staticmethod
     def get_arm_index(arm_str):
@@ -640,6 +650,19 @@ class Link(object):
         arm_idx = Link.get_arm_index(arm_str)
         seed = S.arms.arms[arm_idx].get_joint_positions()
         return Link._get_ik_for_ee_raw(arm_idx, new_pose, seed) is not None
+
+    @staticmethod
+    def get_cur_orient(arm_idx):
+        '''
+        Returns the current orientation for the arm_idx arm.
+
+        Args:
+            arm_idx (int): Side.RIGHT or Side.LEFT
+
+        Returns:
+            Quaternion
+        '''
+        return S.arms.arms[arm_idx].get_ee_state().orientation
 
     @staticmethod
     def move_above_table(arm_idx):

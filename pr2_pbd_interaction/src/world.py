@@ -152,7 +152,7 @@ class PbdObject(object):
         self.vol = PbdObject.get_vol(dimensions)
 
         # These are for hands-free, but are computed later on demand.
-        self.reachability_map = None  # { str: ReachableResult }
+        self.reachability_map = None  # { str: [ReachableResult] }
         self.pickupable = None
 
         # Object stuff

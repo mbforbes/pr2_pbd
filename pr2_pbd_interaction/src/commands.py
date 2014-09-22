@@ -201,6 +201,44 @@ class Command(object):
         '''
         return FailureFeedback('Failed to ' + self.phrases_processed_str)
 
+    @staticmethod
+    def get_rr(pbdobj, rel_pos_str, arm_idx):
+        '''
+        Helper method for those commands that use relative (to object)
+        poses.
+
+        A relative pose will change based on whether the hand is holding
+        an object. In that case, the hand's present orientation should
+        be preserved. Otherwise, the robot may tip the object or orient
+        it in a bad way. However, if the hand is not holding an object,
+        the hand's orientation should be changed, as it should align
+        with the destination object.
+
+        Note that the above paragraph describes a heuristic, albeit a
+        useful one.
+
+        This should be called just before attempting to move, as it uses
+        the current orientation of the hand.
+
+        Args:
+            pbdobj (PbdObject): The object to be relative to.
+            rel_pos_str (str): The string describing how to be relative
+                to pbdobj (e.g. HandsFreeCommand.[...]).
+            arm_idx (int): Side.LEFT or Side.RIGHT
+
+        Returns:
+            ReachableResult
+        '''
+        gs = Link.get_gripper_state(arm_idx)
+        if gs != GripperState.HOLDING:
+            return pbdobj.reachability_map[rel_pos_str][arm_idx]
+        else:
+            return ObjectsHandler.get_reachable_with_cur_orient(
+                pbdobj,
+                rel_pos_str,
+                arm_idx
+            )
+
     @classmethod
     def get_option(cls, option_name):
         '''Gets the option that is set as a class variable.'''
@@ -257,16 +295,21 @@ class MoveRelativePosition(Command):
     def init(self):
         # Initialize some of our own state for convenience.
         self.arm_idx = Link.get_arm_index(self.args[0])
-        self.pbdobj = ObjectsHandler.get_obj_by_name(self.args[2])
-        if self.pbdobj is not None:
-            self.rr = self.pbdobj.reachability_map[self.args[1]][self.arm_idx]
+        self.rel_pos_str = self.args[1]
 
     def pre_check(self):
         '''Ensures reaching can happen.'''
-        if self.pbdobj is None:
+        # Ensure object exists.
+        # TODO(mbforbes): Re-ground object; this name is no longer valid
+        # by execution time.
+        pbdobj = ObjectsHandler.get_obj_by_name(self.args[2])
+        if pbdobj is None:
             return False, FailureFeedback(
                 'Cannot find ' + self.phrases_processed[3])
-        elif not self.rr.reachable:
+
+        # Ensure object is reachable.
+        rr = Commands.get_rr(pbdobj, self.rel_pos_str, self.arm_idx)
+        if not rr.reachable:
             return False, FailureFeedback(' '.join([
                 self.phrases_processed[2],
                 self.phrases_processed[3],
@@ -274,12 +317,17 @@ class MoveRelativePosition(Command):
                 self.phrases_processed[1],
                 '.'
             ]))
-        else:
-            return True, self.default_pre_feedback()
+
+        # Else, sucess.
+        return True, self.default_pre_feedback()
 
     def core(self):
         '''Does the movement.'''
-        res = Link.move_to_computed_pose(self.arm_idx, self.rr.pose)
+        # TODO(mbforbes): Re-ground object; this name is no longer valid
+        # by execution time.
+        pbdobj = ObjectsHandler.get_obj_by_name(self.args[2])
+        rr = Commands.get_rr(pbdobj, self.rel_pos_str, self.arm_idx)
+        res = Link.move_to_computed_pose(self.arm_idx, rr.pose)
         fb = self.default_core_feedback()
         return res, fb
 
@@ -399,8 +447,9 @@ class PlaceAbsoluteLocation(Command):
         res = True
         fb = FailureFeedback(
             "Can't " + self.phrases_processed[0] + ' as ' +
-            self.phrases_processed[2] + ' is empty.')
-        if Link.get_gripper_state(self.arm_idx) == GripperState.OPEN:
+            self.phrases_processed[2] + ' is not holding an object.')
+        # Must be holding to place.
+        if Link.get_gripper_state(self.arm_idx) != GripperState.HOLDING:
             res = False
         return res, fb
 
@@ -440,10 +489,8 @@ class PlaceRelativeLocation(Command):
 
     def init(self):
         # Initialize some of our own state for convenience.
+        self.rel_pos_str = self.args[0]
         self.arm_idx = Link.get_arm_index(self.args[2])
-        self.pbdobj = ObjectsHandler.get_obj_by_name(self.args[1])
-        if self.pbdobj is not None:
-            self.rr = self.pbdobj.reachability_map[self.args[0]][self.arm_idx]
         self.narration = ' '.join([
             self.phrases_processed[0],
             self.phrases_processed[1],
@@ -454,11 +501,18 @@ class PlaceRelativeLocation(Command):
 
     def pre_check(self):
         '''Ensures reaching can happen.'''
-        if self.pbdobj is None:
+        # Ensure object exists.
+        # TODO(mbforbes): Re-ground object; this name is no longer valid
+        # by execution time.
+        pbdobj = ObjectsHandler.get_obj_by_name(self.args[1])
+        if pbdobj is None:
             # No such object.
             return False, FailureFeedback(
                 'Cannot find ' + self.phrases_processed[2])
-        elif not self.rr.reachable:
+
+        # Ensure object is reachable.
+        rr = Commands.get_rr(pbdobj, self.rel_pos_str, self.arm_idx)
+        if not rr.reachable:
             # Can't reach location.
             return False, FailureFeedback(' '.join([
                 self.phrases_processed[1],
@@ -467,14 +521,16 @@ class PlaceRelativeLocation(Command):
                 self.phrases_processed[3],
                 '.'
             ]))
-        elif Link.get_gripper_state(self.arm_idx) == GripperState.OPEN:
-            # Open; can't place.
+
+        # Must be holding to place.
+        if Link.get_gripper_state(self.arm_idx) != GripperState.HOLDING:
+            # Not holding; can't place.
             return False, FailureFeedback(
                 "Can't " + self.phrases_processed[0] + ' as ' +
-                self.phrases_processed[2] + ' is empty.')
-        else:
-            # OK
-            return True, self.default_pre_feedback()
+                self.phrases_processed[2] + ' is not holding an object.')
+
+        # Everything OK.
+        return True, self.default_pre_feedback()
 
     def narrate(self):
         '''Describes the process of placing.'''
@@ -485,7 +541,11 @@ class PlaceRelativeLocation(Command):
         fb = FailureFeedback(' '.join(['Failed to ' + self.narration]))
 
         # Move
-        if not Link.move_to_computed_pose(self.arm_idx, self.rr.pose):
+        # TODO(mbforbes): Re-ground object; this name is no longer valid
+        # by execution time.
+        pbdobj = ObjectsHandler.get_obj_by_name(self.args[1])
+        rr = Commands.get_rr(pbdobj, self.rel_pos_str, self.arm_idx)
+        if not Link.move_to_computed_pose(self.arm_idx, rr.pose):
             return False, fb
 
         # Open
@@ -679,6 +739,7 @@ class Open(Command):
 
     def pre_check(self):
         '''Ensures opening can happen.'''
+        # Can open if closed or holding. Cannot be open.
         res = Link.get_gripper_state(self.arm_idx) != GripperState.OPEN
         fb = FailureFeedback(self.phrases_processed[1] + ' is already open.')
         return res, fb
@@ -691,6 +752,7 @@ class Open(Command):
 
     def post_check(self):
         '''Checks whether opening happened.'''
+        # Cannot be closed or holding. Must be open.
         res = Link.get_gripper_state(self.arm_idx) == GripperState.OPEN
         fb = FailureFeedback(' '.join([
             self.phrases_processed[1],
@@ -722,8 +784,9 @@ class Close(Command):
 
     def pre_check(self):
         '''Ensures closing can happen.'''
-        res = Link.get_gripper_state(self.arm_idx) != GripperState.CLOSED
-        fb = FailureFeedback(self.phrases_processed[1] + ' is already closed.')
+        # Can't close if closed or holding. Must be open.
+        res = Link.get_gripper_state(self.arm_idx) == GripperState.OPEN
+        fb = FailureFeedback(self.phrases_processed[1] + ' is not open.')
         return res, fb
 
     def core(self):
@@ -734,7 +797,8 @@ class Close(Command):
 
     def post_check(self):
         '''Checks whether opening happened.'''
-        res = Link.get_gripper_state(self.arm_idx) == GripperState.CLOSED
+        # Success is closed or holding. Cannot be open.
+        res = Link.get_gripper_state(self.arm_idx) != GripperState.OPEN
         fb = FailureFeedback(' '.join([
             self.phrases_processed[1],
             'did not',

@@ -250,6 +250,28 @@ class ObjectsHandler(object):
         return None
 
     @staticmethod
+    def get_reachable_with_cur_orient(pbd_obj, pos, side):
+        '''
+        Returns whether pos of pbd_obj is reachable with the current
+        orientation of side hand.
+
+        Args:
+            pbd_obj (PbdObject): The object to be relative to.
+            pos (str): The string describing how to be relative
+                to pbd_obj (e.g. HandsFreeCommand.[...]).
+            side (int): Side.LEFT or Side.RIGHT
+
+        Returns:
+            ReachableResult
+        '''
+        return ObjectsHandler._get_reachability_for(
+            pbd_obj,
+            pos,
+            side,
+            Link.get_cur_orient(side)
+        )
+
+    @staticmethod
     def record():
         '''
         Records and broadcasts world objects.
@@ -337,30 +359,52 @@ class ObjectsHandler(object):
     @staticmethod
     def _compute_reachability_for(pbd_obj):
         '''
+        Computes and saves (in reachability_map) reachabilities for
+        pbd_obj of all positions in rel_positions.
+
         Args:
             pbd_obj (PbdObject)
         '''
         pbd_obj.reachability_map = {}
-        for pos, val in ObjectsHandler.rel_positions.iteritems():
-            # Set defaults to unreachable.
-            pbd_obj.reachability_map[pos] = [
-                ObjectsHandler.UNR,  # r
-                ObjectsHandler.UNR,  # l
-            ]
+        # rel_positions is { str: Vector3 | [str] }
+        for pos in ObjectsHandler.rel_positions.keys():
+            # Make space.
+            pbd_obj.reachability_map[pos] = [None, None]
             for side in [Side.RIGHT, Side.LEFT]:
-                if type(val) is list:
-                    # It's referencing previously-computed locations. If
-                    # any match, it's good.
-                    for str_loc in val:
-                        rr = pbd_obj.reachability_map[str_loc][side]
-                        if rr.reachable:
-                            pbd_obj.reachability_map[pos][side] = rr
-                            break
-                else:
-                    # It's referencing a vector directly. Compute.
-                    pbd_obj.reachability_map[pos][side] = (
-                        ObjectsHandler._get_loc_reachable(
-                            pbd_obj, pos, val, side))
+                pbd_obj.reachability_map[pos][side] = (
+                    ObjectsHandler._get_reachability_for(pbd_obj, pos, side))
+
+    def _get_reachability_for(pbd_obj, pos, side, orient=None):
+        '''
+        Gets (and doesn't save) the reachability for pbd_obj at pos
+        relative to it for arm on side. Will use orient if provided.
+
+        Args:
+            pbd_obj (PbdObject)
+            pos (str): Relative position string
+            side (int): Side.RIGHT or Side.LEFT
+            orient (Quaternion, optional): The orientation to use.
+                Defaults to None, in which case the perscribed options
+                are tested.
+        '''
+        # rel_positions is { str: Vector3 | [str] }
+        val = ObjectsHandler.rel_positions[pos]
+        res = ObjectsHandler.UNR  # Default.
+        if type(val) is list:
+            # It's referencing other locations. If any work, it's good.
+            for str_loc in val:
+                # Recurse. Not caching because we don't save the
+                # orientation when computing.
+                rr = ObjectsHandler._get_reachability_for(
+                    pbd_obj, str_loc, side)
+                if rr.reachable:
+                    res = rr
+                    break
+        else:
+            # It's referencing a vector directly. Compute.
+            res = ObjectsHandler._get_loc_reachable(
+                pbd_obj, pos, val, side, orient)
+        return res
 
     # Reachabilities don't change, so probably no need for this.
     # @staticmethod
@@ -375,7 +419,8 @@ class ObjectsHandler(object):
     #     ObjectsHandler.objects_lock.release()
 
     @staticmethod
-    def _get_loc_reachable(pbd_obj, rel_pos_str, rel_pos_vec, side):
+    def _get_loc_reachable(
+            pbd_obj, rel_pos_str, rel_pos_vec, side, orient=None):
         '''
         Tries several hand orientations to reach rel_pos_vec of pbd_obj
         with side hand. Returns reachable result containing whether any
@@ -392,7 +437,9 @@ class ObjectsHandler(object):
                 - ObjectsHandler.TO_LEFT_OF_VEC
                 - ...
             side (int): Side.RIGHT or Side.LEFT
-
+            orient (Quaternion, optional): The orientation to use.
+                Defaults to None, in which case the perscribed options
+                are tested.
 
         Returns:
             ReachableResult
@@ -401,12 +448,19 @@ class ObjectsHandler(object):
         position = ObjectsHandler._get_position_for(
             pbd_obj, rel_pos_str, rel_pos_vec)
 
-        # Try a bunch of orientations.
-        res = ObjectsHandler.UNR
-        prefix = Link.orientation_prefix_map[rel_pos_str]
-        opts = [
-            o for n, o in Link.orientations.iteritems()
-            if n.startswith(prefix)]
+        # Try a bunch of orientations if none specified.
+        if orient is None:
+            prefix = Link.orientation_prefix_map[rel_pos_str]
+            opts = [
+                o for n, o in Link.orientations.iteritems()
+                if n.startswith(prefix)
+            ]
+        else:
+            # Orientation was specified; use it.
+            opts = [orient]
+
+        # Do the tests.
+        res = ObjectsHandler.UNR  # Default.
         for orientation in opts:
             pose = Pose(position, orientation)
             if Link.get_computed_pose_possible(side, pose):
