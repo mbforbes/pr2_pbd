@@ -186,11 +186,15 @@ class ObjectsHandler(object):
     close_delta = 0.01
     # Might have to change for sides to account for gripper size
     near_delta = 0.05
+    # This is all kind of wrong because we're not taking into account
+    # the object we're holding, which matters a great deal. This is to
+    # get clearance.
+    above_delta = 0.08
 
     # Vecs. Applied to border of that object (e.g. ABOVE_VEC added to
     # middle top of object, TO_LEFT_OF_VEC added to middle left side of
     # object, etc.)
-    ABOVE_VEC = Vector3(0.0, 0.0, near_delta)
+    ABOVE_VEC = Vector3(0.0, 0.0, above_delta)
     TO_LEFT_OF_VEC = Vector3(0.0, near_delta, 0.0)
     TO_RIGHT_OF_VEC = Vector3(0.0, -near_delta, 0.0)
     IN_FRONT_OF_VEC = Vector3(-near_delta, 0.0, 0.0)

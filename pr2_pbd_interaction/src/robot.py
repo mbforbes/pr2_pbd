@@ -17,7 +17,8 @@ import rospy
 from threading import Thread
 
 # Pbd (3rd party / local)
-from pr2_pbd_interaction.msg import HandsFreeCommand, RobotState, Side
+from pr2_pbd_interaction.msg import (
+    HandsFreeCommand, RobotState, Side, GripperState)
 
 # Local
 from robotlink import Link
@@ -82,16 +83,12 @@ class RobotHandler(object):
 
         # Fill in gripper states.
         for side in [Side.RIGHT, Side.LEFT]:
-            val = Link.get_gripper_joint_position(side)
-            # Heuristic: Judege based on how open/close the gripper is.
-            # This will fail, for example, when picking up a thin
-            # object.
-            # TODO(mbforbes): Refactor into constants.
-            if val <= 0.02:
-                state = RobotState.CLOSED_EMPTY
-            elif val >= 0.078:
+            gs = Link.get_gripper_state(side)
+            if gs == GripperState.OPEN:
                 state = RobotState.OPEN
-            else:
+            elif gs == GripperState.CLOSED:
+                state = RobotState.CLOSED_EMPTY
+            else:  # gs == GripperState.HOLDING
                 state = RobotState.HAS_OBJ
             rs.gripper_states += [state]
 
