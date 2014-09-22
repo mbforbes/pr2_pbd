@@ -844,10 +844,17 @@ class Arm:
         goal = Pr2GripperCommandGoal()
         goal.command.position = pos
         goal.command.max_effort = eff
+        rospy.loginfo('Gripper moving to ' + str(pos))
         self.gripper_client.send_goal(goal)
+
         if wait:
+            rospy.loginfo(
+                'Waiting for max ' + str(MAX_GRIPPER_WAIT_TIME) + 'seconds...')
             self.gripper_client.wait_for_result(
                 rospy.Duration(MAX_GRIPPER_WAIT_TIME))
+            rospy.loginfo('Done waiting.')
+        else:
+            rospy.loginfo('Not waiting.')
 
     def _record_arm_movement(self, reading):
         '''Records the sensed arm movement.

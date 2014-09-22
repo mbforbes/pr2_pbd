@@ -405,6 +405,8 @@ class Link(object):
         # it doesn't track changes due to pr2_object_manipulation's
         # automatic pick-up.
         joint_val = Link.get_gripper_joint_position(arm_idx)
+        arm = 'Right' if arm_idx == Side.RIGHT else 'Left'
+        rospy.loginfo(arm + ' gripper joint position: ' + str(joint_val))
         if joint_val < 0.078:
             return GripperState.CLOSED
         else:
