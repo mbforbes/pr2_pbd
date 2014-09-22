@@ -308,7 +308,7 @@ class MoveRelativePosition(Command):
                 'Cannot find ' + self.phrases_processed[3])
 
         # Ensure object is reachable.
-        rr = Commands.get_rr(pbdobj, self.rel_pos_str, self.arm_idx)
+        rr = Command.get_rr(pbdobj, self.rel_pos_str, self.arm_idx)
         if not rr.reachable:
             return False, FailureFeedback(' '.join([
                 self.phrases_processed[2],
@@ -326,7 +326,7 @@ class MoveRelativePosition(Command):
         # TODO(mbforbes): Re-ground object; this name is no longer valid
         # by execution time.
         pbdobj = ObjectsHandler.get_obj_by_name(self.args[2])
-        rr = Commands.get_rr(pbdobj, self.rel_pos_str, self.arm_idx)
+        rr = Command.get_rr(pbdobj, self.rel_pos_str, self.arm_idx)
         res = Link.move_to_computed_pose(self.arm_idx, rr.pose)
         fb = self.default_core_feedback()
         return res, fb
@@ -511,7 +511,7 @@ class PlaceRelativeLocation(Command):
                 'Cannot find ' + self.phrases_processed[2])
 
         # Ensure object is reachable.
-        rr = Commands.get_rr(pbdobj, self.rel_pos_str, self.arm_idx)
+        rr = Command.get_rr(pbdobj, self.rel_pos_str, self.arm_idx)
         if not rr.reachable:
             # Can't reach location.
             return False, FailureFeedback(' '.join([
@@ -544,7 +544,7 @@ class PlaceRelativeLocation(Command):
         # TODO(mbforbes): Re-ground object; this name is no longer valid
         # by execution time.
         pbdobj = ObjectsHandler.get_obj_by_name(self.args[1])
-        rr = Commands.get_rr(pbdobj, self.rel_pos_str, self.arm_idx)
+        rr = Command.get_rr(pbdobj, self.rel_pos_str, self.arm_idx)
         if not Link.move_to_computed_pose(self.arm_idx, rr.pose):
             return False, fb
 
