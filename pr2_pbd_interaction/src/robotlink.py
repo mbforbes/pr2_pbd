@@ -21,7 +21,7 @@ roslib.load_manifest('pr2_pbd_interaction')
 import rospy
 
 # System builtins
-from collections import OrderedDict
+from collections import OrderedDict, defaultdict
 import math
 
 # ROS Builtins
@@ -104,61 +104,186 @@ class Link(object):
         #     0.0,
         #     1.0
         # )),
-        ('flat-upsidedown', Quaternion(
+
+        # 'General' list (mostly pointing fowards or angles of pointing
+        # downwards).
+        ('gen-flat-upsidedown', Quaternion(
             1.0,
             0.0,
             0.0,
             0.0
         )),
-        ('smalltilt-upsidedown', Quaternion(
+        ('gen-smalltilt-upsidedown', Quaternion(
             0.958600311321,
             0.0389047107548,
             -0.280663429733,
             -0.0282826064416
         )),
-        ('45deg-upsidedown', Quaternion(
+        ('gen-45deg-upsidedown', Quaternion(
             0.947183721725,
             0.0378169124572,
             -0.317060828047,
             -0.029754155172
         )),
-        ('largetilt-upsidedown', Quaternion(
+        ('gen-largetilt-upsidedown', Quaternion(
             0.84375001925,
             0.0296645574088,
             -0.534565233277,
             -0.0380253917916
         )),
-        ('vert-upsidedown', Quaternion(
+        ('gen-vert-upsidedown', Quaternion(
             0.710535569959,
             0.0208582222416,
             -0.702007727379,
             -0.0434659532153
         )),
-        ('45deg+righttilt-upsidedown', Quaternion(
+        ('gen-45deg+righttilt-upsidedown', Quaternion(
             0.816555509917,
             -0.166496173679,
             -0.388895710032,
             0.392780154914
         )),
-        ('45deg+right-upsidedown', Quaternion(
+        ('gen-45deg+right-upsidedown', Quaternion(
             0.626434852697,
             -0.291921804483,
             -0.305953683145,
             0.654792623021
         )),
-        ('45deg+lefttilt-upsidedown', Quaternion(
+        ('gen-45deg+lefttilt-upsidedown', Quaternion(
             0.83986672291,
             0.176672428537,
             -0.384052777203,
             -0.34046175272
         )),
-        ('45deg+left-upsidedown', Quaternion(
+        ('gen-45deg+left-upsidedown', Quaternion(
             -0.631060356859,
             -0.316931066071,
             0.279972459512,
             0.650332951091
         )),
+
+        # Pointing downwards
+        ('down-1', Quaternion(
+            0.70710678118,
+            0,
+            -0.70710678118,
+            0
+        )),
+        ('down-2', Quaternion(
+            -0.5,
+            0.5,
+            0.5,
+            0.5
+        )),
+        ('down-3', Quaternion(
+            0,
+            0.70710678118,
+            0,
+            0.70710678118
+        )),
+        ('down-4', Quaternion(
+            0.5,
+            0.5,
+            -0.5,
+            0.5
+        )),
+
+        # Pointing left
+        ('left-1', Quaternion(
+            0.70710678118,
+            0.70710678118,
+            0,
+            0
+        )),
+        ('left-2', Quaternion(
+            -0.5,
+            -0.5,
+            0.5,
+            0.5
+        )),
+        ('left-3', Quaternion(
+            0,
+            0,
+            0.70710678118,
+            0.70710678118
+        )),
+        ('left-4', Quaternion(
+            0.5,
+            0.5,
+            0.5,
+            0.5
+        )),
+
+        # Pointing right
+        ('right-1', Quaternion(
+            0,
+            0,
+            -0.70710678118,
+            0.70710678118
+        )),
+        ('right-2', Quaternion(
+            0.5,
+            -0.5,
+            0.5,
+            -0.5
+        )),
+        ('right-3', Quaternion(
+            -0.70710678118,
+            0.70710678118,
+            0,
+            0
+        )),
+        ('right-4', Quaternion(
+            -0.5,
+            0.5,
+            0.5,
+            -0.5
+        )),
+
+        # Pointing forward
+        ('forward-1', Quaternion(
+            1,
+            0,
+            0,
+            0
+        )),
+        ('forward-2', Quaternion(
+            -0.70710678118,
+            0,
+            0,
+            0.70710678118
+        )),
+        ('forward-3', Quaternion(
+            0,
+            0,
+            0,
+            1
+        )),
+        ('forward-4', Quaternion(
+            0.70710678118,
+            0,
+            0,
+            0.70710678118
+        )),
     ])
+
+    # This maps relative positions (e.g. moving hand "to the left of"
+    # something) to the orientation of the hand. If a relative position
+    # is not listed, it gets the default entry. Note that this maps to
+    # prefixes of the orientation map above, because there are multiple
+    # possible "orientations" for a logical orientation.
+    #
+    # NOTE(mbforbes): Relative positions that have multiple options
+    # (e.g. NEXT_TO can be TO_LEFT_OF or TO_RIGHT_OF) don't need to be
+    # mapped here because they resolve to one of their concrete options.
+    orientation_prefix_map = defaultdict(lambda: 'gen', {
+        HandsFreeCommand.ABOVE: 'down',
+        HandsFreeCommand.TO_LEFT_OF: 'right',
+        HandsFreeCommand.TO_RIGHT_OF: 'left',
+        HandsFreeCommand.IN_FRONT_OF: 'forward',
+        HandsFreeCommand.BEHIND: 'down',
+        HandsFreeCommand.ON_TOP_OF: 'down',
+    })
 
     joint_positions = {
         'to_side': {

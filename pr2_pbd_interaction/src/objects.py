@@ -403,7 +403,11 @@ class ObjectsHandler(object):
 
         # Try a bunch of orientations.
         res = ObjectsHandler.UNR
-        for o_name, orientation in Link.orientations.iteritems():
+        prefix = Link.orientation_prefix_map[rel_pos_str]
+        opts = [
+            o for n, o in Link.orientations.iteritems()
+            if n.startswith(prefix)]
+        for orientation in opts:
             pose = Pose(position, orientation)
             if Link.get_computed_pose_possible(side, pose):
                 # Hooray!
