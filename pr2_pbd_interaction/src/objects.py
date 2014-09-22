@@ -374,6 +374,7 @@ class ObjectsHandler(object):
                 pbd_obj.reachability_map[pos][side] = (
                     ObjectsHandler._get_reachability_for(pbd_obj, pos, side))
 
+    @staticmethod
     def _get_reachability_for(pbd_obj, pos, side, orient=None):
         '''
         Gets (and doesn't save) the reachability for pbd_obj at pos
