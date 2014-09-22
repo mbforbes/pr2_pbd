@@ -23,7 +23,7 @@ before_install:
 install:
 # Update package list and install new versions.
     - sudo apt-get update
-    - sudo apt-get -y upgrade --fix-missing
+    - yes | sudo apt-get -y upgrade --fix-missing
 # First, move code to correct place. Also Travis-CI specific.
     - mkdir -p ~/rosbuild_ws
     - cd ..; mv pr2_pbd ~/rosbuild_ws/
@@ -68,3 +68,7 @@ script:
 # NOTE(mbforbes): Add more files to this as they're completed.
     - roscd pr2_pbd_interaction
     - pep8 src/*.py test/*.py nodes/*.py
+# Another test for my convenience: just run through the code, without
+# actually 'running' anything, to check if there are any errors that can
+# be caught by a simple interpreter pass.
+    - python src/handsfree.py
