@@ -43,6 +43,7 @@ class Code(object):
     EXEC_FAIL = 'failure during attempted execution'
     POST_CHECK_FAIL = 'post check failure'
     SUCCESS = 'successfully exected step'
+    NO_STEPS = 'no steps were programmed before executing'
 
 
 class Command(object):

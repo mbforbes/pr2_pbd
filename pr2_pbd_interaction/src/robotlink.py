@@ -62,6 +62,10 @@ ABOVE_TABLE_Z = 0.08  # in m, so 0.08 = 8cm (I think)
 # Maximum time to wait for the head to look at something.
 MAX_GAZE_WAIT_TIME = rospy.Duration(2.0)
 
+# How long to wait for a gripper to open/close before measuring. See
+# note in set_gripper_state(...) for more details.
+GRIPPER_TOGGLE_WAIT_TIME = rospy.Duration(1.5)
+
 
 # ######################################################################
 # Classes
@@ -415,21 +419,31 @@ class Link(object):
     @staticmethod
     def set_gripper_state(arm_idx, gripper_state):
         '''
+        Sets arm_idx to gripper_state.
+
+        Note that, even when waiting for the action to complete, the arm
+        moving action returns too early, leading to incorrect joint
+        measurements and reports of 'failure' when success was really
+        achieved. (For more info, see _send_gripper_command(...) in
+        arm.py and note logging output.) Because of this, we are forced
+        to do a bit more waiting here.
+
         Args:
             arm_idx (int): Side.RIGHT or Side.LEFT
             gripper_state (int): GripperState.OPEN or
                 GripperState.CLOSED
 
         Returns:
-            bool: Success?
+            bool: Whether the arm reached the desired gripper_state.
         '''
         # NOTE(mbforbes): Because this operation is robust we just
         # return whether we ended up in the correct state, not if a
-        # state change happened.
+        # state change happened. Furthermore, we pause before doing so.
         if gripper_state == GripperState.OPEN:
             S.arms.arms[arm_idx].open_gripper()
         else:
             S.arms.arms[arm_idx].close_gripper()
+        rospy.sleep(GRIPPER_TOGGLE_WAIT_TIME)
         post_state = Link.get_gripper_state(arm_idx)
         return post_state == gripper_state
 

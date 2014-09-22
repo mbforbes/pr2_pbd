@@ -59,6 +59,9 @@ class Program(object):
         # Look for objects
         ObjectsHandler.record()
 
+        # Set default code.
+        code = Code.NO_STEPS
+
         # Execute steps in order.
         for idx, command in enumerate(self.commands):
             idx_1based = idx + 1  # For display
@@ -85,6 +88,7 @@ class Program(object):
 
         self.set_executing(False)
 
+        rospy.loginfo("Finished executing with code: " + code)
         if code == Code.SUCCESS:
             Feedback("Completed action %d." % (self.idx_name)).issue()
         else:

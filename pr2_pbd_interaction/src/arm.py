@@ -849,7 +849,8 @@ class Arm:
 
         if wait:
             rospy.loginfo(
-                'Waiting for max ' + str(MAX_GRIPPER_WAIT_TIME) + 'seconds...')
+                'Waiting for max ' + str(MAX_GRIPPER_WAIT_TIME) +
+                ' seconds...')
             self.gripper_client.wait_for_result(
                 rospy.Duration(MAX_GRIPPER_WAIT_TIME))
             rospy.loginfo('Done waiting.')
