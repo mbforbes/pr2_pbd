@@ -1,9 +1,12 @@
 # TODO
 
+## p0 bugs
+- top sentences specify one object, all descriptions match, but command has different object
+- entering 'asdf' with a ton of sentences with 0.000085 score and a ton of commands with score 0.0090 (and lang_score 0.0065 (?)) returns a ccommand!! WTF?!?!
+
 ## Benchmark
 1. hook up correct referring phrase generation
 2. close & open should always be recorded in program, I think... perhaps this means core and post-check fails shouldn't be considered, but pre-check should (as this rules out accidents)
-3. 'create new action' should also set the gripper states
 
 ## Test 1
 - fix property calculation (at least one of leftmost, biggets, etc. should always be true)

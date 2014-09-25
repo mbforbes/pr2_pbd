@@ -42,7 +42,7 @@ from pr2_social_gaze.msg import GazeGoal, GazeAction
 from arms import Arms
 from world import World
 
-# Local (hands-free PbD).
+# Local (hands-free PbD)
 from util import Numbers
 
 

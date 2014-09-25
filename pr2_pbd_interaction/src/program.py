@@ -13,10 +13,15 @@ import roslib
 roslib.load_manifest('pr2_pbd_interaction')
 import rospy
 
+# PbD
+from pr2_pbd_interaction.msg import Side, GripperState
+
+# Local (hands-free PbD)
 from commands import Mode, Code
 from feedback import Feedback, FailureFeedback
 from objects import ObjectsHandler
 from robot import RobotHandler
+from robotlink import Link
 from util import GlobalOptions
 
 # ######################################################################
@@ -130,6 +135,11 @@ class Program(object):
         Feedback(
             'Switched to action %d. Finding objects.' % (self.idx_name)
         ).issue()
+
+        # Create consistent start state.
+        # NOTE(mbforbes): Open vs closed here is arbitrary.
+        Link.set_gripper_state(Side.RIGHT, GripperState.OPEN)
+        Link.set_gripper_state(Side.LEFT, GripperState.OPEN)
         ObjectsHandler.record()
 
     def add_command(self, command):
