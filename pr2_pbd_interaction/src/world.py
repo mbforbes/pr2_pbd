@@ -216,7 +216,7 @@ class PbdObject(object):
         '''Display info (for debug).'''
         rospy.loginfo('Object: ' + self.get_name())
         rospy.loginfo('\t- color: ' + self.color)
-        rospy.loginfo('\t- type:  ' + self.type)
+        rospy.loginfo('\t- shape:  ' + self.shape)
         rospy.loginfo('\t- vol:   ' + str(self.vol))
         p_descs = [
             'rightmost',

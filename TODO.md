@@ -1,10 +1,9 @@
 # TODO
 
 ## Benchmark
-1. confirm w/ maya re: object grounding (which props? referred or try to infer intent?)
-2. implement answer to 1.
-3. hook up referring phrase generation (may be part of 2., may not)
-4. close & open should always be recorded in program, I think... perhaps this means core and post-check fails shouldn't be considered, but pre-check should (as this rules out accidents)
+1. hook up correct referring phrase generation
+2. close & open should always be recorded in program, I think... perhaps this means core and post-check fails shouldn't be considered, but pre-check should (as this rules out accidents)
+3. 'create new action' should also set the gripper states
 
 ## Test 1
 - fix property calculation (at least one of leftmost, biggets, etc. should always be true)
