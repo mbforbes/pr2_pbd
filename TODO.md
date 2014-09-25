@@ -1,8 +1,8 @@
 # TODO
 
 ## p0 bugs
-- top sentences specify one object, all descriptions match, but command has different object
-- entering 'asdf' with a ton of sentences with 0.000085 score and a ton of commands with score 0.0090 (and lang_score 0.0065 (?)) returns a ccommand!! WTF?!?!
+- [parser] top sentences specify one object, all descriptions match, but command has different object
+- [parser] entering 'asdf' with a ton of sentences with 0.000085 score and a ton of commands with score 0.0090 (and lang_score 0.0065 (?)) returns a ccommand!! WTF?!?!
 
 ## Benchmark
 1. hook up correct referring phrase generation
