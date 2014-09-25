@@ -574,7 +574,7 @@ class ObjectsHandler(object):
             # Basic properties
             wo.name = pbd_obj.name
             wo.color = pbd_obj.color
-            wo.type = pbd_obj.type
+            wo.type = pbd_obj.shape
 
             # Reachability
             rm = pbd_obj.reachability_map
