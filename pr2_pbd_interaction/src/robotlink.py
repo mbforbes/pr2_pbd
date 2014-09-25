@@ -608,7 +608,7 @@ class Link(object):
             obj_pos.y + displacement.y,
             obj_pos.z + displacement.z,
         )
-        orientation = Link.orientations['45deg-upsidedown']
+        orientation = Link.orientations['gen-45deg-upsidedown']
         target_fingertip_pose = Pose(position, orientation)
 
         # Solve IK, go.
