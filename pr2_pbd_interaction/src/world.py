@@ -101,13 +101,57 @@ LOOK_AT_TABLE_TIMEOUT_SECONDS = rospy.Duration(2.0)
 # aren't forgetting about other offsets elsewhere in the program that
 # are taking up this range. Hmm.
 PBDOBJ_ID_BASE_OFFSET = 500
-# Must have < this many pbd obj reachability markers.
+# Must have < this many PbdObj reachability markers (per PbdObj).
 PBDOBJ_ID_MULTIPLIER_OFFSET = 10
 
 
 # ######################################################################
 # Classes
 # ######################################################################
+
+
+class ObjectSpec(object):
+    '''A lightweight data structure that commands create and persist to
+    refer to objects and compare them in the future. This contains only
+    the persistent properties of an object (like shape and color) and
+    not transient ones (like location).
+    '''
+
+    def __init__(self, dims, color, shape):
+        '''
+        Args:
+            dimensions (Vector3): Size of bounding box.
+            color (str): Written description of color (e.g. 'red').
+            shape (str): Written description of object category (e.g.
+                'cup' or 'box'). This is left as future work.
+        '''
+        self.dimensions = dims
+        self.color = color
+        self.shape = shape
+
+    def score(self, other):
+        '''
+        Scores how similar self is to other.
+
+        Args:
+            other (ObjectSpec)
+
+        Returns:
+            float: Lower is better.
+        '''
+        # Pre-filters based on color and shape. The 'bad_score' weight
+        # is quite high. This implementation prefers crazy object
+        # matches in bad situations (e.g. programmed on a cup but only
+        # a box is seen, matches to the box) rather than not executing.
+        bad_score = 1000.0
+        score = 0.0
+        if self.color != other.color:
+            score += bad_score
+        if self.shape != other.shape:
+            score += bad_score
+        score += World.object_dissimilarity(self, other)
+        return score
+
 
 class PbdObject(object):
     '''Class for representing objects interally in PbD.'''
@@ -145,7 +189,7 @@ class PbdObject(object):
         self.name = self.get_name()
 
         # Attrs computed for Hands-free.
-        self.type = 'unknown'
+        self.shape = 'unknown'  # Future work.
         self.color = PbdObject.get_color(cluster)
         self.points = PbdObject.get_points(cluster)
         self.endpoints = PbdObject.get_endpoints(self.points)
@@ -163,6 +207,10 @@ class PbdObject(object):
         self.is_removed = False
         self.menu_handler.insert('Remove from scene', callback=self.remove)
         self.display()
+
+    def get_spec(self):
+        '''Returns an ObjectSpec that represents this object.'''
+        return ObjectSpec(self.dimensions, self.color, self.shape)
 
     def display(self):
         '''Display info (for debug).'''
@@ -545,6 +593,10 @@ class World:
     @staticmethod
     def object_dissimilarity(obj1, obj2):
         '''Returns distance between two objects.
+
+        Args:
+            obj1 (PbdObject|ObjectSpec): Must have .dimensions.x/y/z.
+            obj2 (PbdObject|ObjectSpec): Must have .dimensions.x/y/z.
 
         Returns:
             float

@@ -296,13 +296,14 @@ class MoveRelativePosition(Command):
         # Initialize some of our own state for convenience.
         self.arm_idx = Link.get_arm_index(self.args[0])
         self.rel_pos_str = self.args[1]
+        self.obj_spec = ObjectsHandler.get_obj_by_name(self.args[2]).get_spec()
 
     def pre_check(self):
         '''Ensures reaching can happen.'''
         # Ensure object exists.
         # TODO(mbforbes): Re-ground object; this name is no longer valid
         # by execution time.
-        pbdobj = ObjectsHandler.get_obj_by_name(self.args[2])
+        pbdobj = ObjectsHandler.get_obj_by_spec(self.obj_spec)
         if pbdobj is None:
             return False, FailureFeedback(
                 'Cannot find ' + self.phrases_processed[3])
@@ -325,7 +326,7 @@ class MoveRelativePosition(Command):
         '''Does the movement.'''
         # TODO(mbforbes): Re-ground object; this name is no longer valid
         # by execution time.
-        pbdobj = ObjectsHandler.get_obj_by_name(self.args[2])
+        pbdobj = ObjectsHandler.get_obj_by_spec(self.obj_spec)
         rr = Command.get_rr(pbdobj, self.rel_pos_str, self.arm_idx)
         res = Link.move_to_computed_pose(self.arm_idx, rr.pose)
         fb = self.default_core_feedback()
@@ -390,11 +391,12 @@ class MoveRelativeDirection(Command):
 
     def init(self):
         # Initialize some of our own state for convenience.
-        self.pbdobj = ObjectsHandler.get_obj_by_name(self.args[2])
+        self.obj_spec = ObjectsHandler.get_obj_by_name(self.args[2]).get_spec()
 
     def pre_check(self):
         # Check 1: does obj exist?
-        if self.pbdobj is None:
+        pbdobj = ObjectsHandler.get_obj_by_spec(self.obj_spec)
+        if pbdobj is None:
             return (
                 False,
                 FailureFeedback('Cannot find ' + self.phrases_processed[3]))
@@ -403,13 +405,14 @@ class MoveRelativeDirection(Command):
         # TODO(mbforbes): Might be useful to check if we can do this
         # without colliding with other objects...
         res = Link.get_rel_dir_possible(
-            self.args[0], self.pbdobj, self.args[1])
+            self.args[0], pbdobj, self.args[1])
         return res, self.default_pre_feedback()
 
     def core(self):
         '''Do the movement.'''
         fb = self.default_core_feedback()
-        suc = Link.move_rel_dir(self.args[0], self.pbdobj, self.args[1])
+        pbdobj = ObjectsHandler.get_obj_by_spec(self.obj_spec)
+        suc = Link.move_rel_dir(self.args[0], pbdobj, self.args[1])
         return suc, fb
 
 
@@ -490,6 +493,7 @@ class PlaceRelativeLocation(Command):
     def init(self):
         # Initialize some of our own state for convenience.
         self.rel_pos_str = self.args[0]
+        self.obj_spec = ObjectsHandler.get_obj_by_name(self.args[1]).get_spec()
         self.arm_idx = Link.get_arm_index(self.args[2])
         self.narration = ' '.join([
             self.phrases_processed[0],
@@ -502,9 +506,7 @@ class PlaceRelativeLocation(Command):
     def pre_check(self):
         '''Ensures reaching can happen.'''
         # Ensure object exists.
-        # TODO(mbforbes): Re-ground object; this name is no longer valid
-        # by execution time.
-        pbdobj = ObjectsHandler.get_obj_by_name(self.args[1])
+        pbdobj = ObjectsHandler.get_obj_by_spec(self.obj_spec)
         if pbdobj is None:
             # No such object.
             return False, FailureFeedback(
@@ -541,9 +543,7 @@ class PlaceRelativeLocation(Command):
         fb = FailureFeedback(' '.join(['Failed to ' + self.narration]))
 
         # Move
-        # TODO(mbforbes): Re-ground object; this name is no longer valid
-        # by execution time.
-        pbdobj = ObjectsHandler.get_obj_by_name(self.args[1])
+        pbdobj = ObjectsHandler.get_obj_by_spec(self.obj_spec)
         rr = Command.get_rr(pbdobj, self.rel_pos_str, self.arm_idx)
         if not Link.move_to_computed_pose(self.arm_idx, rr.pose):
             return False, fb
@@ -571,6 +571,7 @@ class PickUp(Command):
 
     def init(self):
         # Initialize some of our own state for convenience.
+        self.obj_spec = ObjectsHandler.get_obj_by_name(self.args[0]).get_spec()
         self.arm_idx = Link.get_arm_index(self.args[1])
         self.narration = ' '.join([
             self.phrases_processed[0],
@@ -584,7 +585,7 @@ class PickUp(Command):
         # NOTE(mbforbes): Not sure of a way to conveniently check this
         # with the current implementation. That's not to say it isn't
         # possible.
-        pbdobj = ObjectsHandler.get_obj_by_name(self.args[0])
+        pbdobj = ObjectsHandler.get_obj_by_spec(self.obj_spec)
         res = True
         # This would be the 'default' failure mode (but we never do a
         # real check so it never happens.)
@@ -601,7 +602,7 @@ class PickUp(Command):
 
     def core(self):
         '''Picks up object.'''
-        pbdobj = ObjectsHandler.get_obj_by_name(self.args[0])
+        pbdobj = ObjectsHandler.get_obj_by_spec(self.obj_spec)
         success = False
         fb = FailureFeedback(' '.join(['Failed to ' + self.narration]))
         if pbdobj is not None:
@@ -627,7 +628,7 @@ class PointTo(Command):
 
     def init(self):
         # Initialize some of our own state for convenience.
-        self.pbdobj = ObjectsHandler.get_obj_by_name(self.args[0])
+        self.obj_spec = ObjectsHandler.get_obj_by_name(self.args[0]).get_spec()
         self.arm_idx = Link.get_arm_index(self.args[1])
         self.narration = ' '.join([
             self.phrases_processed[0],
@@ -640,7 +641,8 @@ class PointTo(Command):
         '''Ensures pointing can happen.'''
         # Only check for existance of object; any pointing failure is
         # an implementation failure.
-        if self.pbdobj is None:
+        pbdobj = ObjectsHandler.get_obj_by_spec(self.obj_spec)
+        if pbdobj is None:
             # No such object.
             return False, FailureFeedback(
                 'Cannot find ' + self.phrases_processed[2])
@@ -653,7 +655,8 @@ class PointTo(Command):
     def core(self):
         '''Points to an object.'''
         fb = FailureFeedback(' '.join(['Failed to ' + self.narration]))
-        return Link.point_to(self.pbdobj, self.arm_idx), fb
+        pbdobj = ObjectsHandler.get_obj_by_spec(self.obj_spec)
+        return Link.point_to(pbdobj, self.arm_idx), fb
 
 
 class Rotate(Command):
@@ -700,19 +703,21 @@ class LookAt(Command):
 
     def init(self):
         # Initialize some of our own state for convenience.
-        self.pbdobj = ObjectsHandler.get_obj_by_name(self.args[0])
+        self.obj_spec = ObjectsHandler.get_obj_by_name(self.args[0]).get_spec()
 
     def pre_check(self):
         '''Ensures looking at can happen.'''
         res = True
         fb = FailureFeedback('Cannot find ' + self.phrases_processed[1])
-        if self.pbdobj is None:
+        pbdobj = ObjectsHandler.get_obj_by_spec(self.obj_spec)
+        if pbdobj is None:
             res = False
         return res, fb
 
     def core(self):
         '''Looks at the object.'''
-        res = Link.look_at_object(self.pbdobj)
+        pbdobj = ObjectsHandler.get_obj_by_spec(self.obj_spec)
+        res = Link.look_at_object(pbdobj)
         fb = self.default_core_feedback()
         return res, fb
 

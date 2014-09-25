@@ -254,6 +254,27 @@ class ObjectsHandler(object):
         return None
 
     @staticmethod
+    def get_obj_by_spec(obj_spec):
+        '''
+        Finds the object that most closely matches the specification of
+        obj_spec, or None if no such object exists.
+
+        Args:
+            obj_spec (ObjectSpec): The specification of the object that
+                we're looking for.
+
+        Returns:
+            PbdObject|None: None if not found.
+        '''
+        # If no objects, return None.
+        objs = Link.get_objs()
+        if len(objs) == 0:
+            return None
+        # Compute all the scores, return the obj that scored the lowest.
+        scores = [obj_spc.score(s) for s in [o.get_spec() for o in objs]]
+        return objs[scores.index(min(scores))]
+
+    @staticmethod
     def get_reachable_with_cur_orient(pbd_obj, pos, side):
         '''
         Returns whether pos of pbd_obj is reachable with the current
