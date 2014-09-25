@@ -271,7 +271,7 @@ class ObjectsHandler(object):
         if len(objs) == 0:
             return None
         # Compute all the scores, return the obj that scored the lowest.
-        scores = [obj_spc.score(s) for s in [o.get_spec() for o in objs]]
+        scores = [obj_spec.score(s) for s in [o.get_spec() for o in objs]]
         return objs[scores.index(min(scores))]
 
     @staticmethod
