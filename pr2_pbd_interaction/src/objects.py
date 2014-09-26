@@ -249,9 +249,14 @@ class ObjectsHandler(object):
         Returns:
             PbdObject|None: None if not found.
         '''
-        for pbdobj in Link.get_objs():
+        objs = Link.get_objs()
+        for pbdobj in objs:
             if pbdobj.name == objname:
                 return pbdobj
+
+        # This is actually a bad problem if it doesn't exist.
+        rospy.logerr("Couldn't find object " + objname)
+        rospy.logerr("Objects I have: " + [o.name for o in objs])
         return None
 
     @staticmethod
