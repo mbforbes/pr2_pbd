@@ -75,7 +75,7 @@ class HandsFree(object):
         # TODO(mbforbes): Save image?
         rospy.loginfo('Description:')
         for i in range(len(names)):
-            Feedback(descs[i]).issue()
+            # Feedback(descs[i]).issue()
             rospy.loginfo('\t' + names[i] + '\t' + descs[i])
             rospy.sleep(2.0)
 
