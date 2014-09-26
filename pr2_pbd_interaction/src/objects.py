@@ -309,7 +309,7 @@ class ObjectsHandler(object):
             str
         '''
         if pbd_obj is None or pbd_obj not in ObjectsHandler.descs:
-            return 'object'
+            return 'the object'
         return ObjectsHandler.descs[pbd_obj.name]
 
     @staticmethod
