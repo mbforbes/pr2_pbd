@@ -68,8 +68,9 @@ class Command(object):
         self.phrases_processed = Command.process_phrases(phrases)
         self.phrases_processed_str = (
             ' '.join(self.phrases_processed).capitalize() + '.')
+        self.narration = None  # Optionally set by subclass.
 
-        # Initialize any command-specific code.
+        # Initialize any command-specific (subclass) code.
         if hasattr(self, 'init'):
             self.init()
 
@@ -173,8 +174,11 @@ class Command(object):
         Returns:
             Feedback
         '''
-        # Got to remove hyphens and underscores for speaking.
-        return Feedback(self.phrases_processed_str)
+        # If they've set a narration, use it. Else, use the default.
+        if self.narration is not None:
+            return Feedback(self.narration)
+        else:
+            return Feedback(self.phrases_processed_str)
 
     # Helpers
     def default_pre_feedback(self):
@@ -185,9 +189,28 @@ class Command(object):
         must implement an actual pre_check function. However, this may
         be used in pre_check functions as an easy default response.
 
-        Returns: FailureFeedback
+        Returns:
+            FailureFeedback
         '''
         return FailureFeedback('Cannot ' + self.phrases_processed_str)
+
+    def obj_pre_feedback(self, idx, desc):
+        '''
+        Default feedback for a failed pre-check that refers to an object
+        at index idx in its phrases with (current) description desc.
+
+        NOTE(mbforbes): This is not used automatically, as you still
+        must implement an core function. However, this may be used in
+        core functions as an easy default response.
+
+        Args:
+            idx (int): 0-based index of object expression in phrases.
+            desc (str): Description of object.
+
+        Returns:
+            FailureFeedback
+        '''
+        return FailureFeedback('Cannot ' + self._obj_phrases(idx, desc))
 
     def default_core_feedback(self):
         '''
@@ -197,9 +220,65 @@ class Command(object):
         must implement an core function. However, this may be used in
         core functions as an easy default response.
 
-        Returns: FailureFeedback
+        Returns:
+            FailureFeedback
         '''
         return FailureFeedback('Failed to ' + self.phrases_processed_str)
+
+    def obj_core_feedback(self, idx, desc):
+        '''
+        Default feedback for a failed core (actual execution) that
+        refers to an object at index idx in its phrases with (current)
+        description desc.
+
+        NOTE(mbforbes): This is not used automatically, as you still
+        must implement an core function. However, this may be used in
+        core functions as an easy default response.
+
+        Args:
+            idx (int): 0-based index of object expression in phrases.
+            desc (str): Description of object.
+
+        Returns:
+            FailureFeedback
+        '''
+        return FailureFeedback('Failed to ' + self._obj_phrases(idx, desc))
+
+    def obj_narration(self, idx, desc):
+        '''
+        Default narration with object.
+
+        NOTE(mbforbes): This is not used automatically, as you still
+        must implement an core function. However, this may be used in
+        core functions as an easy default response.
+
+        Args:
+            idx (int): 0-based index of object expression in phrases.
+            desc (str): Description of object.
+
+        Returns:
+            str
+        '''
+        return self._obj_phrases(idx, desc)
+
+    def _obj_phrases(self, idx, desc):
+        '''
+        Helper for creating default pre/core feedback.
+
+        Args:
+            idx (int): Index of object in phrases.
+            desc (str): Description of the object.
+
+        Returns:
+            str
+        '''
+        ret = []
+        for i, phrase in enumerate(self.phrases_processed):
+            if i == idx:
+                ret += [desc]
+            else:
+                ret += [phrase]
+        return ' '.join(ret)
 
     @staticmethod
     def get_rr(pbdobj, rel_pos_str, arm_idx):
@@ -251,7 +330,7 @@ class MoveAbsolutePose(Command):
 
     self.args should have:
         [0] - side (right or left hand)
-        [1] - absolute pose
+        [1] - absolpute pose
 
     self.phrases should indicate:
         [0] - this verb (~move)
@@ -301,25 +380,24 @@ class MoveRelativePosition(Command):
     def pre_check(self):
         '''Ensures reaching can happen.'''
         # Ensure object exists.
-        # TODO(mbforbes): Re-ground object; this name is no longer valid
-        # by execution time.
         pbdobj = ObjectsHandler.get_obj_by_spec(self.obj_spec)
+        obj_desc = ObjectsHandler.get_description_for(pbdobj)
         if pbdobj is None:
-            return False, FailureFeedback(
-                'Cannot find ' + self.phrases_processed[3])
+            return False, FailureFeedback('Cannot find ' + obj_desc)
 
         # Ensure object is reachable.
         rr = Command.get_rr(pbdobj, self.rel_pos_str, self.arm_idx)
         if not rr.reachable:
             return False, FailureFeedback(' '.join([
                 self.phrases_processed[2],
-                self.phrases_processed[3],
+                obj_desc,
                 'is not reachable with',
                 self.phrases_processed[1],
                 '.'
             ]))
 
         # Else, sucess.
+        self.narration = self.obj_narration(3, obj_desc)
         return True, self.default_pre_feedback()
 
     def core(self):
@@ -327,9 +405,10 @@ class MoveRelativePosition(Command):
         # TODO(mbforbes): Re-ground object; this name is no longer valid
         # by execution time.
         pbdobj = ObjectsHandler.get_obj_by_spec(self.obj_spec)
+        obj_desc = ObjectsHandler.get_description_for(pbdobj)
         rr = Command.get_rr(pbdobj, self.rel_pos_str, self.arm_idx)
         res = Link.move_to_computed_pose(self.arm_idx, rr.pose)
-        fb = self.default_core_feedback()
+        fb = self.obj_core_feedback(3, obj_desc)
         return res, fb
 
     # TODO(mbforbes): Post-check that relative move worked.
@@ -378,7 +457,6 @@ class MoveRelativeDirection(Command):
         [1] - relative direction (towards, away)
         [2] - object
 
-
     self.phrases should indicate:
         [0] - this verb (~move)
         [1] - side (right or left hand)
@@ -396,22 +474,25 @@ class MoveRelativeDirection(Command):
     def pre_check(self):
         # Check 1: does obj exist?
         pbdobj = ObjectsHandler.get_obj_by_spec(self.obj_spec)
+        obj_desc = ObjectsHandler.get_description_for(pbdobj)
         if pbdobj is None:
             return (
                 False,
-                FailureFeedback('Cannot find ' + self.phrases_processed[3]))
+                FailureFeedback('Cannot find ' + obj_desc))
 
         # Check 2: Can we move to the requested position?
         # TODO(mbforbes): Might be useful to check if we can do this
         # without colliding with other objects...
         res = Link.get_rel_dir_possible(
             self.args[0], pbdobj, self.args[1])
-        return res, self.default_pre_feedback()
+        self.narration = self.obj_narration(3, obj_desc)
+        return res, self.obj_pre_feedback(3, obj_desc)
 
     def core(self):
         '''Do the movement.'''
-        fb = self.default_core_feedback()
         pbdobj = ObjectsHandler.get_obj_by_spec(self.obj_spec)
+        obj_desc = ObjectsHandler.get_description_for(pbdobj)
+        fb = self.obj_core_feedback(3, obj_desc)
         suc = Link.move_rel_dir(self.args[0], pbdobj, self.args[1])
         return suc, fb
 
@@ -495,22 +576,16 @@ class PlaceRelativeLocation(Command):
         self.rel_pos_str = self.args[0]
         self.obj_spec = ObjectsHandler.get_obj_by_name(self.args[1]).get_spec()
         self.arm_idx = Link.get_arm_index(self.args[2])
-        self.narration = ' '.join([
-            self.phrases_processed[0],
-            self.phrases_processed[1],
-            self.phrases_processed[2],
-            'with',
-            self.phrases_processed[3]
-        ])
 
     def pre_check(self):
         '''Ensures reaching can happen.'''
         # Ensure object exists.
         pbdobj = ObjectsHandler.get_obj_by_spec(self.obj_spec)
+        obj_desc = ObjectsHandler.get_description_for(pbdobj)
         if pbdobj is None:
             # No such object.
             return False, FailureFeedback(
-                'Cannot find ' + self.phrases_processed[2])
+                'Cannot find ' + obj_desc)
 
         # Ensure object is reachable.
         rr = Command.get_rr(pbdobj, self.rel_pos_str, self.arm_idx)
@@ -518,7 +593,7 @@ class PlaceRelativeLocation(Command):
             # Can't reach location.
             return False, FailureFeedback(' '.join([
                 self.phrases_processed[1],
-                self.phrases_processed[2],
+                obj_desc,
                 'is not reachable with',
                 self.phrases_processed[3],
                 '.'
@@ -529,14 +604,18 @@ class PlaceRelativeLocation(Command):
             # Not holding; can't place.
             return False, FailureFeedback(
                 "Can't " + self.phrases_processed[0] + ' as ' +
-                self.phrases_processed[2] + ' is not holding an object.')
+                self.phrases_processed[3] + ' is not holding an object.')
 
         # Everything OK.
-        return True, self.default_pre_feedback()
+        self.narration = ' '.join([
+            self.phrases_processed[0],
+            self.phrases_processed[1],
+            obj_desc,
+            'with',
+            self.phrases_processed[3]
+        ])
 
-    def narrate(self):
-        '''Describes the process of placing.'''
-        return Feedback(self.narration)
+        return True, self.obj_pre_feedback(2, obj_desc)
 
     def core(self):
         '''Places an object.'''
@@ -573,12 +652,6 @@ class PickUp(Command):
         # Initialize some of our own state for convenience.
         self.obj_spec = ObjectsHandler.get_obj_by_name(self.args[0]).get_spec()
         self.arm_idx = Link.get_arm_index(self.args[1])
-        self.narration = ' '.join([
-            self.phrases_processed[0],
-            self.phrases_processed[1],
-            'with',
-            self.phrases_processed[2]
-        ])
 
     def pre_check(self):
         '''Ensures picking up can happen.'''
@@ -586,19 +659,25 @@ class PickUp(Command):
         # with the current implementation. That's not to say it isn't
         # possible.
         pbdobj = ObjectsHandler.get_obj_by_spec(self.obj_spec)
+        obj_desc = ObjectsHandler.get_description_for(pbdobj)
+        self.narration = ' '.join([
+            self.phrases_processed[0],
+            obj_desc,
+            'with',
+            self.phrases_processed[2]
+        ])
         res = True
         # This would be the 'default' failure mode (but we never do a
         # real check so it never happens.)
         fb = FailureFeedback(' '.join(['Cannot', self.narration]))
 
+        # No object.
         if pbdobj is None:
             res = False
-            fb = FailureFeedback('Cannot find ' + self.phrases_processed[1])
-        return res, fb
+            fb = FailureFeedback('Cannot find ' + obj_desc)
 
-    def narrate(self):
-        '''Describes the process of picking up.'''
-        return Feedback(self.narration)
+        # Success.
+        return res, fb
 
     def core(self):
         '''Picks up object.'''
@@ -630,27 +709,24 @@ class PointTo(Command):
         # Initialize some of our own state for convenience.
         self.obj_spec = ObjectsHandler.get_obj_by_name(self.args[0]).get_spec()
         self.arm_idx = Link.get_arm_index(self.args[1])
-        self.narration = ' '.join([
-            self.phrases_processed[0],
-            self.phrases_processed[1],
-            'with',
-            self.phrases_processed[2]
-        ])
 
     def pre_check(self):
         '''Ensures pointing can happen.'''
         # Only check for existance of object; any pointing failure is
         # an implementation failure.
         pbdobj = ObjectsHandler.get_obj_by_spec(self.obj_spec)
+        obj_desc = ObjectsHandler.get_description_for(pbdobj)
+        self.narration = ' '.join([
+            self.phrases_processed[0],
+            obj_desc,
+            'with',
+            self.phrases_processed[2]
+        ])
         if pbdobj is None:
             # No such object.
             return False, FailureFeedback(
-                'Cannot find ' + self.phrases_processed[2])
-        return True, self.default_pre_feedback()
-
-    def narrate(self):
-        '''Describes the process of pointing.'''
-        return Feedback(self.narration)
+                'Cannot find ' + obj_desc)
+        return True, self.obj_pre_feedback(1, pbdobj)
 
     def core(self):
         '''Points to an object.'''
@@ -708,17 +784,20 @@ class LookAt(Command):
     def pre_check(self):
         '''Ensures looking at can happen.'''
         res = True
-        fb = FailureFeedback('Cannot find ' + self.phrases_processed[1])
         pbdobj = ObjectsHandler.get_obj_by_spec(self.obj_spec)
+        obj_desc = ObjectsHandler.get_description_for(pbdobj)
+        fb = FailureFeedback('Cannot find ' + obj_desc)
         if pbdobj is None:
             res = False
+        self.narration = self.obj_narration(1, obj_desc)
         return res, fb
 
     def core(self):
         '''Looks at the object.'''
         pbdobj = ObjectsHandler.get_obj_by_spec(self.obj_spec)
+        obj_desc = ObjectsHandler.get_description_for(pbdobj)
         res = Link.look_at_object(pbdobj)
-        fb = self.default_core_feedback()
+        fb = self.obj_core_feedback(0, obj_desc)
         return res, fb
 
 

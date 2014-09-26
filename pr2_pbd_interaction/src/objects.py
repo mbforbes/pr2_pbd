@@ -238,6 +238,7 @@ class ObjectsHandler(object):
     world_object_pub = rospy.Publisher(topic_worldobjs, WorldObjects)
     objects = []
     objects_lock = Lock()
+    descs = {}
 
     @staticmethod
     def get_obj_by_name(objname):
@@ -297,6 +298,35 @@ class ObjectsHandler(object):
         )
 
     @staticmethod
+    def get_description_for(pbd_obj):
+        '''
+        Gets the latest description for pbd_obj if we have it.
+
+        Args:
+            pbd_obj (PbdObject)
+
+        Returns:
+            str
+        '''
+        if pbd_obj is None or pbd_obj not in ObjectsHandler.descs:
+            return 'object'
+        return ObjectsHandler.descs[pbd_obj.name]
+
+    @staticmethod
+    def save_descriptions(names, descs):
+        '''
+        Recrods received object descriptions. The arrays are aligned.
+
+        Args:
+            names ([str]): Names of objects.
+            descs ([str]): Their descriptions.
+        '''
+        mapping = {}
+        for i in range(len(names)):
+            mapping[names[i]] = descs[i]
+        ObjectsHandler.descs = mapping
+
+    @staticmethod
     def record():
         '''
         Records and broadcasts world objects.
@@ -323,6 +353,7 @@ class ObjectsHandler(object):
         ObjectsHandler.objects_lock.acquire()
         ObjectsHandler.objects = []
         Link.clear_objects()
+        ObjectsHandler.descs = {}
         ObjectsHandler.objects_lock.release()
 
     # Reachabilities don't change, so probably no need for this.

@@ -69,6 +69,9 @@ class HandsFree(object):
         '''
         names, descs = desc.object_names, desc.descriptions
 
+        # Send to objects handler for describing.
+        ObjectsHandler.save_descriptions(names, descs)
+
         # TODO(mbforbes): Save image?
         rospy.loginfo('Description:')
         for i in range(len(names)):
