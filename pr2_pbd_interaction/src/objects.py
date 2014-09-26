@@ -308,8 +308,11 @@ class ObjectsHandler(object):
         Returns:
             str
         '''
-        if pbd_obj is None or pbd_obj not in ObjectsHandler.descs:
+        rospy.loginfo("Object map: " + str(ObjectsHandler.descs))
+        if pbd_obj is None:
             return 'the object'
+        if pbd_obj not in ObjectsHandler.descs:
+            return pbd_obj.name
         return ObjectsHandler.descs[pbd_obj.name]
 
     @staticmethod
