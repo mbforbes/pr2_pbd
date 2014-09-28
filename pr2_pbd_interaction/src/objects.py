@@ -188,7 +188,7 @@ class ObjectsHandler(object):
     # This is all kind of wrong because we're not taking into account
     # the object we're holding, which matters a great deal. This is to
     # get clearance.
-    above_delta = 0.08
+    above_delta = 0.10
 
     # Vecs. Applied to border of that object (e.g. ABOVE_VEC added to
     # middle top of object, TO_LEFT_OF_VEC added to middle left side of
