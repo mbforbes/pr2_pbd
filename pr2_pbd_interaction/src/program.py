@@ -46,8 +46,8 @@ class Program(object):
         self.options = options
         self.idx_name = idx_name  # 1-based
         self.stop_requested = False
-        Feedback("Created action %d. Finding objects." % (idx_name)).issue()
-        self._enter()
+        fb = Feedback("Created action %d. Finding objects." % (idx_name))
+        self._enter(fb)
 
     def execute(self):
         '''
@@ -132,17 +132,20 @@ class Program(object):
             idx_name (int): 1-based index of this program, purely for
                 speech.
         '''
-        Feedback(
-            'Switched to action %d. Finding objects.' % (self.idx_name)
-        ).issue()
-        self._enter()
+        fb = Feedback(
+            'Switched to action %d. Finding objects.' % (self.idx_name))
+        self._enter(fb)
 
-    def _enter(self):
+    def _enter(fb, self):
         '''
         Helper that does all required steps when entering a new action.
         This unifies the logic for 'create' and 'switch_to'.
+
+        Args:
+            fbmsg (Feedback): Feedback to issue upon enterin.
         '''
         Logger.L.enter_action()
+        fb.issue()
         # Create consistent start state.
         # NOTE(mbforbes): Open vs closed here is arbitrary.
         Link.set_gripper_state(Side.RIGHT, GripperState.OPEN)
