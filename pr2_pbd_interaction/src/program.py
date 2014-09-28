@@ -142,7 +142,7 @@ class Program(object):
         Helper that does all required steps when entering a new action.
         This unifies the logic for 'create' and 'switch_to'.
         '''
-        L.enter_action()
+        Logger.L.enter_action()
         # Create consistent start state.
         # NOTE(mbforbes): Open vs closed here is arbitrary.
         Link.set_gripper_state(Side.RIGHT, GripperState.OPEN)
