@@ -19,7 +19,7 @@ from datetime import datetime
 
 # ROS builtins
 import rosbag
-from sensor_msgs.msg import CompressedImage
+from sensor_msgs.msg import Image
 from std_msgs.msg import String
 
 # PbD (3rd party / local)
@@ -33,7 +33,7 @@ from pr2_pbd_interaction.msg import (
 EXP_DIR = '/home/mbforbes/repos/hfpbd-data/'
 
 # For listening and logging to ROS bag.
-IMG_TOPIC = '/head_mount_kinect/rgb/image_raw/compressed'
+IMG_TOPIC = '/head_mount_kinect/rgb/image_color'
 
 # For logging to ROS bag only.
 DESC_TOPIC = '/handsfree_description'
@@ -188,7 +188,7 @@ class LoggerImplementation(object):
         self.fnum = str(num)
         t_filename = dir_ + self.fnum + t_ext
         self.fh = open(t_filename, 'w')
-        self.p(now)
+        self._p(now)
 
         # Open bag file
         b_ext = '.bag'
@@ -205,7 +205,7 @@ class LoggerImplementation(object):
         self.bag.flush()
         self.bag.close()
 
-    def p(self, obj):
+    def _p(self, obj):
         '''
         Prints obj to text log.
 
@@ -215,6 +215,13 @@ class LoggerImplementation(object):
         self.fh.write(str(obj) + '\n')
         # For safety as ROS crashes a lot and we're not logging much.
         self.fh.flush()
+
+    def enter_action(self):
+        '''
+        For visual convenience, save 'different action' separators in
+        log (either 'new' or 'switch_to').
+        '''
+        self._p('-' * 70)
 
     def save_fb(self, msg):
         '''
@@ -228,8 +235,8 @@ class LoggerImplementation(object):
 
         # Save to bag and text log.
         self.bag.write(FB_TOPIC, String(msg))
-        self.p('Feedback:')
-        self.p('\t' + msg)
+        self._p('Feedback:')
+        self._p('\t' + msg)
 
     def save_grounding(self, hf_grounding):
         '''
@@ -243,12 +250,12 @@ class LoggerImplementation(object):
 
         # Save grounding to bag and text log.
         self.bag.write(GROUNDING_TOPIC, hf_grounding)
-        query, obj_names, obj_probs = (
-            hf_grounding.query, hf_grounding.obj_names, hf_grounding.obj_probs)
-        self.p('Grounding:')
-        self.p('\tquery: ' + query)
+        obj_names, obj_probs, query = (
+            hf_grounding.obj_names, hf_grounding.obj_probs, hf_grounding.query)
+        self._p('Grounding:')
+        self._p('\tquery: ' + query)
         for i in range(len(obj_names)):
-            self.p('\t' + obj_names[i] + ': ' + obj_probs[i])
+            self._p('\t' + obj_names[i] + ': ' + str(obj_probs[i]))
 
     def save_cmd(self, hf_cmd):
         '''
@@ -265,10 +272,10 @@ class LoggerImplementation(object):
         self.bag.write(CMD_TOPIC, hf_cmd)
         cmd, args, phrases, utterance = (
             hf_cmd.cmd, hf_cmd.args, hf_cmd.phrases, hf_cmd.utterance)
-        self.p('Command:')
-        self.p('\t  command: ' + cmd + ': ' + ' '.join(args))
-        self.p('\t  phrases: ' + ' '.join(phrases))
-        self.p('\tutterance: ' + utterance)
+        self._p('Command:')
+        self._p('\t  command: ' + cmd + ': ' + ' '.join(args))
+        self._p('\t  phrases: ' + ' '.join(phrases))
+        self._p('\tutterance: ' + utterance)
 
     def save_desc(self, desc):
         '''
@@ -284,16 +291,16 @@ class LoggerImplementation(object):
         # Log description to bag and text log.
         self.bag.write(DESC_TOPIC, desc)
         names, descs = desc.object_names, desc.descriptions
-        self.p('Description:')
+        self._p('Description:')
         for i in range(len(names)):
-            self.p('\t' + names[i] + ':' + descs[i])
+            self._p('\t' + names[i] + ':' + descs[i])
 
     def save_picture(self):
         '''
         Captures images from head kinect and saves to ros bag.
         '''
         rospy.loginfo('Trying to save picture')
-        msg = rospy.wait_for_message(IMG_TOPIC, CompressedImage)
+        msg = rospy.wait_for_message(IMG_TOPIC, Image)
         self.bag.write(IMG_TOPIC, msg)
         rospy.loginfo('Done saving picture')
 

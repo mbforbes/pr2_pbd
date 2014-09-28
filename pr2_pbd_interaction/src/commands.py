@@ -23,6 +23,12 @@ from robot import RobotHandler
 from robotlink import Link
 from util import CommandOptions
 
+# ######################################################################
+# Module-level constants
+# ######################################################################
+
+PICKUP_TRIES = 3
+
 
 # ######################################################################
 # Classes
@@ -685,7 +691,13 @@ class PickUp(Command):
         success = False
         fb = FailureFeedback(' '.join(['Failed to ' + self.narration]))
         if pbdobj is not None:
-            success = Link.pick_up(pbdobj, self.arm_idx)
+            # Try picking up a few times; often, the interactive
+            # manipulation system will fail to plan a route the first
+            # time, then succeed on the next try.
+            attempts = 0
+            while not success and attempts < PICKUP_TRIES:
+                success = Link.pick_up(pbdobj, self.arm_idx)
+                attempts += 1
         return success, fb
 
 

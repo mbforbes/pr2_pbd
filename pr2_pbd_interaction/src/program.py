@@ -22,7 +22,7 @@ from feedback import Feedback, FailureFeedback
 from objects import ObjectsHandler
 from robot import RobotHandler
 from robotlink import Link
-from util import GlobalOptions
+from util import GlobalOptions, Logger
 
 # ######################################################################
 # Classes
@@ -46,10 +46,8 @@ class Program(object):
         self.options = options
         self.idx_name = idx_name  # 1-based
         self.stop_requested = False
-
-        # Record and broadcast objects.
         Feedback("Created action %d. Finding objects." % (idx_name)).issue()
-        ObjectsHandler.record()
+        self._enter()
 
     def execute(self):
         '''
@@ -137,7 +135,14 @@ class Program(object):
         Feedback(
             'Switched to action %d. Finding objects.' % (self.idx_name)
         ).issue()
+        self._enter()
 
+    def _enter(self):
+        '''
+        Helper that does all required steps when entering a new action.
+        This unifies the logic for 'create' and 'switch_to'.
+        '''
+        L.enter_action()
         # Create consistent start state.
         # NOTE(mbforbes): Open vs closed here is arbitrary.
         Link.set_gripper_state(Side.RIGHT, GripperState.OPEN)
