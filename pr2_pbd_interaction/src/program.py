@@ -136,14 +136,15 @@ class Program(object):
             'Switched to action %d. Finding objects.' % (self.idx_name))
         self._enter(fb)
 
-    def _enter(fb, self):
+    def _enter(self, fb):
         '''
         Helper that does all required steps when entering a new action.
         This unifies the logic for 'create' and 'switch_to'.
 
         Args:
-            fbmsg (Feedback): Feedback to issue upon enterin.
+            fb (Feedback): Feedback to issue upon entering.
         '''
+        # Log separator first so we clearly delineate between actions.
         Logger.L.enter_action()
         fb.issue()
         # Create consistent start state.
