@@ -32,7 +32,7 @@ from pr2_pbd_interaction.msg import HandsFreeCommand, Description
 EXP_DIR = '/home/mbforbes/repos/hfpbd-data/'
 
 # For listening and logging to ROS bag.
-IMG_TOPIC = '/head_mount_kinect/rgb/image_color/compressed'
+IMG_TOPIC = '/head_mount_kinect/rgb/image_raw/compressed'
 
 # For logging to ROS bag only.
 DESC_TOPIC = '/handsfree_description'
@@ -189,9 +189,9 @@ class LoggerImplementation(object):
         self.p(now)
 
         # Open bag file
-        b_filename = dir_ + self.fnum + b_ext
         b_ext = '.bag'
-        self.bag = rosbag.Bag(self.fnum + b_ext, 'w')
+        b_filename = dir_ + self.fnum + b_ext
+        self.bag = rosbag.Bag(b_filename, 'w')
 
     def cleanup(self):
         '''
@@ -214,13 +214,16 @@ class LoggerImplementation(object):
         # For safety as ROS crashes a lot and we're not logging much.
         self.fh.flush()
 
-    def fb(self, msg):
+    def save_fb(self, msg):
         '''
-        Logs feedback message msg.
+        Logs feedback message msg and a picture to go with it.
 
         Args:
             msg (str)
         '''
+        # Save picture
+        self.save_picture()
+
         # Save to bag and text log.
         self.bag.write(FB_TOPIC, String(msg))
         self.p('Feedback:')
@@ -242,9 +245,9 @@ class LoggerImplementation(object):
         cmd, args, phrases, utterance = (
             hf_cmd.cmd, hf_cmd.args, hf_cmd.phrases, hf_cmd.utterance)
         self.p('Command:')
-        self.p('\tcmd: ' + cmd + ':' + ' '.join(args))
-        self.p('\tphr: ' + ' '.join(phrases))
-        self.p('\tutt: ' + utterance)
+        self.p('\t  command: ' + cmd + ': ' + ' '.join(args))
+        self.p('\t  phrases: ' + ' '.join(phrases))
+        self.p('\tutterance: ' + utterance)
 
     def save_desc(self, desc):
         '''
@@ -268,8 +271,10 @@ class LoggerImplementation(object):
         '''
         Captures images from head kinect and saves to ros bag.
         '''
+        rospy.loginfo('Trying to save picture')
         msg = rospy.wait_for_message(IMG_TOPIC, CompressedImage)
         self.bag.write(IMG_TOPIC, msg)
+        rospy.loginfo('Done saving picture')
 
 
 class Logger(object):

@@ -30,7 +30,7 @@ from feedback import Feedback
 from robotlink import Link
 from pr2_pbd_interaction.srv import (
     WorldChange, WorldChangeRequest, WorldChangeResponse)
-
+from util import Logger
 
 # ######################################################################
 # Classes
@@ -387,9 +387,6 @@ class ObjectsHandler(object):
             ObjectsHandler._compute_reachability_for(pbd_obj)
         Link.refresh_objects()
 
-        # TODO(mbforbes): Compute global properties (which farthest,
-        # etc.)
-
         ObjectsHandler.objects_lock.release()
 
     @staticmethod
@@ -616,11 +613,12 @@ class ObjectsHandler(object):
         '''
         ObjectsHandler.objects_lock.acquire()
         try:
-            # Call the parser as a service.
-            desc = ObjectsHandler.world_change_srv(
+            # Call the parser as a service, extract description.
+            resp = ObjectsHandler.world_change_srv(
                 WorldChangeRequest(ObjectsHandler.make_worldobjs()))
+            desc = resp.desc
 
-            # Log the description
+            # Log the description.
             Logger.L.save_desc(desc)
 
             # Save it for use internally.

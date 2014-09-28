@@ -39,7 +39,7 @@ class Feedback(object):
     def issue(self):
         '''Issues the Feedback (says and/or gazes).'''
         if self.speech is not None:
-            Logger.L.fb(self.speech)
+            Logger.L.save_fb(self.speech)
             Response.say(self.speech)
         if self.gaze is not None:
             Response.perform_gaze_action(self.gaze)
