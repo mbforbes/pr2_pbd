@@ -89,3 +89,4 @@ string ACTION = action
 string cmd
 string[] args
 string[] phrases
+string utterance

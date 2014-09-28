@@ -149,6 +149,7 @@ class Interaction:
         '''Intercept quit signals (like ^C) in order to clean up (save
         experiment state) before exiting.'''
         rospy.loginfo('Interaction signal handler intercepted signal; saving.')
+        self.hf.cleanup()
         self.session.save_current_action()
         # NOTE(mbforbes): We don't call sys.exit(0) here because that
         # would prevent cleanup from happening outside interaction

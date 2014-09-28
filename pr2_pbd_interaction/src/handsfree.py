@@ -23,7 +23,7 @@ from robotlink import Link
 from program import Program
 from commands import CommandRouter, Mode, Code
 from objects import ObjectsHandler
-from util import GlobalOptions
+from util import GlobalOptions, Logger
 
 
 # ######################################################################
@@ -59,6 +59,12 @@ class HandsFree(object):
         # so people can just start programming right off the bat.
         RobotHandler.async_broadcast()
 
+    def cleanup(self):
+        '''
+        Called as the system is exiting.
+        '''
+        Logger.L.cleanup()
+
     def description_cb(self, desc):
         '''
         Callback for when praser sends us a description of the world's
@@ -67,17 +73,11 @@ class HandsFree(object):
         Args:
             desc (Description)
         '''
-        names, descs = desc.object_names, desc.descriptions
-
+        # Record
+        Logger.L.save_desc(desc)
         # Send to objects handler for describing.
+        names, descs = desc.object_names, desc.descriptions
         ObjectsHandler.save_descriptions(names, descs)
-
-        # TODO(mbforbes): Save image?
-        rospy.loginfo('Description:')
-        for i in range(len(names)):
-            # Feedback(descs[i]).issue()
-            rospy.loginfo('\t' + names[i] + '\t' + descs[i])
-            rospy.sleep(2.0)
 
     def command_cb(self, hf_cmd):
         '''
@@ -86,6 +86,9 @@ class HandsFree(object):
         Args:
             hf_cmd (HandsFreeCommand)
         '''
+        # Log
+        Logger.L.save_cmd(hf_cmd)
+
         # Extract vars for ease of use
         cmd, args, phrases = hf_cmd.cmd, hf_cmd.args, hf_cmd.phrases
         rospy.loginfo('HandsFree: Received command: ' + cmd + ' ' + str(args))

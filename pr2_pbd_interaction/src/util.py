@@ -13,10 +13,31 @@ import roslib
 roslib.load_manifest('pr2_pbd_interaction')
 import rospy
 
+# Builtins
+import os
+from datetime import datetime
+
+# ROS builtins
+import rosbag
+from sensor_msgs.msg import CompressedImage
+from std_msgs.msg import String
+
+# PbD (3rd party / local)
+from pr2_pbd_interaction.msg import HandsFreeCommand, Description
 
 # ######################################################################
 # Module level constants
 # ######################################################################
+
+EXP_DIR = '/home/mbforbes/repos/hfpbd-data/'
+
+# For listening and logging to ROS bag.
+IMG_TOPIC = '/head_mount_kinect/rgb/image_color/compressed'
+
+# For logging to ROS bag only.
+DESC_TOPIC = '/handsfree_description'
+CMD_TOPIC = '/handsfree_command'
+FB_TOPIC = '/feedback'
 
 FLOAT_COMPARE_EPSILON = 0.01
 
@@ -134,3 +155,123 @@ class CommandOptions(Options):
         NARRATE_PROG: True,
         NARRATE_EXEC: True,
     }
+
+
+class LoggerImplementation(object):
+    '''
+    Helper class for recording experiment data.
+
+    Attrs:
+        self.fh (filehandle)
+        self.bag (rosbag)
+        self.fnum (str)
+    '''
+
+    def __init__(self):
+        # Find dir
+        now = datetime.now()
+        yearmonth = now.strftime('%y-%m%b').lower()
+        day = now.strftime('%d%a').lower()
+        dir_ = EXP_DIR + yearmonth + '/' + day + '/'
+        if not os.path.exists(dir_):
+            os.makedirs(dir_)
+
+        # Find empty number
+        num = 1
+        t_ext = '.txt'
+        while os.path.exists(dir_ + str(num) + t_ext):
+            num += 1
+
+        # Open text file
+        self.fnum = str(num)
+        t_filename = dir_ + self.fnum + t_ext
+        self.fh = open(t_filename, 'w')
+        self.p(now)
+
+        # Open bag file
+        b_filename = dir_ + self.fnum + b_ext
+        b_ext = '.bag'
+        self.bag = rosbag.Bag(self.fnum + b_ext, 'w')
+
+    def cleanup(self):
+        '''
+        Called before exiting.
+        '''
+        # I'm sure these already flush, but why not.
+        self.fh.flush()
+        self.fh.close()
+        self.bag.flush()
+        self.bag.close()
+
+    def p(self, obj):
+        '''
+        Prints obj to text log.
+
+        Args:
+            obj (object)
+        '''
+        self.fh.write(str(obj) + '\n')
+        # For safety as ROS crashes a lot and we're not logging much.
+        self.fh.flush()
+
+    def fb(self, msg):
+        '''
+        Logs feedback message msg.
+
+        Args:
+            msg (str)
+        '''
+        # Save to bag and text log.
+        self.bag.write(FB_TOPIC, String(msg))
+        self.p('Feedback:')
+        self.p('\t' + msg)
+
+    def save_cmd(self, hf_cmd):
+        '''
+        Saves a hands-free command and a picture to go with it.
+
+        Args:
+            hf_cmd (HandsFreeCommand)
+        '''
+        # Save picture first in case it is time-sensitive (e.g. robot
+        # will be moving shortly after).
+        self.save_picture()
+
+        # Log command to bag and text log.
+        self.bag.write(CMD_TOPIC, hf_cmd)
+        cmd, args, phrases, utterance = (
+            hf_cmd.cmd, hf_cmd.args, hf_cmd.phrases, hf_cmd.utterance)
+        self.p('Command:')
+        self.p('\tcmd: ' + cmd + ':' + ' '.join(args))
+        self.p('\tphr: ' + ' '.join(phrases))
+        self.p('\tutt: ' + utterance)
+
+    def save_desc(self, desc):
+        '''
+        Saves a description and picture to go with it.
+
+        Args:
+            desc (Description)
+        '''
+        # Save picture first in case it is time-sensitive (e.g. robot
+        # will be moving shortly after).
+        self.save_picture()
+
+        # Log description to bag and text log.
+        self.bag.write(DESC_TOPIC, desc)
+        names, descs = desc.object_names, desc.descriptions
+        self.p('Description:')
+        for i in range(len(names)):
+            self.p('\t' + names[i] + ':' + descs[i])
+
+    def save_picture(self):
+        '''
+        Captures images from head kinect and saves to ros bag.
+        '''
+        msg = rospy.wait_for_message(IMG_TOPIC, CompressedImage)
+        self.bag.write(IMG_TOPIC, msg)
+
+
+class Logger(object):
+    '''Singleton for providing access to the logger.'''
+    L = LoggerImplementation()
