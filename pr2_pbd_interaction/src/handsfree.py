@@ -13,16 +13,14 @@ import roslib
 roslib.load_manifest('pr2_pbd_interaction')
 import rospy
 
-# PbD (3rd party / local)
-from pr2_pbd_interaction.msg import HandsFreeCommand, Description
-
 # True local
+from commands import CommandRouter, Mode, Code
 from feedback import Feedback, FailureFeedback
+from objects import ObjectsHandler
+from pr2_pbd_interaction.msg import HandsFreeCommand
+from program import Program
 from robot import RobotHandler
 from robotlink import Link
-from program import Program
-from commands import CommandRouter, Mode, Code
-from objects import ObjectsHandler
 from util import GlobalOptions, Logger
 
 
@@ -47,11 +45,9 @@ class HandsFree(object):
         self.programs = []
         self.program_idx = -1
 
-        # Set up the command and description dispatch.
+        # Set up the command dispatch.
         rospy.Subscriber(
             'handsfree_command', HandsFreeCommand, self.command_cb)
-        rospy.Subscriber(
-            'handsfree_description', Description, self.description_cb)
 
         # Send off one robot state to get system started.
         # NOTE(mbforbes): Once the system is working, it might be best
@@ -64,20 +60,6 @@ class HandsFree(object):
         Called as the system is exiting.
         '''
         Logger.L.cleanup()
-
-    def description_cb(self, desc):
-        '''
-        Callback for when praser sends us a description of the world's
-        objects.
-
-        Args:
-            desc (Description)
-        '''
-        # Record
-        Logger.L.save_desc(desc)
-        # Send to objects handler for describing.
-        names, descs = desc.object_names, desc.descriptions
-        ObjectsHandler.save_descriptions(names, descs)
 
     def command_cb(self, hf_cmd):
         '''
@@ -128,8 +110,7 @@ class HandsFree(object):
         IK, etc. are computed.
         '''
         RobotHandler.async_broadcast()
-        # World objects don't change, so broadcasting is fast.
-        ObjectsHandler.broadcast()
+        # World objects don't change.
 
     def get_program(self):
         '''Come on, get with the program!

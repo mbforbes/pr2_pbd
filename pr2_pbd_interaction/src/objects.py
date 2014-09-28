@@ -28,6 +28,8 @@ from pr2_pbd_interaction.msg import (
 # Local
 from feedback import Feedback
 from robotlink import Link
+from pr2_pbd_interaction.srv import (
+    WorldChange, WorldChangeRequest, WorldChangeResponse)
 
 
 # ######################################################################
@@ -179,9 +181,6 @@ class ObjectsHandler(object):
         ),
     ]
 
-    # TODO(mbforbes): Refactor into constant somewhere.
-    topic_worldobjs = 'handsfree_worldobjects'
-
     # Settings
     close_delta = 0.01
     # Might have to change for sides to account for gripper size
@@ -235,7 +234,8 @@ class ObjectsHandler(object):
     ])
 
     # Class variables
-    world_object_pub = rospy.Publisher(topic_worldobjs, WorldObjects)
+    world_change_srv = rospy.ServiceProxy(
+        'handsfree_worldchange', WorldChange)
     objects = []
     objects_lock = Lock()
     descs = {}
@@ -341,7 +341,7 @@ class ObjectsHandler(object):
         '''
         ObjectsHandler._clear()
         ObjectsHandler._record_internal()
-        ObjectsHandler.broadcast()
+        ObjectsHandler.change_world()
 
         # Feedback to user.
         n_objs = len(ObjectsHandler.objects)
@@ -364,42 +364,14 @@ class ObjectsHandler(object):
         ObjectsHandler.descs = {}
         ObjectsHandler.objects_lock.release()
 
-    # Reachabilities don't change, so probably no need for this.
-    # @staticmethod
-    # def async_update():
-    #     '''
-    #     Updates the existing world objects by assuming they haven't
-    #     changed and computing reachabilities. Also broadcasts.
-
-    #     Non-blocking.
-    #     '''
-    #     Thread(
-    #         group=None,
-    #         target=ObjectsHandler.update,
-    #         name='update_world_objects_thread'
-    #     ).start()
-
-    # Reachabilities don't change, so probably no need for this.
-    # @staticmethod
-    # def update():
-    #     '''
-    #     Updates the existing world objects by assuming they haven't
-    #     changed and computing reachabilities. Also broadcasts.
-
-    #     Blocking.
-    #     '''
-    #     # TODO(mbforbes): Implement.
-    #     # - compute properties of existing objects
-    #     ObjectsHandler._update_internal()
-    #     ObjectsHandler.broadcast()
-
     @staticmethod
     def _record_internal():
         '''
         Moves hands to side, gets the world objects (actually observes).
 
-        Note that it doesn't move the hands back. This is useful because
-        now we start programming from the same location every time.
+        Note that it doesn't move the hands back to where they were when
+        this was called. This is useful because now we start programming
+        from the same location every time.
         '''
         # Move arms to side.
         Link.move_to_named_position('to_side')
@@ -637,11 +609,23 @@ class ObjectsHandler(object):
         return WorldObjects(wobjs)
 
     @staticmethod
-    def broadcast():
+    def change_world():
         '''
-        Actually publishes the WorldObjects.
+        Calls the WorldChange service to give the WorldObjects to the
+        parser and get a Description in return.
         '''
         ObjectsHandler.objects_lock.acquire()
-        ObjectsHandler.world_object_pub.publish(
-            ObjectsHandler.make_worldobjs())
+        try:
+            # Call the parser as a service.
+            desc = ObjectsHandler.world_change_srv(
+                WorldChangeRequest(ObjectsHandler.make_worldobjs()))
+
+            # Log the description
+            Logger.L.save_desc(desc)
+
+            # Save it for use internally.
+            names, descs = desc.object_names, desc.descriptions
+            ObjectsHandler.save_descriptions(names, descs)
+        except rospy.ServiceException, e:
+            rospy.logwarn("World Change service call failed: " + str(e))
         ObjectsHandler.objects_lock.release()
