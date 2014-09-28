@@ -696,8 +696,9 @@ class PickUp(Command):
             # time, then succeed on the next try.
             attempts = 0
             while not success and attempts < PICKUP_TRIES:
-                success = Link.pick_up(pbdobj, self.arm_idx)
                 attempts += 1
+                rospy.loginfo('Pickup attempt ' % (attempts))
+                success = Link.pick_up(pbdobj, self.arm_idx)
         return success, fb
 
 
