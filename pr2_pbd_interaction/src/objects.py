@@ -182,7 +182,7 @@ class ObjectsHandler(object):
     ]
 
     # Settings
-    close_delta = 0.01
+    close_delta = 0.05  # Try to take into account object size.
     # Might have to change for sides to account for gripper size
     near_delta = 0.05
     # This is all kind of wrong because we're not taking into account

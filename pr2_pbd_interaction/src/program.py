@@ -55,7 +55,8 @@ class Program(object):
         '''
         Executes the commands that have been programmed.
         '''
-        Feedback("Executing action %d." % (self.idx_name)).issue()
+        Feedback(
+            "Executing action %d. Finding objects." % (self.idx_name)).issue()
         self.set_executing(True)
 
         # TODO(mbforbes): Recording objects should be a step.
@@ -97,9 +98,10 @@ class Program(object):
         if code == Code.SUCCESS:
             Feedback("Completed action %d." % (self.idx_name)).issue()
         else:
-            FailureFeedback(
-                "Problem executing action %d." % (self.idx_name)
-            ).issue()
+            # Don't want to do failure feedback here because it drowns
+            # out the 'real' error message (which happens in one of the
+            # commands above).
+            rospy.loginfo("Problem executing action %d." % (self.idx_name))
 
     @staticmethod
     def is_executing():
