@@ -32,6 +32,7 @@ from pr2_pbd_interaction.srv import (
     WorldChange, WorldChangeRequest, WorldChangeResponse)
 from util import Logger
 
+
 # ######################################################################
 # Classes
 # ######################################################################
