@@ -17,7 +17,7 @@ import rospy
 from commands import CommandRouter, Mode, Code
 from feedback import Feedback, FailureFeedback
 from objects import ObjectsHandler
-from pr2_pbd_interaction.msg import HandsFreeCommand
+from pr2_pbd_interaction.msg import HandsFreeCommand, HandsFreeGrounding
 from program import Program
 from robot import RobotHandler
 from robotlink import Link
@@ -45,9 +45,11 @@ class HandsFree(object):
         self.programs = []
         self.program_idx = -1
 
-        # Set up the command dispatch.
+        # Set up the command dispatch and grounding logger.
         rospy.Subscriber(
             'handsfree_command', HandsFreeCommand, self.command_cb)
+        rospy.Subscriber(
+            'handsfree_grounding', HandsFreeGrounding, self.grounding_cb)
 
         # Send off one robot state to get system started.
         # NOTE(mbforbes): Once the system is working, it might be best
@@ -60,6 +62,16 @@ class HandsFree(object):
         Called as the system is exiting.
         '''
         Logger.L.cleanup()
+
+    def grounding_cb(self, hf_grounding):
+        '''
+        Callback for when parser sends us a grounding. We use this just
+        for logging.
+
+        Args:
+            hf_grounding (HandsFreeGrounding)
+        '''
+        Logger.L.save_grounding(hf_grounding)
 
     def command_cb(self, hf_cmd):
         '''

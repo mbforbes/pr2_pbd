@@ -23,7 +23,8 @@ from sensor_msgs.msg import CompressedImage
 from std_msgs.msg import String
 
 # PbD (3rd party / local)
-from pr2_pbd_interaction.msg import HandsFreeCommand, Description
+from pr2_pbd_interaction.msg import (
+    HandsFreeCommand, Description, HandsFreeGrounding)
 
 # ######################################################################
 # Module level constants
@@ -37,6 +38,7 @@ IMG_TOPIC = '/head_mount_kinect/rgb/image_raw/compressed'
 # For logging to ROS bag only.
 DESC_TOPIC = '/handsfree_description'
 CMD_TOPIC = '/handsfree_command'
+GROUNDING_TOPIC = '/handsfree_grounding'
 FB_TOPIC = '/feedback'
 
 FLOAT_COMPARE_EPSILON = 0.01
@@ -228,6 +230,25 @@ class LoggerImplementation(object):
         self.bag.write(FB_TOPIC, String(msg))
         self.p('Feedback:')
         self.p('\t' + msg)
+
+    def save_grounding(self, hf_grounding):
+        '''
+        Logs grounding result and a picture to go with it.
+
+        Args:
+            hf_grounding (HandsFreeGrounding)
+        '''
+        # Save picture
+        self.save_picture()
+
+        # Save grounding to bag and text log.
+        self.bag.write(GROUNDING_TOPIC, hf_grounding)
+        query, obj_names, obj_probs = (
+            hf_grounding.query, hf_grounding.obj_names, hf_grounding.obj_probs)
+        self.p('Grounding:')
+        self.p('\tquery: ' + query)
+        for i in range(len(obj_names)):
+            self.p('\t' + obj_names[i] + ': ' + obj_probs[i])
 
     def save_cmd(self, hf_cmd):
         '''
