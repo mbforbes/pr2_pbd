@@ -19,6 +19,7 @@ from datetime import datetime
 
 # ROS builtins
 import rosbag
+from rospy.exceptions import ROSException
 from sensor_msgs.msg import Image
 from std_msgs.msg import String
 
@@ -300,9 +301,15 @@ class LoggerImplementation(object):
         Captures images from head kinect and saves to ros bag.
         '''
         rospy.loginfo('Trying to save picture')
-        msg = rospy.wait_for_message(IMG_TOPIC, Image)
-        self.bag.write(IMG_TOPIC, msg)
-        rospy.loginfo('Done saving picture')
+        # Note that this doesn't work in simulation because of the
+        # different topic. Could do conditional here, but we really only
+        # care about real robot, so just doing timeout for now.
+        try:
+            msg = rospy.wait_for_message(IMG_TOPIC, Image, 1.0)
+            self.bag.write(IMG_TOPIC, msg)
+            rospy.loginfo('Done saving picture')
+        except ROSException:
+            rospy.loginfo("Couldn't get picture to save.")
 
 
 class Logger(object):

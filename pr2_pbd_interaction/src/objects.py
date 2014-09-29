@@ -34,6 +34,19 @@ from util import Logger
 
 
 # ######################################################################
+# Module-level constants
+# ######################################################################
+
+# Saliency delta threshholds; objects' properties must differ by at
+# least these (respectively) to be assiend a unique identifier.
+# For more info: https://docs.google.com/document/d/
+#     1tHmfctkPF-oPROQNBxMEwaHfqvHGVxkh7OnUx28yO0g/edit
+VOL_DELTA = 0.0005
+HEIGHT_DELTA = 0.1
+DIST_DELTA = 0.1
+
+
+# ######################################################################
 # Classes
 # ######################################################################
 
@@ -65,14 +78,22 @@ class ReachableResult(object):
 
 
 class UniqueProperty(object):
-    '''For tracking biggest/smallest/shortest/leftmost/etc.'''
+    '''For tracking biggest/smallest/shortest/leftmost/etc. If a
+    property isn't salient enough, not object will receive it.
+
+    Process for using:
+        - create the UniqueProperty
+        - call check(...) with all PbdObjects
+        - call get_special() to see if any PbdObject gets the property
+        - call reset() to reset cached values and use again
+    '''
 
     # These are starting values that are supposted to be so 'absurdly'
     # low / high that any object's property will be > / < these values.
     low_start = -1000
     high_start = 1000
 
-    def __init__(self, name, prop_name, val, attr_get_fn, cmp_op):
+    def __init__(self, name, prop_name, val, attr_get_fn, cmp_op, delta):
         '''
         Args:
             name (str): Internal use.
@@ -83,14 +104,19 @@ class UniqueProperty(object):
             cmp_op (function): The operator function to determine
                 whether "beats" the current val and becomes special.
                 Appled as cmp_op(obj_val, val).
+            delta (float): The delta needed between the 'best' val and
+                the 'second-best' val in order to allow an object to
+                receive this property.
         '''
         self.name = name
         self.prop_name = prop_name
         self.val = val
+        self.second_val = val  # For checking saliency.
         self.orig_val = val  # For resetting.
         self.attr_get_fn = attr_get_fn
         self.cmp_op = cmp_op
         self.special = None
+        self.delta = delta
 
     def check(self, pbd_obj):
         '''
@@ -101,14 +127,35 @@ class UniqueProperty(object):
         '''
         obj_val = self.attr_get_fn(pbd_obj)
         if self.cmp_op(obj_val, self.val):
+            # obj_val wins; shift self.val to second.
+            self.second_val = self.val
             self.val = obj_val
             self.special = pbd_obj
+        elif self.cmp_op(obj_val, self.second_val):
+            # obj_val second
+            self.second_val = obj_val
+
+    def get_special(self):
+        '''
+        Returns a PbdObject if it is both:
+            - the 'best' property holder for this unique property
+            - and salient enough in its 'best-ness'
+        Returns None if no such object meets this critera.
+
+        Returns:
+            PbdObject | None
+        '''
+        return (
+            self.special if abs(self.val - self.second_val) >= self.delta
+            else None
+        )
 
     def reset(self):
         '''
         Resets the unique property so that it can be computed anew.
         '''
         self.val = self.orig_val
+        self.second_val = self.orig_val
         self.special = None
 
 
@@ -129,56 +176,64 @@ class ObjectsHandler(object):
             'is_rightmost',
             UniqueProperty.high_start,
             lambda o: o.endpoints[0],
-            operator.lt
+            operator.lt,
+            DIST_DELTA
         ),
         UniqueProperty(
             'leftmost',
             'is_leftmost',
             UniqueProperty.low_start,
             lambda o: o.endpoints[1],
-            operator.gt
+            operator.gt,
+            DIST_DELTA
         ),
         UniqueProperty(
             'farthest',
             'is_farthest',
             UniqueProperty.low_start,
             lambda o: o.endpoints[2],
-            operator.gt
+            operator.gt,
+            DIST_DELTA
         ),
         UniqueProperty(
             'nearest',
             'is_nearest',
             UniqueProperty.high_start,
             lambda o: o.endpoints[3],
-            operator.lt
+            operator.lt,
+            DIST_DELTA
         ),
         UniqueProperty(
             'tallest',
             'is_tallest',
             UniqueProperty.low_start,
             lambda o: o.endpoints[4],
-            operator.gt
+            operator.gt,
+            HEIGHT_DELTA
         ),
         UniqueProperty(
             'shortest',
             'is_shortest',
             UniqueProperty.high_start,
             lambda o: o.endpoints[5],
-            operator.lt
+            operator.lt,
+            HEIGHT_DELTA
         ),
         UniqueProperty(
             'biggest',
             'is_biggest',
             UniqueProperty.low_start,
             lambda o: o.vol,
-            operator.gt
+            operator.gt,
+            VOL_DELTA
         ),
         UniqueProperty(
             'smallest',
             'is_smallest',
             UniqueProperty.high_start,
             lambda o: o.vol,
-            operator.lt
+            operator.lt,
+            VOL_DELTA
         ),
     ]
 
@@ -441,18 +496,6 @@ class ObjectsHandler(object):
                 pbd_obj, pos, val, side, orient)
         return res
 
-    # Reachabilities don't change, so probably no need for this.
-    # @staticmethod
-    # def _update_internal():
-    #     '''
-    #     Updates reachability properties of existing WorldObjects.
-    #     '''
-    #     ObjectsHandler.objects_lock.acquire()
-    #     for pbd_object in ObjectsHandler.objects:
-    #         # TODO(mbforbes): compute properties.
-    #         pass
-    #     ObjectsHandler.objects_lock.release()
-
     @staticmethod
     def _get_loc_reachable(
             pbd_obj, rel_pos_str, rel_pos_vec, side, orient=None):
@@ -577,6 +620,7 @@ class ObjectsHandler(object):
                 for prop in ObjectsHandler.unique_properties:
                     prop.check(pbd_obj)
 
+        # Set properties for objects.
         for pbd_obj in ObjectsHandler.objects:
             wo = WorldObject()
 
@@ -593,7 +637,7 @@ class ObjectsHandler(object):
 
             # Add any unique properties.
             for prop in ObjectsHandler.unique_properties:
-                if prop.special == pbd_obj:
+                if prop.get_special() == pbd_obj:
                     setattr(wo, prop.prop_name, True)
 
             # Slap it on.
