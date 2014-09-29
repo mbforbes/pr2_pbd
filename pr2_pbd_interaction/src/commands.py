@@ -739,7 +739,7 @@ class PointTo(Command):
             # No such object.
             return False, FailureFeedback(
                 'Cannot find ' + obj_desc)
-        return True, self.obj_pre_feedback(1, pbdobj)
+        return True, self.obj_pre_feedback(1, obj_desc)
 
     def core(self):
         '''Points to an object.'''
@@ -903,6 +903,24 @@ class Close(Command):
         ]))
         return res, fb
 
+class Record(Command):
+    '''Action 13: Record object poses (position, orientation, and size).
+
+    self.args should be empty
+
+    self.phrases should indicate:
+        [0] - this verb (~record)
+    '''
+
+    options = CommandOptions({
+    })
+
+    def core(self):
+        '''Looks for objects and saves them.'''
+        # This always succeeds.
+        ObjectsHandler.record()
+        return True, self.default_core_feedback()
+
 
 class CommandRouter(object):
     '''Maps commands to classes and functions.'''
@@ -948,4 +966,6 @@ class CommandRouter(object):
         HandsFreeCommand.OPEN: Open,
         # Action 12
         HandsFreeCommand.CLOSE: Close,
+        # Action 13
+        HandsFreeCommand.RECORD: Record,
     }

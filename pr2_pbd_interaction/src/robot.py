@@ -37,8 +37,12 @@ class RobotHandler(object):
     # Where we store the state.
     robot_state = RobotState()
 
-    # Where we store the last-commanded side. Commands sets this.
+    # Where we store the last-commanded side. Commands set this.
     last_commanded = RobotState.NEITHER
+
+    # Where we store the last-referred object. ObjectsHandler sets this.
+    # Type: PbdObject
+    last_referred_obj = None
 
     # Where we store whether we are executing. Program sets this.
     is_executing = False
@@ -80,6 +84,8 @@ class RobotHandler(object):
         # Fill in basic vals.
         rs.last_cmd_side = RobotHandler.last_commanded
         rs.is_executing = RobotHandler.is_executing
+        if RobotHandler.last_referred_obj is not None:
+            rs.last_referred_obj_name = RobotHandler.last_referred_obj.name
 
         # Fill in gripper states.
         for side in [Side.RIGHT, Side.LEFT]:

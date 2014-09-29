@@ -20,6 +20,7 @@ string HAS_OBJ = has_obj
 # ======================================================================
 
 string last_cmd_side
+string last_referred_obj_name
 bool is_executing
 
 # Arrays have two entires: right, left

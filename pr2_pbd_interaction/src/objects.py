@@ -27,6 +27,7 @@ from pr2_pbd_interaction.msg import (
 
 # Local
 from feedback import Feedback
+from robot import RobotHandler
 from robotlink import Link
 from pr2_pbd_interaction.srv import (
     WorldChange, WorldChangeRequest, WorldChangeResponse)
@@ -332,9 +333,12 @@ class ObjectsHandler(object):
         objs = Link.get_objs()
         if len(objs) == 0:
             return None
-        # Compute all the scores, return the obj that scored the lowest.
+        # Compute all the scores, select the obj that scored the lowest.
         scores = [obj_spec.score(s) for s in [o.get_spec() for o in objs]]
-        return objs[scores.index(min(scores))]
+        obj = objs[scores.index(min(scores))]
+        # Save this as the last referred, then give it back.
+        RobotHandler.last_referred_obj = obj
+        return obj
 
     @staticmethod
     def get_reachable_with_cur_orient(pbd_obj, pos, side):
@@ -379,7 +383,7 @@ class ObjectsHandler(object):
     @staticmethod
     def save_descriptions(names, descs):
         '''
-        Recrods received object descriptions. The arrays are aligned.
+        Records received object descriptions. The arrays are aligned.
 
         Args:
             names ([str]): Names of objects.
@@ -417,6 +421,7 @@ class ObjectsHandler(object):
         ObjectsHandler.objects_lock.acquire()
         ObjectsHandler.objects = []
         Link.clear_objects()
+        RobotHandler.last_referred_obj = None
         ObjectsHandler.descs = {}
         ObjectsHandler.objects_lock.release()
 

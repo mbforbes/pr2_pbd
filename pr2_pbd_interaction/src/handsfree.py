@@ -102,6 +102,12 @@ class HandsFree(object):
             rospy.loginfo('HandsFree: Executing normal command: ' + cmd)
             command = CommandRouter.command_map[cmd](args, phrases)
 
+            # Before executing, broadcast robot state. The robot state
+            # is altered during command creation (directly above), and
+            # any utterances that come in while the command is executing
+            # should be interpreted into commands using the new state.
+            self.async_broadcast_state()
+
             # Execute on the robot
             code = command.execute(Mode.PROG)
 

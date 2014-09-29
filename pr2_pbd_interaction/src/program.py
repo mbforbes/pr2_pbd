@@ -57,9 +57,6 @@ class Program(object):
             "Executing action %d. Finding objects." % (self.idx_name)).issue()
         self.set_executing(True)
 
-        # TODO(mbforbes): Recording objects should be a step.
-        # TODO(mbforbes): Step pre-checks should ensure given objects
-        # exist.
         # Look for objects
         ObjectsHandler.record()
 

@@ -39,7 +39,8 @@ string LOOK_AT = look_at
 string OPEN = open
 # Action 12
 string CLOSE = close
-
+# Action 13
+string RECORD = record
 
 # Different argument options that can appear in the field 'args'
 # ----------------------------------------------------------------------
