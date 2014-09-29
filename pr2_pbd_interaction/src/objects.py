@@ -215,7 +215,7 @@ class ObjectsHandler(object):
             'shortest',
             'is_shortest',
             UniqueProperty.high_start,
-            lambda o: o.endpoints[5],
+            lambda o: o.endpoints[4],  # Not a bug; use 4 for height.
             operator.lt,
             HEIGHT_DELTA
         ),
