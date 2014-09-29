@@ -640,6 +640,38 @@ class ObjectsHandler(object):
                 if prop.get_special() == pbd_obj:
                     setattr(wo, prop.prop_name, True)
 
+            # Special unique propery: middle (is_middle). Conditions:
+            # (1) must have three objects
+            # (2) can't be l/r-most or farthest/nearest
+            # (3) two other objects must have l/r-most OR
+            #     farthest/nearest
+            #
+            # (1) Must have 3 objs.
+            if len(ObjectsHandler.objects) == 3:
+                up = ObjectsHandler.unique_properties
+                lprop = [p for p in up if p.name == 'leftmost'][0]
+                lobj = lprop.get_special()
+                rprop = [p for p in up if p.name == 'rightmost'][0]
+                robj = rprop.get_special()
+                fprop = [p for p in up if p.name == 'farthest'][0]
+                fobj = fprop.get_special()
+                nprop = [p for p in up if p.name == 'nearest'][0]
+                nobj = nprop.get_special()
+                # (2) Can't be l/r-most or farthest/nearest
+                if (lobj != pbd_obj and
+                        robj != pbd_obj and
+                        fobj != pbd_obj and
+                        nobj != pbd_obj):
+                    # (3) two other objects must have l/r-most OR
+                    # farthest/nearest
+                    if ((lobj is not None and
+                            robj is not None and
+                            lobj != robj) or (
+                            fobj is not None and
+                            nobj is not None and
+                            fobj != nobj)):
+                        setattr(wo, 'is_middle', True)
+
             # Slap it on.
             wobjs += [wo]
 

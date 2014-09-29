@@ -40,6 +40,7 @@ bool[] is_near_reachable
 # Computed w.r.t other objects
 bool is_rightmost
 bool is_leftmost
+bool is_middle
 bool is_farthest
 bool is_nearest
 bool is_tallest
