@@ -23,7 +23,7 @@ from geometry_msgs.msg import Vector3, Pose, Point
 
 # Pbd (3rd party / local)
 from pr2_pbd_interaction.msg import (
-    HandsFreeCommand, WorldObject, WorldObjects, Side)
+    HandsFreeCommand, WorldObject, WorldObjects, Side, GripperState)
 
 # Local
 from feedback import Feedback
@@ -434,8 +434,10 @@ class ObjectsHandler(object):
         this was called. This is useful because now we start programming
         from the same location every time.
         '''
-        # Move arms to side.
+        # Move arms to side and open grippers.
         Link.move_to_named_position('to_side')
+        Link.set_gripper_state(Side.RIGHT, GripperState.OPEN)
+        Link.set_gripper_state(Side.LEFT, GripperState.OPEN)
 
         # Record and grab objects
         Link.update_object_pose()
