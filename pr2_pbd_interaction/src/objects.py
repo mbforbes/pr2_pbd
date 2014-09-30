@@ -43,8 +43,8 @@ from util import Logger
 # For more info: https://docs.google.com/document/d/
 #     1tHmfctkPF-oPROQNBxMEwaHfqvHGVxkh7OnUx28yO0g/edit
 VOL_DELTA = 0.0005
-HEIGHT_DELTA = 0.1
-DIST_DELTA = 0.1
+HEIGHT_DELTA = 0.05
+DIST_DELTA = 0.07
 
 
 # ######################################################################
