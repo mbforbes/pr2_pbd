@@ -32,7 +32,6 @@ Here are the steps we've taken so far:
 
 - We've combined certain word pairs like `left-hand` and `in-front-of` in the grammar for better speech recognition (notably at the expense of typing input)
 - We've implemented a dedicated mode in the parser that will generate a full corpus of training sentences that can be used to generate settings files for speech recognition programs like Pocketsphinx
-- We've tested using standard speech input and the system functions.
+- We've tested using standard speech input and the system functions
 
-With that said, we have not yet worked to make the system demo-able and rebust enough to handle naive users. While we use a vastly restricted vocabulary, its domain is large enough, and its impact on the system (read: complete control) is great enough that getting reliable speech input without a dialog manager is a nontrivial task.
-
+With that said, we have not yet worked to make the system demo-able and rebust enough to handle naive users. While we use a vastly restricted vocabulary, its domain is large enough, and its impact on the system great enough (i.e. complete control), that getting reliable speech input without a dialog manager is a nontrivial task.
