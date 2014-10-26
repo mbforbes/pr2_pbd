@@ -6,6 +6,10 @@ The work in this repository is under publication review. **Please contact me for
 This guide is intended for those familiar with PbD, and who have the [Hands-Free PbD Parser](https://github.com/mbforbes/hfpbd-parser) on their computer. If that's not you, please proceed to the "Running" section below.
 
 ```bash
+# FIRST: EDIT pr2_pbd_interaction/src/util.py and change EXP_DIR to
+# a directory that's not mine. If you're using this, I would love a
+# PR that fixes this; it's simple, I just don't have time to test it.
+
 # On the robot
 $ roslaunch pr2_pbd_interaction pbd_backend.launch
 
@@ -23,6 +27,21 @@ Please see the [main PbD repository](https://github.com/PR2/pr2_pbd) for general
 
 ### Parser code
 You must also run the [Hands-Free PbD Parser](https://github.com/mbforbes/hfpbd-parser). See that page for instructions, including how to modify and extend the grammar, how to set-up voice versus keyboard input, and how to run the various supported frontends, including the default vocabulary you need to use to interact with the system.
+
+### Cool feature: PR2 records everything!
+```bash
+# NOTE: EDIT pr2_pbd_interaction/src/util.py and change EXP_DIR to
+# a directory that's not mine. If you're using this, I would love a
+# PR that fixes this; it's simple, I just don't have time to test it.
+```
+
+With that said, the system automatically saves a rosbag (`.bag`) in a convenient directory structure in every run that contains:
+
+- Snapshot pictures of the first-person view of what the robot sees from the Kinect. It takes snapshots anytime a system event happens. Great for going through actions to figure out what happened!
+- All commands
+- All robot speech
+- All grounding queries
+- All object descriptions
 
 
 ## Language input
